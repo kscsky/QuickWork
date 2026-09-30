@@ -7,13 +7,13 @@ The `quickwork` CLI connects your local machine to QuickWork. It handles authent
 ### Homebrew (macOS/Linux)
 
 ```bash
-brew install multica-ai/tap/quickwork
+brew install kscsky/tap/quickwork
 ```
 
 ### Build from Source
 
 ```bash
-git clone https://github.com/multica-ai/multica.git
+git clone https://github.com/kscsky/QuickWork.git
 cd quickwork
 make build
 cp server/bin/quickwork /usr/local/bin/quickwork
@@ -22,7 +22,7 @@ cp server/bin/quickwork /usr/local/bin/quickwork
 ### Update
 
 ```bash
-brew upgrade multica-ai/tap/quickwork
+brew upgrade kscsky/tap/quickwork
 ```
 
 For install script or manual installs, use:

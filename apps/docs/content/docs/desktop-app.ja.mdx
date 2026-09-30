@@ -148,7 +148,7 @@ $json = @'
 **症状**: Windows セキュリティが `Trojan:Script/Wacatac.B!ml` のような脅威を報告し、Desktop のインストール先にあるファイルを隔離します。対象になるのは通常、アプリ本体の実行ファイルではなく同梱の CLI です。
 
 ```text
-C:\Users\<ユーザー名>\AppData\Local\Programs\@multicadesktop\resources\app.asar.unpacked\resources\bin\quickwork.exe
+C:\Users\<ユーザー名>\AppData\Local\Programs\QuickWork\resources\app.asar.unpacked\resources\bin\quickwork.exe
 ```
 
 **これは誤検知です。** `!ml` というサフィックスは、この判定がマルウェアのシグネチャ一致ではなく Defender の機械学習ヒューリスティックによるものであることを示します。QuickWork の Windows ビルドはまだ Authenticode コード署名を行っておらず、公開されたばかりで署名がなく、バックグラウンドプロセスを起動してネットワーク接続を張るバイナリは、この種のヒューリスティックが最も疑わしいと判定するプロファイルそのものです。Windows 向けの成果物はすべて、このリポジトリの公開ソースから GitHub Actions でビルドされています。
@@ -159,20 +159,20 @@ C:\Users\<ユーザー名>\AppData\Local\Programs\@multicadesktop\resources\app.
 Get-FileHash .\quickwork-cli-<version>-windows-amd64.zip -Algorithm SHA256
 ```
 
-出力されたハッシュを、[最新リリース](https://github.com/multica-ai/multica/releases/latest)の `checksums.txt` の該当行と照合してください。
+出力されたハッシュを、[最新リリース](https://github.com/kscsky/QuickWork/releases/latest)の `checksums.txt` の該当行と照合してください。
 
 **対処方法**:
 
 1. **隔離されたファイルを復元する** — Windows セキュリティ → *ウイルスと脅威の防止* → *保護の履歴* → QuickWork の項目を選択 → *操作* → *復元*。
 2. **除外を追加する**（再び隔離されないように）— *ウイルスと脅威の防止* → *設定の管理* → *除外* → *除外の追加または削除* → *フォルダー* で、次の両方を追加します。
-   - `%LOCALAPPDATA%\Programs\@multicadesktop`
+   - `%LOCALAPPDATA%\Programs\QuickWork`
    - `%APPDATA%\QuickWork`
 
    両方が必要です。同梱の CLI が失われると Desktop は代替バイナリを `%APPDATA%\QuickWork\bin` にダウンロードするため、インストール先だけを除外してもダウンロードした代替バイナリが再び隔離され、同じことの繰り返しになります。
 3. **誤検知を Microsoft に報告する** — [Microsoft Security Intelligence のファイル送信ページ](https://www.microsoft.com/en-us/wdsi/filesubmission)で *Software developer* と *Incorrectly detected as malware* を選択します。すべてのユーザーに対して検出を取り下げてもらうにはこの手順が必要で、通常は数日で反映されます。
 
 <Callout type="warning">
-これらの除外を追加してよいのは、[ダウンロードページ](https://quickwork.ai/download)または [GitHub リリース](https://github.com/multica-ai/multica/releases)からインストールし、チェックサムが一致している場合だけです。除外を設定すると、そのフォルダー内のすべてのファイルでリアルタイム保護が無効になります。
+これらの除外を追加してよいのは、[ダウンロードページ](https://quickwork.ai/download)または [GitHub リリース](https://github.com/kscsky/QuickWork/releases)からインストールし、チェックサムが一致している場合だけです。除外を設定すると、そのフォルダー内のすべてのファイルでリアルタイム保護が無効になります。
 </Callout>
 
 ## 次のステップ

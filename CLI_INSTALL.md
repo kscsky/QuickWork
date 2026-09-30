@@ -7,7 +7,7 @@
 Give this instruction to your AI agent:
 
 ```
-Fetch https://github.com/multica-ai/multica/blob/main/CLI_INSTALL.md and follow the instructions to install QuickWork CLI, log in, and start the daemon on this machine.
+Fetch https://github.com/kscsky/QuickWork/blob/main/CLI_INSTALL.md and follow the instructions to install QuickWork CLI, log in, and start the daemon on this machine.
 ```
 
 ---
@@ -40,7 +40,7 @@ which brew
 If `brew` is found, install via Homebrew:
 
 ```bash
-brew install multica-ai/tap/quickwork
+brew install kscsky/tap/quickwork
 ```
 
 Then verify:
@@ -54,7 +54,7 @@ If the version prints successfully, skip to **Step 3**.
 To upgrade later, run:
 
 ```bash
-brew upgrade multica-ai/tap/quickwork
+brew upgrade kscsky/tap/quickwork
 ```
 
 ### Option B: Download from GitHub Releases (macOS/Linux, no Homebrew)
@@ -73,11 +73,11 @@ if [ "$ARCH" = "x86_64" ]; then
 fi
 
 # Get the latest release tag from GitHub
-LATEST=$(curl -sI https://github.com/multica-ai/multica/releases/latest | grep -i '^location:' | sed 's/.*tag\///' | tr -d '\r\n')
+LATEST=$(curl -sI https://github.com/kscsky/QuickWork/releases/latest | grep -i '^location:' | sed 's/.*tag\///' | tr -d '\r\n')
 
 # Download and extract
 VERSION="${LATEST#v}"
-curl -sL "https://github.com/multica-ai/multica/releases/download/${LATEST}/quickwork-cli-${VERSION}-${OS}-${ARCH}.tar.gz" -o /tmp/quickwork.tar.gz
+curl -sL "https://github.com/kscsky/QuickWork/releases/download/${LATEST}/quickwork-cli-${VERSION}-${OS}-${ARCH}.tar.gz" -o /tmp/quickwork.tar.gz
 tar -xzf /tmp/quickwork.tar.gz -C /tmp quickwork
 sudo mv /tmp/quickwork /usr/local/bin/quickwork
 rm /tmp/quickwork.tar.gz
@@ -99,7 +99,7 @@ quickwork version
 Run in PowerShell (no admin required):
 
 ```powershell
-irm https://raw.githubusercontent.com/multica-ai/multica/main/scripts/install.ps1 | iex
+irm https://raw.githubusercontent.com/kscsky/QuickWork/main/scripts/install.ps1 | iex
 ```
 
 This downloads the latest Windows binary from GitHub Releases, installs it to `%USERPROFILE%\.quickwork\bin\`, and adds it to your user PATH.
@@ -112,7 +112,6 @@ quickwork version
 
 **If this fails:**
 - Restart your terminal so the updated PATH takes effect.
-- If you use Scoop, the installer will use it automatically: `scoop bucket add quickwork https://github.com/multica-ai/scoop-bucket.git && scoop install quickwork`
 - If your execution policy blocks the script: `Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned` then re-run.
 
 ---

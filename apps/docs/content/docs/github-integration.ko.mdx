@@ -5,11 +5,11 @@ description: pull request를 QuickWork 이슈에 연결하고 이슈에서 개�
 
 import { Callout } from "fumadocs-ui/components/callout";
 
-GitHub를 연결하면 Multica가 이슈 번호를 기준으로 pull request를 자동 연결합니다. 이슈 상세 화면에서 PR 상태, 변경 규모, CI 결과, merge conflict를 바로 확인할 수 있습니다.
+GitHub를 연결하면 QuickWork가 이슈 번호를 기준으로 pull request를 자동 연결합니다. 이슈 상세 화면에서 PR 상태, 변경 규모, CI 결과, merge conflict를 바로 확인할 수 있습니다.
 
 GitHub 연동은 설치할 때 승인한 저장소만 읽으며 코드, 댓글, status check를 제출하지 않습니다.
 
-자체 배포한 Multica에서는 자체 호스팅 Forgejo, Gitea, GitLab 인스턴스도 동시에 연결해 동일한 PR 자동 연결, merge 시 Done 전환, CI 표시 기능을 사용할 수 있습니다. **설정 → 연동 → Git 코드 호스팅**에서 연결하며 자세한 내용은 [자체 호스팅 Git 코드 호스팅](/vcs-integration)을 참고하세요. QuickWork Cloud에는 이 메뉴가 없습니다.
+자체 배포한 QuickWork에서는 자체 호스팅 Forgejo, Gitea, GitLab 인스턴스도 동시에 연결해 동일한 PR 자동 연결, merge 시 Done 전환, CI 표시 기능을 사용할 수 있습니다. **설정 → 연동 → Git 코드 호스팅**에서 연결하며 자세한 내용은 [자체 호스팅 Git 코드 호스팅](/vcs-integration)을 참고하세요. QuickWork Cloud에는 이 메뉴가 없습니다.
 
 ## GitHub 연결
 
@@ -19,12 +19,12 @@ GitHub 연동은 설치할 때 승인한 저장소만 읽으며 코드, 댓글, 
 2. GitHub 연동 전체 스위치를 켭니다.
 3. **GitHub 연결**을 클릭합니다.
 4. GitHub에서 계정 또는 조직을 선택하고 모든 저장소나 지정한 저장소를 승인합니다.
-5. 설치가 끝나면 Multica로 돌아옵니다.
+5. 설치가 끝나면 QuickWork로 돌아옵니다.
 
 연결 상태는 같은 페이지에 표시됩니다. 일반 멤버는 상태를 볼 수 있지만 연결, 연결 해제, 스위치 변경은 할 수 없습니다.
 
 <Callout type="info">
-**GitHub 연결**은 Multica가 어느 저장소에서 PR 이벤트를 받을지 결정합니다. **코드 저장소** 설정은 에이전트가 태스크를 실행할 때 선택할 수 있는 저장소를 결정합니다. 용도가 다르므로 각각 설정해야 합니다.
+**GitHub 연결**은 QuickWork가 어느 저장소에서 PR 이벤트를 받을지 결정합니다. **코드 저장소** 설정은 에이전트가 태스크를 실행할 때 선택할 수 있는 저장소를 결정합니다. 용도가 다르므로 각각 설정해야 합니다.
 </Callout>
 
 ## 기능 스위치
@@ -37,7 +37,7 @@ GitHub 연동은 설치할 때 승인한 저장소만 읽으며 코드, 댓글, 
 | PR 사이드바 | 이슈 상세 화면에 연결된 pull request를 표시합니다. |
 | Co-authored-by | 에이전트가 만든 commit에 `Co-authored-by: quickwork-agent <github@quickwork.ai>`를 추가합니다. |
 | PR 자동 연결 | PR의 브랜치 이름, 제목, 본문에서 이슈 번호를 찾습니다. |
-| **PR 카드 → CI와 머지 가능 여부** | 연결된 각 PR에 대해 Multica는 인증된 GitHub API 스냅샷을 가져와, 그 **CI 상태**와 **머지 가능 여부**를 카드에 미러링합니다(아래 **PR 카드에 표시되는 것** 참조). |
+| **PR 카드 → CI와 머지 가능 여부** | 연결된 각 PR에 대해 QuickWork는 인증된 GitHub API 스냅샷을 가져와, 그 **CI 상태**와 **머지 가능 여부**를 카드에 미러링합니다(아래 **PR 카드에 표시되는 것** 참조). |
 
 
 ## PR을 이슈에 연결
@@ -52,7 +52,7 @@ mul-123-fix-login-redirect
 MUL-123 로그인 후 리디렉션 수정
 ```
 
-Multica는 대소문자를 구분하지 않으며 현재 워크스페이스의 이슈 접두사만 매칭합니다. 하나의 PR을 여러 이슈에 연결할 수 있습니다.
+QuickWork는 대소문자를 구분하지 않으며 현재 워크스페이스의 이슈 접두사만 매칭합니다. 하나의 PR을 여러 이슈에 연결할 수 있습니다.
 
 이슈 번호를 PR 본문에만 쓸 때는 GitHub의 종료 문구를 사용해야 합니다.
 
@@ -74,13 +74,13 @@ Resolves MUL-123
 - CI 상태: 모두 통과(개수 표시), 일부 실패(실패한 check 이름 표시), 일부 진행 중. 설정된 check가 없는 PR에는 이 항목을 표시하지 않으며 "check 없음"을 통과로 간주하지 않습니다.
 - merge 가능 여부: merge 가능(GitHub가 merge 상태를 clean으로 보고한 경우만), conflict 있음, blocked, behind
 
-CI 상태와 merge 가능 여부는 Multica가 GitHub API에서 가져온 snapshot이며 서로 독립적입니다. 이미 merge되거나 닫힌 PR에는 두 항목을 더 이상 표시하지 않습니다. GitHub를 일시적으로 사용할 수 없으면 카드가 비워지는 대신 마지막 snapshot을 유지하고 만료된 정보라고 표시합니다.
+CI 상태와 merge 가능 여부는 QuickWork가 GitHub API에서 가져온 snapshot이며 서로 독립적입니다. 이미 merge되거나 닫힌 PR에는 두 항목을 더 이상 표시하지 않습니다. GitHub를 일시적으로 사용할 수 없으면 카드가 비워지는 대신 마지막 snapshot을 유지하고 만료된 정보라고 표시합니다.
 
 항목을 클릭하면 GitHub의 PR이 열립니다. **PR 사이드바**를 꺼도 이 영역만 숨겨질 뿐 연결은 해제되지 않습니다.
 
 ## PR merge 시 Done 전환 조건
 
-PR이 merge되었다고 이슈가 반드시 완료된 것은 아닙니다. Multica는 다음 조건이 모두 충족될 때만 이슈를 `Done`으로 바꿉니다.
+PR이 merge되었다고 이슈가 반드시 완료된 것은 아닙니다. QuickWork는 다음 조건이 모두 충족될 때만 이슈를 `Done`으로 바꿉니다.
 
 1. merge된 연결 PR이 하나 이상 있고, `Closes MUL-123`처럼 종료 문구 바로 뒤에 번호가 있습니다(`Closes login MUL-123`처럼 중간에 다른 단어가 있으면 적용되지 않음).
 2. 해당 이슈에 `Open` 또는 `Draft` 상태인 다른 작업 PR이 없습니다. 본문의 일반 언급은 작업 PR에 포함되지 않습니다.
@@ -133,7 +133,7 @@ Repository permissions:
 - **Pull request**
 - CI와 merge 가능 여부 새로 고침을 트리거할 **Check suite**, **Check run**, **Status**
 
-Multica에서 CI를 표시할 필요가 없다면 Checks 및 Commit statuses 권한을 부여하거나 관련 이벤트를 구독하지 않아도 됩니다. 단, Contents는 반드시 필요합니다. 없으면 snapshot 쿼리 자체가 실패해 PR 카드에서 머지 상태도 사라집니다.
+QuickWork에서 CI를 표시할 필요가 없다면 Checks 및 Commit statuses 권한을 부여하거나 관련 이벤트를 구독하지 않아도 됩니다. 단, Contents는 반드시 필요합니다. 없으면 snapshot 쿼리 자체가 실패해 PR 카드에서 머지 상태도 사라집니다.
 
 <Callout type="warning">
 여기에는 OAuth Client secret이 아니라 **Webhook secret**이 필요합니다. 양쪽에 입력한 Webhook secret이 다르면 GitHub delivery가 `401 invalid signature`를 반환합니다.
@@ -151,7 +151,7 @@ FRONTEND_ORIGIN=https://quickwork.example.com
 
 `GITHUB_APP_SLUG`와 `GITHUB_WEBHOOK_SECRET` 중 하나라도 없으면 연결 버튼이 비활성화되고 webhook endpoint도 이벤트 처리를 거부합니다.
 
-다음 두 변수는 PR 카드에서 CI 상태와 merge 가능 여부를 표시하기 위해 필요합니다. Multica는 이 값으로 App 신원을 인증하고 snapshot을 가져옵니다.
+다음 두 변수는 PR 카드에서 CI 상태와 merge 가능 여부를 표시하기 위해 필요합니다. QuickWork는 이 값으로 App 신원을 인증하고 snapshot을 가져옵니다.
 
 ```dotenv
 GITHUB_APP_ID=<GitHub App 숫자 ID>

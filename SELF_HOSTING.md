@@ -23,7 +23,7 @@ Two commands to set up everything — server, CLI, and configuration.
 
 ```bash
 # 1. Install CLI + provision the self-host server
-curl -fsSL https://raw.githubusercontent.com/multica-ai/multica/main/scripts/install.sh | bash -s -- --with-server
+curl -fsSL https://raw.githubusercontent.com/kscsky/QuickWork/main/scripts/install.sh | bash -s -- --with-server
 
 # 2. Configure CLI, authenticate, and start the daemon
 quickwork setup self-host
@@ -36,7 +36,7 @@ quickwork setup self-host
 
 ```powershell
 # 1. Install CLI + provision the self-host server
-$env:QUICKWORK_MODE="with-server"; irm https://raw.githubusercontent.com/multica-ai/multica/main/scripts/install.ps1 | iex
+$env:QUICKWORK_MODE="with-server"; irm https://raw.githubusercontent.com/kscsky/QuickWork/main/scripts/install.ps1 | iex
 
 # 2. Configure CLI, authenticate, and start the daemon
 quickwork setup self-host
@@ -52,7 +52,7 @@ Open http://localhost:3000. To log in, configure `RESEND_API_KEY` in `.env` for 
 > **CLI only?** If the self-host server is already running and you only need the CLI on a macOS/Linux machine, install it with Homebrew:
 >
 > ```bash
-> brew install multica-ai/tap/quickwork
+> brew install kscsky/tap/quickwork
 > ```
 
 ---
@@ -66,7 +66,7 @@ If you prefer to run each step manually:
 **Prerequisites:** Docker and Docker Compose.
 
 ```bash
-git clone https://github.com/multica-ai/multica.git
+git clone https://github.com/kscsky/QuickWork.git
 cd quickwork
 make selfhost
 ```
@@ -105,7 +105,7 @@ Each team member who wants to run AI agents locally needs to:
 ### a) Install the CLI and an AI agent
 
 ```bash
-brew install multica-ai/tap/quickwork
+brew install kscsky/tap/quickwork
 ```
 
 You also need at least one AI agent CLI installed:
@@ -171,7 +171,7 @@ quickwork daemon status
 
 ## Kubernetes Deployment (Alternative)
 
-If you already run a Kubernetes cluster, you can deploy QuickWork there instead of Docker Compose using the released OCI Helm chart at `oci://ghcr.io/multica-ai/charts/quickwork` or the source chart at [`deploy/helm/quickwork/`](deploy/helm/quickwork/). It targets a typical k3s / k8s setup with an Ingress controller and a default `ReadWriteOnce` StorageClass — authored against k3s + Traefik + `local-path`, and should work on any cluster with minor tweaks.
+If you already run a Kubernetes cluster, you can deploy QuickWork there instead of Docker Compose using the released OCI Helm chart at `oci://ghcr.io/kscsky/charts/quickwork` or the source chart at [`deploy/helm/quickwork/`](deploy/helm/quickwork/). It targets a typical k3s / k8s setup with an Ingress controller and a default `ReadWriteOnce` StorageClass — authored against k3s + Traefik + `local-path`, and should work on any cluster with minor tweaks.
 
 The chart creates the following resources in the target namespace:
 
@@ -228,7 +228,7 @@ Leave optional values empty for now — you can fill them in later (see [Step 5 
 ### Step 4 — Install the chart
 
 ```bash
-helm install quickwork oci://ghcr.io/multica-ai/charts/quickwork \
+helm install quickwork oci://ghcr.io/kscsky/charts/quickwork \
   --version <chart-version> \
   -n quickwork
 ```
@@ -238,10 +238,10 @@ Released chart versions strip the leading `v` from the Git tag. For example, rel
 To override defaults, export the chart values, edit them, and pass them with `-f`:
 
 ```bash
-helm show values oci://ghcr.io/multica-ai/charts/quickwork \
+helm show values oci://ghcr.io/kscsky/charts/quickwork \
   --version <chart-version> > my-values.yaml
 # edit my-values.yaml — e.g. change ingress hosts, image tags, resource limits
-helm install quickwork oci://ghcr.io/multica-ai/charts/quickwork \
+helm install quickwork oci://ghcr.io/kscsky/charts/quickwork \
   --version <chart-version> \
   -n quickwork \
   -f my-values.yaml
@@ -291,7 +291,7 @@ The chart defaults to `APP_ENV=production` (set in `values.yaml` under `backend.
 - **Deterministic local/private testing:** set `backend.config.appEnv: development` in your values file and `QUICKWORK_DEV_VERIFICATION_CODE=888888` in the Secret, then `helm upgrade` and restart. This fixed code is ignored when `APP_ENV=production`.
 
   ```bash
-  helm upgrade quickwork oci://ghcr.io/multica-ai/charts/quickwork \
+  helm upgrade quickwork oci://ghcr.io/kscsky/charts/quickwork \
     --version <chart-version> \
     -n quickwork \
     -f my-values.yaml --set backend.config.appEnv=development
@@ -327,7 +327,7 @@ kubectl -n quickwork rollout restart deploy/quickwork-backend deploy/quickwork-f
 To upgrade to a specific QuickWork release, upgrade to the matching chart version. The released chart defaults its app images to the matching Git tag:
 
 ```bash
-helm upgrade quickwork oci://ghcr.io/multica-ai/charts/quickwork \
+helm upgrade quickwork oci://ghcr.io/kscsky/charts/quickwork \
   --version <chart-version> \
   -n quickwork \
   -f my-values.yaml
@@ -346,7 +346,7 @@ images:
 Then run the same upgrade command with `-f my-values.yaml`:
 
 ```bash
-helm upgrade quickwork oci://ghcr.io/multica-ai/charts/quickwork \
+helm upgrade quickwork oci://ghcr.io/kscsky/charts/quickwork \
   --version <chart-version> \
   -n quickwork \
   -f my-values.yaml
@@ -431,7 +431,7 @@ External cron / systemd timer / Kubernetes `CronJob` setups that call `SELECT ro
 If you installed via the install script:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/multica-ai/multica/main/scripts/install.sh | bash -s -- --stop
+curl -fsSL https://raw.githubusercontent.com/kscsky/QuickWork/main/scripts/install.sh | bash -s -- --stop
 ```
 
 If you cloned the repo manually:
@@ -475,7 +475,7 @@ If the selected GHCR tag has not been published yet, fall back to `make selfhost
 If you prefer running Docker Compose steps manually instead of `make selfhost`:
 
 ```bash
-git clone https://github.com/multica-ai/multica.git
+git clone https://github.com/kscsky/QuickWork.git
 cd quickwork
 cp .env.example .env
 ```

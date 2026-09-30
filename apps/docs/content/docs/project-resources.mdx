@@ -106,13 +106,13 @@ QuickWork never deletes a linked local directory when cleaning up run environmen
 # Link a repository when creating a project
 quickwork project create \
   --title "Agent UX" \
-  --repo https://github.com/multica-ai/multica
+  --repo https://github.com/kscsky/QuickWork
 
 # List and add resources
 quickwork project resource list <project-id>
 quickwork project resource add <project-id> \
   --type github_repo \
-  --url https://github.com/multica-ai/multica \
+  --url https://github.com/kscsky/QuickWork \
   --ref main
 
 # Link a local directory on a specific daemon

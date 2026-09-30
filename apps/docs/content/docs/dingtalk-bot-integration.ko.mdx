@@ -8,7 +8,7 @@ import { Callout } from "fumadocs-ui/components/callout";
 [에이전트](/agents)를 DingTalk에 연결하면 해당 에이전트가 속한 워크스페이스의 멤버는 봇에게 DM을 보내거나, 그룹에서 @ 멘션하거나, `/issue` 명령으로 QuickWork [태스크](/issues)를 바로 만들 수 있습니다. 대화와 실행 기록은 QuickWork 워크스페이스에 저장됩니다.
 
 <Callout type="info">
-DingTalk 연동은 [커뮤니티가 유지관리](/community-maintained)하며 공식 지원 SLA는 제공되지 않습니다. 문제가 있으면 [GitHub issues](https://github.com/multica-ai/multica/issues)에 보고해 주세요.
+DingTalk 연동은 [커뮤니티가 유지관리](/community-maintained)하며 공식 지원 SLA는 제공되지 않습니다. 문제가 있으면 [GitHub issues](https://github.com/kscsky/QuickWork/issues)에 보고해 주세요.
 </Callout>
 
 
@@ -23,7 +23,7 @@ DingTalk 연동은 [커뮤니티가 유지관리](/community-maintained)하며 �
 
 ## 2. 로봇에 권한 부여하기
 
-**로봇 메시지 전송 권한**(`qyapi_robot_sendmsg`)은 기본으로 추가되어 있습니다. Multica에 봇 이름을 표시하려면 **DingTalk 그룹 기본 정보 관리 권한**(`qyapi_chat_manage`)을 수동으로 추가하세요.
+**로봇 메시지 전송 권한**(`qyapi_robot_sendmsg`)은 기본으로 추가되어 있습니다. QuickWork에 봇 이름을 표시하려면 **DingTalk 그룹 기본 정보 관리 권한**(`qyapi_chat_manage`)을 수동으로 추가하세요.
 
 ## 3. 앱 자격 증명 가져오기
 
@@ -31,7 +31,7 @@ DingTalk 연동은 [커뮤니티가 유지관리](/community-maintained)하며 �
 
 ## 4. 에이전트를 DingTalk에 연결하기
 
-1. Multica로 돌아가 **에이전트 → _당신의 에이전트_ → 기능 → 연동**을 엽니다.
+1. QuickWork로 돌아가 **에이전트 → _당신의 에이전트_ → 기능 → 연동**을 엽니다.
 2. **DingTalk 연결**을 클릭합니다.
 3. **AppKey**와 **AppSecret**을 입력한 뒤 제출합니다.
 
@@ -56,20 +56,20 @@ DM과 그룹 채팅 모두 텍스트와 이미지가 함께 있는 메시지를 
 
 ### `/issue`로 태스크 만들기
 
-`/issue <제목>` 또는 `/issue <제목>{줄 바꿈}<상세 설명>`을 보내면 새 QuickWork 태스크가 만들어지고 봇에 연결된 에이전트에 자동으로 할당됩니다. 같은 메시지의 이미지도 첨부 파일로 태스크에 추가됩니다. 일반 대화 메시지와 달리 `/issue` 명령은 Multica의 “[채팅](/chat)”에 기록을 남기지 않습니다.
+`/issue <제목>` 또는 `/issue <제목>{줄 바꿈}<상세 설명>`을 보내면 새 QuickWork 태스크가 만들어지고 봇에 연결된 에이전트에 자동으로 할당됩니다. 같은 메시지의 이미지도 첨부 파일로 태스크에 추가됩니다. 일반 대화 메시지와 달리 `/issue` 명령은 QuickWork의 “[채팅](/chat)”에 기록을 남기지 않습니다.
 
 ### `/new`로 새 Chat 시작하기
 
-`/new`를 보내면 비어 있는 새 QuickWork Chat이 생성되고 이후 DingTalk 메시지가 새 Chat으로 라우팅됩니다. `/new <메시지>`를 보내면 해당 메시지가 새 Chat의 첫 번째 대화가 됩니다. 이전 Chat은 Multica에 저장된 채 계속 사용할 수 있습니다.
+`/new`를 보내면 비어 있는 새 QuickWork Chat이 생성되고 이후 DingTalk 메시지가 새 Chat으로 라우팅됩니다. `/new <메시지>`를 보내면 해당 메시지가 새 Chat의 첫 번째 대화가 됩니다. 이전 Chat은 QuickWork에 저장된 채 계속 사용할 수 있습니다.
 
 ### `/clear`로 현재 컨텍스트 지우기
 
-`/clear`를 보내면 현재 QuickWork Chat은 유지되고 다음 메시지에 새 에이전트 컨텍스트가 적용됩니다. `/clear <메시지>`는 해당 메시지를 경계 이후의 첫 번째 대화로 사용합니다. 전체 Chat 기록은 Multica에 계속 표시됩니다.
+`/clear`를 보내면 현재 QuickWork Chat은 유지되고 다음 메시지에 새 에이전트 컨텍스트가 적용됩니다. `/clear <메시지>`는 해당 메시지를 경계 이후의 첫 번째 대화로 사용합니다. 전체 Chat 기록은 QuickWork에 계속 표시됩니다.
 
 ## 연결 관리
 
 - **에이전트 → _당신의 에이전트_ → 기능 → 연동** 페이지에서 에이전트 생성자와 워크스페이스 owner/admin은 DingTalk에 연결하거나 연결을 해제할 수 있습니다. DingTalk에 연결하면 이 페이지에 봇 이름, 봇이 메시지를 정상적으로 처리한 적이 있는 DingTalk 그룹, 그리고 각 그룹에서의 봇 활동 상태 데이터가 표시됩니다. 에이전트 읽기 권한이 있는 워크스페이스 멤버는 모두 이 정보를 볼 수 있습니다. 최근 90일 동안 정상적으로 처리된 메시지가 없는 그룹은 **장기 미활동**에 모이며 펼칠 때 불러옵니다.
-- **설정 → 연동** 페이지에는 현재 워크스페이스에서 자신에게 읽기 권한이 있고 DingTalk에 연결된 모든 에이전트 목록과 DingTalk 그룹에서의 봇 활동 상태 데이터가 표시됩니다. 워크스페이스 owner/admin은 목록에 있는 에이전트의 DingTalk 연결을 여기서 바로 해제할 수도 있습니다. 연결을 해제하면 봇은 메시지 수신을 멈추지만 설치 기록은 감사용으로 보관됩니다. 워크스페이스 owner/admin은 그룹을 목록에서 삭제할 수도 있습니다. 이 작업은 대화나 메시지를 삭제하지 않습니다. 이후 DingTalk 계정을 연결한 워크스페이스 멤버가 같은 그룹에서 봇을 다시 @멘션하고 Multica가 해당 메시지를 정상적으로 접수하면 그룹이 다시 표시됩니다.
+- **설정 → 연동** 페이지에는 현재 워크스페이스에서 자신에게 읽기 권한이 있고 DingTalk에 연결된 모든 에이전트 목록과 DingTalk 그룹에서의 봇 활동 상태 데이터가 표시됩니다. 워크스페이스 owner/admin은 목록에 있는 에이전트의 DingTalk 연결을 여기서 바로 해제할 수도 있습니다. 연결을 해제하면 봇은 메시지 수신을 멈추지만 설치 기록은 감사용으로 보관됩니다. 워크스페이스 owner/admin은 그룹을 목록에서 삭제할 수도 있습니다. 이 작업은 대화나 메시지를 삭제하지 않습니다. 이후 DingTalk 계정을 연결한 워크스페이스 멤버가 같은 그룹에서 봇을 다시 @멘션하고 QuickWork가 해당 메시지를 정상적으로 접수하면 그룹이 다시 표시됩니다.
 
 
 ## 자체 호스팅 설정
