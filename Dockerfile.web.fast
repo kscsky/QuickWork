@@ -1,0 +1,66 @@
+# Fast-rebuild variant of Dockerfile.web. Identical result, but the sources
+# arrive as four named build contexts holding ONLY source files (no
+# node_modules / .next / nested worktrees), so the wire payload stays ~26MB
+# instead of the ~1.6GB full tree — which stalls Docker Desktop's context
+# transfer on this machine.
+#
+# Build (from the repo root):
+#   docker build -f Dockerfile.web.fast \
+#     --build-context webctx=/tmp/webctx \
+#     --build-context corectx=/tmp/corectx \
+#     --build-context uictx=/tmp/uictx \
+#     --build-context viewsctx=/tmp/viewsctx \
+#     -t quickwork-web:dev .
+
+ARG NODE_VERSION=22-alpine
+
+# --- deps ---
+FROM node:${NODE_VERSION} AS deps
+WORKDIR /app
+RUN corepack enable
+COPY --from=webctx /package.json /pnpm-lock.yaml /pnpm-workspace.yaml /turbo.json ./
+COPY --from=webctx /apps/web/package.json apps/web/
+COPY --from=webctx /apps/web/source.config.ts apps/web/source.config.ts
+COPY --from=webctx /packages/core/package.json packages/core/package.json
+COPY --from=webctx /packages/ui/package.json packages/ui/package.json
+COPY --from=webctx /packages/views/package.json packages/views/package.json
+COPY --from=webctx /packages/tsconfig/package.json packages/tsconfig/package.json
+COPY --from=webctx /packages/eslint-config/package.json packages/eslint-config/package.json
+COPY --from=webctx /packages/plugin-sdk/package.json packages/plugin-sdk/package.json
+RUN pnpm install --frozen-lockfile
+# packages/views/assets.d.ts carries a triple-slash reference to
+# vite/client, so the web build's type-check stage needs vite's
+# type declarations present. The web app itself never bundles vite.
+RUN pnpm add -w vite -D
+
+# --- builder ---
+FROM node:${NODE_VERSION} AS builder
+WORKDIR /app
+RUN corepack enable
+COPY --from=deps /app ./
+COPY --from=webctx /package.json /turbo.json /pnpm-workspace.yaml ./
+COPY --from=webctx /apps/web/ apps/web/
+COPY --from=corectx / packages/core/
+COPY --from=uictx / packages/ui/
+COPY --from=viewsctx / packages/views/
+COPY --from=sdkctx / packages/plugin-sdk/
+
+ARG NEXT_PUBLIC_APP_VERSION=dev
+ENV NEXT_PUBLIC_APP_VERSION=$NEXT_PUBLIC_APP_VERSION
+ENV STANDALONE=true
+RUN pnpm --filter @quickwork/web build
+
+# --- runtime ---
+FROM node:${NODE_VERSION} AS runner
+WORKDIR /app
+ENV NODE_ENV=production
+ENV REMOTE_API_URL=http://backend:8080
+RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nextjs
+COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/static ./apps/web/.next/static
+COPY --from=builder --chown=nextjs:nodejs /app/apps/web/public ./apps/web/public
+USER nextjs
+EXPOSE 3000
+ENV PORT=3000
+ENV HOSTNAME=0.0.0.0
+CMD ["node", "apps/web/server.js"]

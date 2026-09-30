@@ -1,0 +1,12 @@
+-- Per-agent sandbox execution config.
+--
+-- A deliberate sibling of runtime_config rather than a key inside it:
+-- UpdateAgent writes runtime_config wholesale (COALESCE(narg, runtime_config)),
+-- and the OpenClaw settings tab serializes that object from scratch — so a
+-- `sandbox` key living there would be silently erased the first time someone
+-- edited an OpenClaw agent's gateway settings.
+--
+-- NULL means "run on the daemon", which is the default and the only behaviour
+-- the execution path implements today. Nothing in the daemon reads this column
+-- yet; the sandbox settings UI writes it and the routing change lands later.
+ALTER TABLE agent ADD COLUMN IF NOT EXISTS sandbox_config JSONB;

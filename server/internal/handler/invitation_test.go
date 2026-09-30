@@ -1,0 +1,429 @@
+package handler
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+	"time"
+
+	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+	obsmetrics "github.com/kscsky/quickwork/server/internal/metrics"
+	"github.com/kscsky/quickwork/server/internal/middleware"
+)
+
+const invitationTestEmail = "invitation-test@quickwork.ai"
+
+func TestDefaultInvitationRateLimits(t *testing.T) {
+	limits := DefaultInvitationRateLimits()
+	want := SlidingWindowRateLimit{Limit: 6, Window: 24 * time.Hour}
+	if limits.Recipient != want {
+		t.Fatalf("recipient limit = %+v, want %+v", limits.Recipient, want)
+	}
+}
+
+type stubInvitationRateLimiter struct {
+	allowed     bool
+	allowResult *bool
+	err         error
+	allowErr    error
+	retryAfter  time.Duration
+	checkKeys   []string
+	allowKeys   []string
+}
+
+func (l *stubInvitationRateLimiter) Allow(ctx context.Context, key string) bool {
+	allowed, _ := l.AllowWithError(ctx, key)
+	return allowed
+}
+
+func (l *stubInvitationRateLimiter) AllowWithError(_ context.Context, key string) (bool, error) {
+	l.allowKeys = append(l.allowKeys, key)
+	if l.allowResult != nil {
+		return *l.allowResult, l.allowErr
+	}
+	return l.allowed, l.allowErr
+}
+
+func (l *stubInvitationRateLimiter) Check(ctx context.Context, key string) bool {
+	allowed, _ := l.CheckWithError(ctx, key)
+	return allowed
+}
+
+func (l *stubInvitationRateLimiter) CheckWithError(_ context.Context, key string) (bool, error) {
+	l.checkKeys = append(l.checkKeys, key)
+	return l.allowed, l.err
+}
+
+func (l *stubInvitationRateLimiter) RetryAfter(_ context.Context, _ string) time.Duration {
+	return l.retryAfter
+}
+
+func useInvitationRateLimiters(t *testing.T, limiters InvitationRateLimiters) {
+	t.Helper()
+	previous := testHandler.InvitationRateLimiters
+	testHandler.InvitationRateLimiters = limiters
+	t.Cleanup(func() {
+		testHandler.InvitationRateLimiters = previous
+	})
+}
+
+func clearInvitationsForTestWorkspace(t *testing.T) {
+	t.Helper()
+	ctx := context.Background()
+	if _, err := testPool.Exec(ctx,
+		`DELETE FROM workspace_invitation WHERE workspace_id = $1`,
+		parseUUID(testWorkspaceID),
+	); err != nil {
+		t.Fatalf("clear invitations: %v", err)
+	}
+	t.Cleanup(func() {
+		testPool.Exec(context.Background(),
+			`DELETE FROM workspace_invitation WHERE workspace_id = $1`,
+			parseUUID(testWorkspaceID),
+		)
+	})
+}
+
+type rollbackOnCommitTx struct {
+	pgx.Tx
+}
+
+func (tx rollbackOnCommitTx) Commit(ctx context.Context) error {
+	_ = tx.Tx.Rollback(ctx)
+	return errors.New("forced commit failure")
+}
+
+type rollbackOnCommitTxStarter struct {
+	pool *pgxpool.Pool
+}
+
+func (s rollbackOnCommitTxStarter) Begin(ctx context.Context) (pgx.Tx, error) {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return rollbackOnCommitTx{Tx: tx}, nil
+}
+
+// Sanity check: a fresh, live pending invitation must block re-invitation.
+func TestCreateInvitation_BlocksWhilePending(t *testing.T) {
+	clearInvitationsForTestWorkspace(t)
+	actor := &stubInvitationRateLimiter{allowed: true}
+	workspace := &stubInvitationRateLimiter{allowed: true}
+	recipient := &stubInvitationRateLimiter{allowed: true}
+	useInvitationRateLimiters(t, InvitationRateLimiters{Actor: actor, Workspace: workspace, Recipient: recipient})
+
+	req := newRequest("POST", "/api/workspaces/"+testWorkspaceID+"/members", CreateMemberRequest{
+		Email: invitationTestEmail,
+		Role:  "member",
+	})
+	req = withURLParam(req, "id", testWorkspaceID)
+	w := httptest.NewRecorder()
+	testHandler.CreateInvitation(w, req)
+	if w.Code != http.StatusCreated {
+		t.Fatalf("first invite: expected 201, got %d: %s", w.Code, w.Body.String())
+	}
+
+	req2 := newRequest("POST", "/api/workspaces/"+testWorkspaceID+"/members", CreateMemberRequest{
+		Email: invitationTestEmail,
+		Role:  "member",
+	})
+	req2 = withURLParam(req2, "id", testWorkspaceID)
+	w2 := httptest.NewRecorder()
+	testHandler.CreateInvitation(w2, req2)
+	if w2.Code != http.StatusConflict {
+		t.Fatalf("second invite: expected 409 while still pending, got %d: %s", w2.Code, w2.Body.String())
+	}
+	for name, calls := range map[string]int{
+		"actor checks": len(actor.checkKeys), "workspace checks": len(workspace.checkKeys), "recipient checks": len(recipient.checkKeys),
+		"actor allows": len(actor.allowKeys), "workspace allows": len(workspace.allowKeys), "recipient allows": len(recipient.allowKeys),
+	} {
+		if calls != 1 {
+			t.Errorf("%s limiter calls = %d, want 1; a pending retry must not consume budget", name, calls)
+		}
+	}
+}
+
+func TestCreateInvitation_AllowsAfterExpiry(t *testing.T) {
+	clearInvitationsForTestWorkspace(t)
+	ctx := context.Background()
+
+	var staleID string
+	if err := testPool.QueryRow(ctx, `
+		INSERT INTO workspace_invitation (
+			workspace_id, inviter_id, invitee_email, role, status, created_at, updated_at, expires_at
+		)
+		VALUES ($1, $2, $3, 'member', 'pending', now() - interval '10 days', now() - interval '10 days', now() - interval '3 days')
+		RETURNING id
+	`, parseUUID(testWorkspaceID), parseUUID(testUserID), invitationTestEmail).Scan(&staleID); err != nil {
+		t.Fatalf("seed expired invitation: %v", err)
+	}
+
+	req := newRequest("POST", "/api/workspaces/"+testWorkspaceID+"/members", CreateMemberRequest{
+		Email: invitationTestEmail,
+		Role:  "member",
+	})
+	req = withURLParam(req, "id", testWorkspaceID)
+	w := httptest.NewRecorder()
+	testHandler.CreateInvitation(w, req)
+	if w.Code != http.StatusCreated {
+		t.Fatalf("re-invite after expiry: expected 201, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var resp InvitationResponse
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if resp.ID == "" || resp.ID == staleID {
+		t.Fatalf("expected a new invitation row, got id=%q (stale=%q)", resp.ID, staleID)
+	}
+
+	var staleStatus string
+	if err := testPool.QueryRow(ctx,
+		`SELECT status FROM workspace_invitation WHERE id = $1`, staleID,
+	).Scan(&staleStatus); err != nil {
+		t.Fatalf("read stale row: %v", err)
+	}
+	if staleStatus != "expired" {
+		t.Fatalf("expected stale row to be 'expired', got %q", staleStatus)
+	}
+
+	var pendingCount int
+	if err := testPool.QueryRow(ctx, `
+		SELECT COUNT(*) FROM workspace_invitation
+		WHERE workspace_id = $1 AND invitee_email = $2 AND status = 'pending'
+	`, parseUUID(testWorkspaceID), invitationTestEmail).Scan(&pendingCount); err != nil {
+		t.Fatalf("count pending: %v", err)
+	}
+	if pendingCount != 1 {
+		t.Fatalf("expected exactly 1 pending invitation after re-invite, got %d", pendingCount)
+	}
+}
+
+func TestCreateInvitation_RateLimiterFailureReturnsServiceUnavailable(t *testing.T) {
+	clearInvitationsForTestWorkspace(t)
+	actor := &stubInvitationRateLimiter{allowed: false, retryAfter: 10 * time.Minute}
+	workspace := &stubInvitationRateLimiter{allowed: true, err: errors.New("redis unavailable")}
+	recipient := &stubInvitationRateLimiter{allowed: true}
+	useInvitationRateLimiters(t, InvitationRateLimiters{Actor: actor, Workspace: workspace, Recipient: recipient})
+	previousMetrics := testHandler.Metrics
+	testHandler.Metrics = obsmetrics.NewBusinessMetrics()
+	t.Cleanup(func() {
+		testHandler.Metrics = previousMetrics
+	})
+
+	req := newRequest(http.MethodPost, "/api/workspaces/"+testWorkspaceID+"/members", CreateMemberRequest{
+		Email: "invitation-limiter-error@quickwork.ai",
+		Role:  "member",
+	})
+	req = withURLParam(req, "id", testWorkspaceID)
+	rec := httptest.NewRecorder()
+	testHandler.CreateInvitation(rec, req)
+
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status = %d, want 503: %s", rec.Code, rec.Body.String())
+	}
+	if rec.Header().Get("Retry-After") != "5" || rec.Header().Get("Cache-Control") != "no-store" {
+		t.Errorf("unexpected retry/cache headers: %v", rec.Header())
+	}
+	var body map[string]string
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if body["code"] != "invitation_rate_limiter_unavailable" {
+		t.Errorf("code = %q, want invitation_rate_limiter_unavailable", body["code"])
+	}
+	metricFamily := obsmetrics.GatherForTest(t, testHandler.Metrics)["quickwork_email_rate_limited_total"]
+	for _, metric := range metricFamily.GetMetric() {
+		if metric.GetCounter().GetValue() != 0 {
+			t.Errorf("rate-limit metric = %v, want 0 when the final response is 503", metric.GetCounter().GetValue())
+		}
+	}
+	for name, calls := range map[string]int{
+		"actor checks": len(actor.checkKeys), "workspace checks": len(workspace.checkKeys), "recipient checks": len(recipient.checkKeys),
+	} {
+		if calls != 1 {
+			t.Errorf("%s = %d, want 1 even when another gate errors", name, calls)
+		}
+	}
+	for name, calls := range map[string]int{
+		"actor": len(actor.allowKeys), "workspace": len(workspace.allowKeys), "recipient": len(recipient.allowKeys),
+	} {
+		if calls != 0 {
+			t.Errorf("%s limiter consumed %d times, want 0 after a backend error", name, calls)
+		}
+	}
+	var pendingCount int
+	if err := testPool.QueryRow(context.Background(), `
+		SELECT COUNT(*) FROM workspace_invitation
+		WHERE workspace_id = $1 AND invitee_email = 'invitation-limiter-error@quickwork.ai' AND status = 'pending'
+	`, parseUUID(testWorkspaceID)).Scan(&pendingCount); err != nil {
+		t.Fatalf("count pending invitations: %v", err)
+	}
+	if pendingCount != 0 {
+		t.Fatalf("pending invitation count = %d, want 0 after limiter backend failure", pendingCount)
+	}
+}
+
+func TestInvitationAdmission_RejectedActorDoesNotConsumeWorkspaceBudget(t *testing.T) {
+	limits := InvitationRateLimits{
+		Actor:     SlidingWindowRateLimit{Limit: 1, Window: time.Hour},
+		Workspace: SlidingWindowRateLimit{Limit: 2, Window: time.Hour},
+		Recipient: SlidingWindowRateLimit{Limit: 10, Window: time.Hour},
+	}
+	h := *testHandler
+	h.InvitationRateLimiters = NewMemoryInvitationRateLimiters(limits)
+
+	admit := func(actorID, email string) bool {
+		req := httptest.NewRequest(http.MethodPost, "/api/workspaces/workspace-a/members", nil)
+		admission, ok := h.checkInvitationAdmission(httptest.NewRecorder(), req, actorID, "workspace-a", email)
+		if ok {
+			h.consumeInvitationAdmission(req, admission)
+		}
+		return ok
+	}
+
+	if !admit("actor-a", "first@quickwork.ai") {
+		t.Fatal("first invitation was unexpectedly rejected")
+	}
+	for i := 0; i < 3; i++ {
+		if admit("actor-a", fmt.Sprintf("rejected-%d@quickwork.ai", i)) {
+			t.Fatalf("actor-limited invitation %d was unexpectedly admitted", i)
+		}
+	}
+	if !admit("actor-b", "second@quickwork.ai") {
+		t.Fatal("actor-limited retries consumed the shared workspace budget")
+	}
+}
+
+func TestInvitationAdmission_RejectedActorDoesNotConsumeRecipientBudget(t *testing.T) {
+	limits := InvitationRateLimits{
+		Actor:     SlidingWindowRateLimit{Limit: 1, Window: time.Hour},
+		Workspace: SlidingWindowRateLimit{Limit: 10, Window: time.Hour},
+		Recipient: SlidingWindowRateLimit{Limit: 2, Window: time.Hour},
+	}
+	h := *testHandler
+	h.InvitationRateLimiters = NewMemoryInvitationRateLimiters(limits)
+
+	admit := func(actorID, workspaceID string) bool {
+		req := httptest.NewRequest(http.MethodPost, "/api/workspaces/"+workspaceID+"/members", nil)
+		admission, ok := h.checkInvitationAdmission(httptest.NewRecorder(), req, actorID, workspaceID, "shared@quickwork.ai")
+		if ok {
+			h.consumeInvitationAdmission(req, admission)
+		}
+		return ok
+	}
+
+	if !admit("actor-a", "workspace-a") {
+		t.Fatal("first invitation was unexpectedly rejected")
+	}
+	if admit("actor-a", "workspace-a") {
+		t.Fatal("actor-limited retry was unexpectedly admitted")
+	}
+	if !admit("actor-b", "workspace-b") {
+		t.Fatal("actor-limited retry consumed the global recipient budget")
+	}
+}
+
+func TestInvitationAdmission_AllowsBoundedOvershootWhenGateFillsAfterCheck(t *testing.T) {
+	allowDenied := false
+	actor := &stubInvitationRateLimiter{allowed: true, allowResult: &allowDenied}
+	workspace := &stubInvitationRateLimiter{allowed: true}
+	recipient := &stubInvitationRateLimiter{allowed: true}
+	h := *testHandler
+	h.InvitationRateLimiters = InvitationRateLimiters{Actor: actor, Workspace: workspace, Recipient: recipient}
+
+	req := httptest.NewRequest(http.MethodPost, "/api/workspaces/workspace-a/members", nil)
+	admission, ok := h.checkInvitationAdmission(httptest.NewRecorder(), req, "actor-a", "workspace-a", "recipient@quickwork.ai")
+	if !ok {
+		t.Fatal("invitation was rejected during the non-consuming check")
+	}
+	h.consumeInvitationAdmission(req, admission)
+	for name, calls := range map[string]int{
+		"actor checks": len(actor.checkKeys), "workspace checks": len(workspace.checkKeys), "recipient checks": len(recipient.checkKeys),
+		"actor allows": len(actor.allowKeys), "workspace allows": len(workspace.allowKeys), "recipient allows": len(recipient.allowKeys),
+	} {
+		if calls != 1 {
+			t.Errorf("%s = %d, want 1", name, calls)
+		}
+	}
+}
+
+func TestInvitationAdmission_AllowsBoundedOvershootWhenBackendFailsAfterChecks(t *testing.T) {
+	actor := &stubInvitationRateLimiter{allowed: true}
+	workspace := &stubInvitationRateLimiter{allowed: true, allowErr: errors.New("redis unavailable")}
+	recipient := &stubInvitationRateLimiter{allowed: true}
+	h := *testHandler
+	h.InvitationRateLimiters = InvitationRateLimiters{Actor: actor, Workspace: workspace, Recipient: recipient}
+
+	req := httptest.NewRequest(http.MethodPost, "/api/workspaces/workspace-a/members", nil)
+	rec := httptest.NewRecorder()
+	admission, ok := h.checkInvitationAdmission(rec, req, "actor-a", "workspace-a", "recipient@quickwork.ai")
+	if !ok {
+		t.Fatalf("invitation was rejected during successful checks with %d: %s", rec.Code, rec.Body.String())
+	}
+	h.consumeInvitationAdmission(req, admission)
+	if rec.Body.Len() != 0 || rec.Header().Get("Retry-After") != "" {
+		t.Fatalf("backend failure after checks wrote an error response: headers=%v body=%s", rec.Header(), rec.Body.String())
+	}
+	for name, calls := range map[string]int{
+		"actor checks": len(actor.checkKeys), "workspace checks": len(workspace.checkKeys), "recipient checks": len(recipient.checkKeys),
+		"actor allows": len(actor.allowKeys), "workspace allows": len(workspace.allowKeys), "recipient allows": len(recipient.allowKeys),
+	} {
+		if calls != 1 {
+			t.Errorf("%s = %d, want 1", name, calls)
+		}
+	}
+}
+
+func TestCreateInvitation_RouteRequiresAdminRole(t *testing.T) {
+	clearInvitationsForTestWorkspace(t)
+	ctx := context.Background()
+	const memberEmail = "invitation-route-member@quickwork.ai"
+	_, _ = testPool.Exec(ctx, `DELETE FROM "user" WHERE email = $1`, memberEmail)
+	var memberUserID string
+	if err := testPool.QueryRow(ctx, `INSERT INTO "user" (name, email) VALUES ('Invitation Route Member', $1) RETURNING id`, memberEmail).Scan(&memberUserID); err != nil {
+		t.Fatalf("create member user: %v", err)
+	}
+	if _, err := testPool.Exec(ctx, `INSERT INTO member (workspace_id, user_id, role) VALUES ($1, $2, 'member')`, testWorkspaceID, memberUserID); err != nil {
+		t.Fatalf("create member: %v", err)
+	}
+	t.Cleanup(func() {
+		_, _ = testPool.Exec(context.Background(), `DELETE FROM member WHERE workspace_id = $1 AND user_id = $2`, testWorkspaceID, memberUserID)
+		_, _ = testPool.Exec(context.Background(), `DELETE FROM "user" WHERE id = $1`, memberUserID)
+	})
+
+	router := chi.NewRouter()
+	router.Route("/api/workspaces/{id}", func(r chi.Router) {
+		r.Group(func(r chi.Router) {
+			r.Use(middleware.RequireWorkspaceRoleFromURL(testHandler.Queries, "id", "owner", "admin"))
+			r.Post("/members", testHandler.CreateInvitation)
+		})
+	})
+
+	call := func(userID, inviteeEmail string) *httptest.ResponseRecorder {
+		var body bytes.Buffer
+		if err := json.NewEncoder(&body).Encode(CreateMemberRequest{Email: inviteeEmail, Role: "member"}); err != nil {
+			t.Fatal(err)
+		}
+		req := httptest.NewRequest(http.MethodPost, "/api/workspaces/"+testWorkspaceID+"/members", &body)
+		req.Header.Set("X-User-ID", userID)
+		rec := httptest.NewRecorder()
+		router.ServeHTTP(rec, req)
+		return rec
+	}
+
+	if rec := call(memberUserID, "invitation-route-rejected@quickwork.ai"); rec.Code != http.StatusForbidden {
+		t.Errorf("member status = %d, want 403: %s", rec.Code, rec.Body.String())
+	}
+	if rec := call(testUserID, fmt.Sprintf("invitation-route-owner-%s@quickwork.ai", testWorkspaceID)); rec.Code != http.StatusCreated {
+		t.Errorf("owner status = %d, want 201: %s", rec.Code, rec.Body.String())
+	}
+}
