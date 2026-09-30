@@ -73,7 +73,8 @@ func (b *opencodeBackend) supportsSkipPermissionsFlag(execPath string) bool {
 	v := false
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
-	if out, err := b.cfg.commandAt(execPath).exec(ctx, "run", "--help").CombinedOutput(); err == nil {
+	probe := b.cfg.commandAt(execPath).exec(ctx, "run", "--help")
+	if out, err := combinedOutputOwned(probe, b.cfg.Logger); err == nil {
 		v = strings.Contains(string(out), "--dangerously-skip-permissions")
 	}
 	opencodeFlagProbeCache[execPath] = v
