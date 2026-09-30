@@ -5,7 +5,6 @@ import {
   useEffect,
   useCallback,
   useRef,
-  type CSSProperties,
   type ReactNode,
 } from "react";
 import { motion, useReducedMotion } from "motion/react";
@@ -22,11 +21,12 @@ import {
   InputOTPGroup,
   InputOTPSlot,
 } from "@quickwork/ui/components/ui/input-otp";
-import { UI_EASE_OUT } from "@quickwork/ui/lib/motion";
+import { UI_EASE_OUT, UI_MOTION_DURATION } from "@quickwork/ui/lib/motion";
 import { useAuthStore } from "@quickwork/core/auth";
 import { workspaceKeys } from "@quickwork/core/workspace/queries";
 import { api } from "@quickwork/core/api";
 import type { User } from "@quickwork/core/types";
+import { DispatchScene } from "./dispatch-scene";
 import { useT } from "../i18n";
 
 // ---------------------------------------------------------------------------
@@ -102,81 +102,37 @@ export function validateCliCallback(cliCallback: string): boolean {
 // Component
 // ---------------------------------------------------------------------------
 
-/**
- * Rail art for the sign-in panel: one rail per zone, each carrying a few task
- * blocks. It is the product's own model drawn with the product's own tokens —
- * work sitting on rails, tinted by the zone that owns it — rather than a stock
- * illustration. The layout is a literal rather than generated so the backdrop
- * is byte-stable across renders and does not reshuffle when the window resizes.
- */
-const ZONE_DOT = [
-  "bg-zone-1",
-  "bg-zone-2",
-  "bg-zone-3",
-  "bg-zone-4",
-  "bg-zone-5",
-  "bg-zone-6",
-  "bg-zone-7",
-  "bg-zone-8",
-] as const;
+/** Seconds between successive items of the sign-in column. */
+const REVEAL_STAGGER = 0.06;
 
 /**
- * Rail art for the sign-in panel: one rail per zone, each carrying a few task
- * blocks. It is the product's own model drawn with the product's own tokens —
- * work sitting on rails, tinted by the zone that owns it — rather than a stock
- * illustration.
- *
- * Every block drifts toward the panel edge and dissolves, then comes back. The
- * durations and offsets are literals, not generated: the backdrop must not
- * reshuffle when the window resizes, and the rails must not fall into lockstep,
- * because zones do not process at the same rate. `base.css` owns the keyframes
- * and the reduced-motion opt-out.
+ * One item of the sign-in column. The items arrive one after another — title,
+ * then description, then the fields — so the eye is led down the form instead
+ * of being given the whole thing at once. The column is remounted on every step
+ * change (see `stepKey` below), so the same cascade plays when the code and CLI
+ * steps replace the email form rather than the content swapping in flat.
  */
-const RAILS: readonly {
-  lead: number;
-  duration: number;
-  offset: number;
-  blocks: readonly number[];
-}[] = [
-  { lead: 0, duration: 21, offset: 0, blocks: [168, 112, 64] },
-  { lead: 92, duration: 29, offset: 5.5, blocks: [132, 184] },
-  { lead: 36, duration: 24, offset: 11, blocks: [88, 156, 96] },
-  { lead: 148, duration: 33, offset: 2.5, blocks: [196, 84] },
-  { lead: 64, duration: 26, offset: 8, blocks: [112, 56, 128] },
-  { lead: 12, duration: 31, offset: 14, blocks: [144, 96, 172] },
-  { lead: 108, duration: 22, offset: 3.5, blocks: [76, 132] },
-];
+function Reveal({
+  index,
+  children,
+}: {
+  index: number;
+  children: ReactNode;
+}) {
+  const shouldReduceMotion = useReducedMotion() ?? false;
 
-/** Seconds between successive blocks on one rail, so a rail never blinks all at once. */
-const RAIL_BLOCK_STAGGER = 3.4;
-
-function RailArt() {
   return (
-    <div className="-mr-14 flex flex-col gap-4" aria-hidden="true">
-      {RAILS.map((rail, i) => (
-        <div key={i} className="flex items-center gap-3">
-          <span
-            className={`size-1.5 shrink-0 rounded-full ${ZONE_DOT[i % ZONE_DOT.length]}`}
-          />
-          <div className="flex items-center gap-2.5" style={{ marginLeft: rail.lead }}>
-            {rail.blocks.map((width, j) => (
-              <span
-                key={j}
-                className="animate-rail-drift h-[5px] shrink-0 rounded-full bg-muted-foreground/25"
-                style={
-                  {
-                    width,
-                    "--rail-duration": `${rail.duration}s`,
-                    "--rail-delay": `${(rail.offset + j * RAIL_BLOCK_STAGGER).toFixed(1)}s`,
-                    "--rail-drift": "16px",
-                  } as CSSProperties
-                }
-              />
-            ))}
-          </div>
-        </div>
-      ))}
-    </div>
+    <motion.div
+      initial={shouldReduceMotion ? false : { opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{
+        duration: UI_MOTION_DURATION.standard,
+        delay: shouldReduceMotion ? 0 : index * REVEAL_STAGGER,
+        ease: [...UI_EASE_OUT],
+      }}
+    >
+      {children}
+    </motion.div>
   );
 }
 
@@ -188,10 +144,21 @@ function RailArt() {
  * The form is deliberately NOT wrapped in a card. A bordered box floating in a
  * column says nothing about the product, and the identity panel already carries
  * the page's visual weight — the form only has to be quiet and legible.
+ *
+ * `stepKey` is the identity of the step on screen. Re-keying the column instead
+ * of routing an exit animation through AnimatePresence keeps the outgoing step
+ * out of the DOM immediately — the new step's content is never delayed behind
+ * an exit that failed to fire, and the OTP field is focusable on the frame it
+ * appears.
  */
-function LoginShell({ children }: { children: React.ReactNode }) {
+function LoginShell({
+  stepKey,
+  children,
+}: {
+  stepKey: string;
+  children: ReactNode;
+}) {
   const { t } = useT("auth");
-  const shouldReduceMotion = useReducedMotion() ?? false;
 
   return (
     <div className="grid min-h-svh lg:grid-cols-[1.15fr_1fr]">
@@ -211,21 +178,16 @@ function LoginShell({ children }: { children: React.ReactNode }) {
             </p>
           </div>
 
-          <RailArt />
+          <DispatchScene />
         </div>
 
         <div aria-hidden="true" />
       </aside>
 
       <main className="flex items-center justify-center px-6 py-12">
-        <motion.div
-          initial={shouldReduceMotion ? false : { opacity: 0, y: 14 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.45, ease: [...UI_EASE_OUT] }}
-          className="flex w-full max-w-[25rem] flex-col gap-7"
-        >
+        <div key={stepKey} className="flex w-full max-w-[25rem] flex-col gap-7">
           {children}
-        </motion.div>
+        </div>
       </main>
     </div>
   );
@@ -426,16 +388,21 @@ export function LoginPage({
 
   if (step === "cli_confirm" && existingUser) {
     return (
-      <LoginShell>
-          <div className="flex flex-col items-center gap-1.5 text-center">
+      <LoginShell stepKey="cli_confirm">
+        <div className="flex flex-col items-center gap-1.5 text-center">
+          <Reveal index={0}>
             {logo && <div className="mx-auto mb-4">{logo}</div>}
             <CardTitle className="text-display-sm">
               {t(($) => $.cli.title)}
             </CardTitle>
+          </Reveal>
+          <Reveal index={1}>
             <CardDescription>
               {t(($) => $.cli.description, { email: existingUser.email })}
             </CardDescription>
-          </div>
+          </Reveal>
+        </div>
+        <Reveal index={2}>
           <div className="flex flex-col gap-3">
             <Button
               onClick={handleCliAuthorize}
@@ -458,6 +425,7 @@ export function LoginPage({
               {t(($) => $.cli.different_account)}
             </Button>
           </div>
+        </Reveal>
       </LoginShell>
     );
   }
@@ -468,16 +436,21 @@ export function LoginPage({
 
   if (step === "code") {
     return (
-      <LoginShell>
-          <div className="flex flex-col items-center gap-1.5 text-center">
+      <LoginShell stepKey="code">
+        <div className="flex flex-col items-center gap-1.5 text-center">
+          <Reveal index={0}>
             {logo && <div className="mx-auto mb-4">{logo}</div>}
             <CardTitle className="text-display-sm">
               {t(($) => $.verify.title)}
             </CardTitle>
+          </Reveal>
+          <Reveal index={1}>
             <CardDescription>
               {t(($) => $.verify.description, { email })}
             </CardDescription>
-          </div>
+          </Reveal>
+        </div>
+        <Reveal index={2}>
           <div className="flex flex-col items-center gap-4">
             <InputOTP
               autoFocus
@@ -514,20 +487,21 @@ export function LoginPage({
               </button>
             </div>
           </div>
-          <div>
-            <Button
-              type="button"
-              variant="ghost"
-              className="w-full"
-              onClick={() => {
-                setStep("email");
-                setCode("");
-                setError("");
-              }}
-            >
-              {t(($) => $.common.back)}
-            </Button>
-          </div>
+        </Reveal>
+        <Reveal index={3}>
+          <Button
+            type="button"
+            variant="ghost"
+            className="w-full"
+            onClick={() => {
+              setStep("email");
+              setCode("");
+              setError("");
+            }}
+          >
+            {t(($) => $.common.back)}
+          </Button>
+        </Reveal>
       </LoginShell>
     );
   }
@@ -537,36 +511,41 @@ export function LoginPage({
   // -------------------------------------------------------------------------
 
   return (
-    <LoginShell>
-        <div className="flex flex-col items-center gap-1.5 text-center">
+    <LoginShell stepKey="email">
+      <div className="flex flex-col items-center gap-1.5 text-center">
+        <Reveal index={0}>
           {logo && <div className="mx-auto mb-4">{logo}</div>}
           <CardTitle className="text-display-sm">
             {t(($) => $.signin.title)}
           </CardTitle>
+        </Reveal>
+        <Reveal index={1}>
           <CardDescription>
             {t(($) => $.signin.description)}
           </CardDescription>
-        </div>
-        <div>
-          <form id="login-form" onSubmit={handleSendCode} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="login-email">{t(($) => $.common.email)}</Label>
-              <Input
-                id="login-email"
-                type="email"
-                placeholder={t(($) => $.common.email_placeholder)}
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                autoFocus
-                required
-              />
-            </div>
-            {error && (
-              <p className="text-body text-destructive">{error}</p>
-            )}
-          </form>
-        </div>
-        <div className="flex flex-col gap-3">
+        </Reveal>
+      </div>
+      <form id="login-form" onSubmit={handleSendCode} className="space-y-4">
+        <Reveal index={2}>
+          <div className="space-y-2">
+            <Label htmlFor="login-email">{t(($) => $.common.email)}</Label>
+            <Input
+              id="login-email"
+              type="email"
+              placeholder={t(($) => $.common.email_placeholder)}
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              autoFocus
+              required
+            />
+          </div>
+        </Reveal>
+        {error && (
+          <p className="text-body text-destructive">{error}</p>
+        )}
+      </form>
+      <div className="flex flex-col gap-3">
+        <Reveal index={3}>
           <Button
             type="submit"
             form="login-form"
@@ -578,7 +557,9 @@ export function LoginPage({
               ? t(($) => $.signin.sending)
               : t(($) => $.signin.continue)}
           </Button>
-          {(google || onGoogleLogin) && (
+        </Reveal>
+        {(google || onGoogleLogin) && (
+          <Reveal index={4}>
             <Button
               type="button"
               variant="outline"
@@ -607,9 +588,10 @@ export function LoginPage({
               </svg>
               {t(($) => $.signin.google)}
             </Button>
-          )}
-          {extra && <div className="w-full pt-1 text-center">{extra}</div>}
-        </div>
+          </Reveal>
+        )}
+        {extra && <div className="w-full pt-1 text-center">{extra}</div>}
+      </div>
     </LoginShell>
   );
 }

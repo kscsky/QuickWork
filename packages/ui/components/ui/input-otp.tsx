@@ -60,7 +60,13 @@ function InputOTPSlot({
       )}
       {...props}
     >
-      {char}
+      {/* Keyed by the digit so the span remounts — and the pop replays — when
+          this slot fills or changes, rather than the character just appearing.
+          Empty slots get the same span with nothing in it, which keeps the
+          slot's single-child centering intact. */}
+      <span key={char ?? ""} className="animate-otp-digit">
+        {char}
+      </span>
       {hasFakeCaret && (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
           <div className="h-4 w-px animate-caret-blink bg-foreground duration-1000" />
