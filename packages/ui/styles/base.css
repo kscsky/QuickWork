@@ -290,12 +290,46 @@ html[data-dnd-dragging="true"] * {
   transition: none;
 }
 
+
+/* Sign-in rail art: the task blocks on each zone rail drift toward the panel
+ * edge and dissolve. Work moving across a boundary is the product's whole
+ * subject, so the art is allowed to move — but ambiently, over tens of
+ * seconds, because it sits beside a form someone is trying to fill in.
+ *
+ * The fade at BOTH ends is load-bearing: without it the loop restart reads as
+ * a snap, because a block would jump from the right edge back to its origin.
+ * Per-rail durations and delays keep the rails out of lockstep, the way zones
+ * processing at their own rate would look. */
+@keyframes rail-drift {
+  0% {
+    transform: translateX(0);
+    opacity: 0;
+  }
+  18% {
+    opacity: 1;
+  }
+  82% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(var(--rail-drift, 150px));
+    opacity: 0;
+  }
+}
+
+.animate-rail-drift {
+  animation: rail-drift var(--rail-duration, 32s) linear infinite;
+  animation-delay: var(--rail-delay, 0s);
+  will-change: transform, opacity;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .animate-entrance-spin,
   .animate-onboarding-enter,
   .animate-welcome-emoji-pop,
   .animate-completion-badge,
   .animate-completion-check,
+  .animate-rail-drift,
   .animate-chat-impulse,
   .animate-chat-text-shimmer,
   .animate-nav-progress-sweep {

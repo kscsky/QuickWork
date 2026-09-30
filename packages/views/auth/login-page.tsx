@@ -1,14 +1,18 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef, type ReactNode } from "react";
+import {
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+  type CSSProperties,
+  type ReactNode,
+} from "react";
+import { motion, useReducedMotion } from "motion/react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
-  Card,
-  CardHeader,
   CardTitle,
   CardDescription,
-  CardContent,
-  CardFooter,
 } from "@quickwork/ui/components/ui/card";
 import { Input } from "@quickwork/ui/components/ui/input";
 import { Button } from "@quickwork/ui/components/ui/button";
@@ -18,6 +22,7 @@ import {
   InputOTPGroup,
   InputOTPSlot,
 } from "@quickwork/ui/components/ui/input-otp";
+import { UI_EASE_OUT } from "@quickwork/ui/lib/motion";
 import { useAuthStore } from "@quickwork/core/auth";
 import { workspaceKeys } from "@quickwork/core/workspace/queries";
 import { api } from "@quickwork/core/api";
@@ -115,15 +120,35 @@ const ZONE_DOT = [
   "bg-zone-8",
 ] as const;
 
-const RAILS: readonly { lead: number; blocks: readonly number[] }[] = [
-  { lead: 0, blocks: [168, 112, 64] },
-  { lead: 92, blocks: [132, 184] },
-  { lead: 36, blocks: [88, 156, 96] },
-  { lead: 148, blocks: [196, 84] },
-  { lead: 64, blocks: [112, 56, 128] },
-  { lead: 12, blocks: [144, 96, 172] },
-  { lead: 108, blocks: [76, 132] },
+/**
+ * Rail art for the sign-in panel: one rail per zone, each carrying a few task
+ * blocks. It is the product's own model drawn with the product's own tokens —
+ * work sitting on rails, tinted by the zone that owns it — rather than a stock
+ * illustration.
+ *
+ * Every block drifts toward the panel edge and dissolves, then comes back. The
+ * durations and offsets are literals, not generated: the backdrop must not
+ * reshuffle when the window resizes, and the rails must not fall into lockstep,
+ * because zones do not process at the same rate. `base.css` owns the keyframes
+ * and the reduced-motion opt-out.
+ */
+const RAILS: readonly {
+  lead: number;
+  duration: number;
+  offset: number;
+  blocks: readonly number[];
+}[] = [
+  { lead: 0, duration: 21, offset: 0, blocks: [168, 112, 64] },
+  { lead: 92, duration: 29, offset: 5.5, blocks: [132, 184] },
+  { lead: 36, duration: 24, offset: 11, blocks: [88, 156, 96] },
+  { lead: 148, duration: 33, offset: 2.5, blocks: [196, 84] },
+  { lead: 64, duration: 26, offset: 8, blocks: [112, 56, 128] },
+  { lead: 12, duration: 31, offset: 14, blocks: [144, 96, 172] },
+  { lead: 108, duration: 22, offset: 3.5, blocks: [76, 132] },
 ];
+
+/** Seconds between successive blocks on one rail, so a rail never blinks all at once. */
+const RAIL_BLOCK_STAGGER = 3.4;
 
 function RailArt() {
   return (
@@ -137,8 +162,15 @@ function RailArt() {
             {rail.blocks.map((width, j) => (
               <span
                 key={j}
-                className="h-[5px] shrink-0 rounded-full bg-muted-foreground/25"
-                style={{ width }}
+                className="animate-rail-drift h-[5px] shrink-0 rounded-full bg-muted-foreground/25"
+                style={
+                  {
+                    width,
+                    "--rail-duration": `${rail.duration}s`,
+                    "--rail-delay": `${(rail.offset + j * RAIL_BLOCK_STAGGER).toFixed(1)}s`,
+                    "--rail-drift": "16px",
+                  } as CSSProperties
+                }
               />
             ))}
           </div>
@@ -152,9 +184,14 @@ function RailArt() {
  * Sign-in chrome. The identity panel is the desktop half of the page and is
  * deliberately absent on a phone: at that width the form is the entire job, and
  * a decorative half-screen would only push the field below the fold.
+ *
+ * The form is deliberately NOT wrapped in a card. A bordered box floating in a
+ * column says nothing about the product, and the identity panel already carries
+ * the page's visual weight — the form only has to be quiet and legible.
  */
 function LoginShell({ children }: { children: React.ReactNode }) {
   const { t } = useT("auth");
+  const shouldReduceMotion = useReducedMotion() ?? false;
 
   return (
     <div className="grid min-h-svh lg:grid-cols-[1.15fr_1fr]">
@@ -181,7 +218,14 @@ function LoginShell({ children }: { children: React.ReactNode }) {
       </aside>
 
       <main className="flex items-center justify-center px-6 py-12">
-        <Card className="w-full max-w-sm">{children}</Card>
+        <motion.div
+          initial={shouldReduceMotion ? false : { opacity: 0, y: 14 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.45, ease: [...UI_EASE_OUT] }}
+          className="flex w-full max-w-[25rem] flex-col gap-7"
+        >
+          {children}
+        </motion.div>
       </main>
     </div>
   );
@@ -383,7 +427,7 @@ export function LoginPage({
   if (step === "cli_confirm" && existingUser) {
     return (
       <LoginShell>
-          <CardHeader className="text-center">
+          <div className="flex flex-col items-center gap-1.5 text-center">
             {logo && <div className="mx-auto mb-4">{logo}</div>}
             <CardTitle className="text-display-sm">
               {t(($) => $.cli.title)}
@@ -391,8 +435,8 @@ export function LoginPage({
             <CardDescription>
               {t(($) => $.cli.description, { email: existingUser.email })}
             </CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-3">
+          </div>
+          <div className="flex flex-col gap-3">
             <Button
               onClick={handleCliAuthorize}
               disabled={loading}
@@ -413,7 +457,7 @@ export function LoginPage({
             >
               {t(($) => $.cli.different_account)}
             </Button>
-          </CardContent>
+          </div>
       </LoginShell>
     );
   }
@@ -425,7 +469,7 @@ export function LoginPage({
   if (step === "code") {
     return (
       <LoginShell>
-          <CardHeader className="text-center">
+          <div className="flex flex-col items-center gap-1.5 text-center">
             {logo && <div className="mx-auto mb-4">{logo}</div>}
             <CardTitle className="text-display-sm">
               {t(($) => $.verify.title)}
@@ -433,8 +477,8 @@ export function LoginPage({
             <CardDescription>
               {t(($) => $.verify.description, { email })}
             </CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-col items-center gap-4">
+          </div>
+          <div className="flex flex-col items-center gap-4">
             <InputOTP
               autoFocus
               maxLength={6}
@@ -469,8 +513,8 @@ export function LoginPage({
                   : t(($) => $.verify.resend)}
               </button>
             </div>
-          </CardContent>
-          <CardFooter>
+          </div>
+          <div>
             <Button
               type="button"
               variant="ghost"
@@ -483,7 +527,7 @@ export function LoginPage({
             >
               {t(($) => $.common.back)}
             </Button>
-          </CardFooter>
+          </div>
       </LoginShell>
     );
   }
@@ -494,7 +538,7 @@ export function LoginPage({
 
   return (
     <LoginShell>
-        <CardHeader className="text-center">
+        <div className="flex flex-col items-center gap-1.5 text-center">
           {logo && <div className="mx-auto mb-4">{logo}</div>}
           <CardTitle className="text-display-sm">
             {t(($) => $.signin.title)}
@@ -502,8 +546,8 @@ export function LoginPage({
           <CardDescription>
             {t(($) => $.signin.description)}
           </CardDescription>
-        </CardHeader>
-        <CardContent>
+        </div>
+        <div>
           <form id="login-form" onSubmit={handleSendCode} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="login-email">{t(($) => $.common.email)}</Label>
@@ -521,8 +565,8 @@ export function LoginPage({
               <p className="text-body text-destructive">{error}</p>
             )}
           </form>
-        </CardContent>
-        <CardFooter className="flex flex-col gap-3">
+        </div>
+        <div className="flex flex-col gap-3">
           <Button
             type="submit"
             form="login-form"
@@ -565,7 +609,7 @@ export function LoginPage({
             </Button>
           )}
           {extra && <div className="w-full pt-1 text-center">{extra}</div>}
-        </CardFooter>
+        </div>
     </LoginShell>
   );
 }
