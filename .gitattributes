@@ -2,5 +2,10 @@
 *.sh text eol=lf
 docker/entrypoint.sh text eol=lf
 
+# Read line by line by scripts/go-test-with-agent-cli-guard.sh, which validates
+# each name against [A-Za-z0-9._-]. A CRLF checkout appends a CR to every name
+# and the guard rejects the first one, failing test-go.sh before it runs a test.
+scripts/agent-cli-command-names.txt text eol=lf
+
 # Default behavior
 * text=auto
