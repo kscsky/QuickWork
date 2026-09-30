@@ -291,376 +291,425 @@ html[data-dnd-dragging="true"] * {
 }
 
 
-/* Sign-in dispatch scene: the identity panel shows a dispatch board doing its
- * job — a task card is handed from the left zone to an agent in the right
- * zone, the agent runs it, and a receipt travels back. It replaced a rail
- * drawing whose anonymous grey blocks said nothing about who was doing what.
+/* Sign-in dispatch board: the identity panel shows the product's own conveyor —
+ * five lanes (demand, review, execute, test, accept) with task cards on them.
+ * React owns the board (which card is in which lane, and every number under
+ * the headers); this block owns only what is pure decoration, so none of it
+ * costs a render:
  *
- * Every element runs off ONE 10s timeline of CSS keyframes, so the scene is
- * deterministic, runs off the main thread and costs zero React renders. The
- * percentages are the product's own timings, not decoration: 14% the card has
- * settled, 18-32% it crosses, 32-36% the receiving agent lights up, 36-66%
- * the run (progress 0→100%), 66-74% done, 74-88% the receipt flies back,
- * 88-96% the fade that hides the loop restart. Every moving part reaches
- * opacity 0 before the timeline wraps, which is what makes the snap back to
- * the start invisible.
+ *   .login-scene-sweep   a slow wash crossing the board, so it is never a
+ *                        still image between ticks
+ *   .login-scene-pulse   the live dot on a card an agent is working
+ *   .login-scene-agent   the agent avatar's ring, breathing while it runs
+ *   .login-scene-run     the progress fill, whose duration is the ticks that
+ *                        card actually spends in the execute lane
+ *   .login-scene-check   the accept check, drawn rather than popped in
+ *   .login-scene-card    the tone handover as a card changes stage
  *
- * `--dispatch-phase` (set on a lane root, negative so a lane is already
- * mid-cycle on first paint) shifts a whole lane down the same timeline. Three
- * lanes at 0s / -3.5s / -7s never line up, so something is always dispatching,
- * running or receiving rather than the panel resetting in unison every 10s.
- *
- * Each rule declares its animation in longhands and leaves out the delay: the
- * single `.dispatch-flow` rule at the end supplies `animation-delay` for every
- * animated part (the avatar's pulse ring included), so the phase wiring is one
- * thing to read rather than twelve. */
+ * Every one of them is in the reduced-motion list at the bottom of this file:
+ * a reader who asked for less motion gets the resting frame, which the base
+ * declarations below are written to make presentable (an idle dot, a full
+ * progress bar, a finished check).
+ */
 
-/* The card's travel. The runner spans the lane's width, so 100% minus the
- * card's own width parks the card's trailing edge at the target zone. */
-@keyframes dispatch-card-run {
-  0%,
-  18% {
-    transform: translateX(0);
-  }
-  32%,
-  100% {
-    transform: translateX(var(--dispatch-run));
-  }
-}
-
-/* Every stop below repeats all four properties on purpose, and the rules
- * further down follow the same rule. A property omitted from the closing stops
- * does not hold its value — it interpolates back toward whatever the timeline
- * said elsewhere, which silently drained the progress bar to zero over the
- * last third of the cycle and bled the card's tint back to white. */
-@keyframes dispatch-card {
+@keyframes login-scene-sweep {
   0% {
+    transform: translateX(-100%);
     opacity: 0;
-    transform: translateY(8px);
-    background-color: var(--surface-raised);
-    border-color: var(--surface-border);
   }
   14%,
-  34% {
+  86% {
     opacity: 1;
-    transform: translateY(0);
-    background-color: var(--surface-raised);
-    border-color: var(--surface-border);
   }
-  38%,
-  66% {
-    opacity: 1;
-    transform: translateY(0);
-    background-color: var(--inflight-surface);
-    border-color: color-mix(in oklab, var(--inflight) 40%, transparent);
-  }
-  70%,
-  88% {
-    opacity: 1;
-    transform: translateY(0);
-    background-color: color-mix(in oklab, var(--success) 12%, var(--surface-raised));
-    border-color: color-mix(in oklab, var(--success) 38%, transparent);
-  }
-  96%,
   100% {
+    transform: translateX(100%);
     opacity: 0;
-    transform: translateY(-6px);
-    background-color: color-mix(in oklab, var(--success) 12%, var(--surface-raised));
-    border-color: color-mix(in oklab, var(--success) 38%, transparent);
   }
 }
 
-/* Trail left behind the card while it crosses, drawn from the card's trailing
- * edge so it grows with the card instead of with the lane. */
-@keyframes dispatch-trail {
+.login-scene-sweep {
+  background: linear-gradient(
+    90deg,
+    transparent 34%,
+    color-mix(in oklab, var(--brand) 5%, transparent) 50%,
+    transparent 66%
+  );
+  animation: login-scene-sweep 9s linear infinite;
+}
+
+@keyframes login-scene-pulse {
   0%,
-  18% {
-    opacity: 0;
+  100% {
+    opacity: 1;
+    box-shadow: 0 0 0 0 color-mix(in oklab, var(--inflight) 45%, transparent);
+  }
+  50% {
+    opacity: 0.55;
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--inflight) 0%, transparent);
+  }
+}
+
+.login-scene-pulse {
+  animation: login-scene-pulse 1.8s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+@keyframes login-scene-agent {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in oklab, var(--inflight) 40%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--inflight) 0%, transparent);
+  }
+}
+
+.login-scene-agent {
+  animation: login-scene-agent 2.4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+/* Duration comes from the card, not from here: the bar has to be full on the
+ * tick the card leaves the lane, and how many ticks that is depends on which
+ * dwell row the card drew. `both` so the fill also holds empty before the
+ * first frame — without it the bar flashes full for one paint on mount. */
+@keyframes login-scene-run {
+  from {
     transform: scaleX(0);
   }
-  22% {
-    opacity: 1;
-  }
-  30% {
-    opacity: 1;
-    transform: scaleX(1);
-  }
-  34%,
-  100% {
-    opacity: 0;
+  to {
     transform: scaleX(1);
   }
 }
 
-@keyframes dispatch-receipt-run {
-  0%,
-  74% {
-    transform: translateX(var(--dispatch-run));
+.login-scene-run {
+  transform-origin: left center;
+  animation-name: login-scene-run;
+  animation-duration: var(--login-scene-run-ms, 1400ms);
+  animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  animation-fill-mode: both;
+}
+
+/* The check is drawn. The dash length overshoots the path (~8.7 units in a
+ * 10-unit viewBox) so the stroke is hidden at the start regardless of how the
+ *  path is later edited. */
+@keyframes login-scene-check {
+  from {
+    stroke-dashoffset: 14;
   }
-  88%,
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.login-scene-check {
+  stroke-dasharray: 14;
+  animation: login-scene-check 380ms linear both;
+}
+
+/* The card's own tone handover: grey while queued, amber with an agent, green
+ * once accepted. A transition rather than a keyframe because the class changes
+ * with the stage and there is nothing to sequence. */
+.login-scene-card {
+  transition:
+    background-color 320ms cubic-bezier(0.23, 1, 0.32, 1),
+    border-color 320ms cubic-bezier(0.23, 1, 0.32, 1),
+    color 320ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+/* Sign-in column: three steps share this chrome (email, code, CLI authorize),
+ * so everything below has to hold on all three.
+ *
+ *   .login-form-ambient        a slow brand wash behind the panel, so the
+ *                              form is not a rectangle of still DOM
+ *   .login-form-marker         the ring that travels along the step rail and
+ *                              breathes once it arrives
+ *   .login-field               the frame around a text field, including the
+ *                              accent bar and halo that only exist on focus
+ *   .login-otp-cell            one digit of the code, framed like a field
+ *   .login-cta                 hover lift / press settle on the CTAs
+ *   .login-cta-busy            and the sweep that says the wait is a request
+ *   .login-form-shake          a rejected attempt
+ *   .login-form-otp-complete   six digits in: the cells go green, hold a ring
+ *                              and draw a rule under themselves while the code
+ *                              is verified
+ *   .login-form-otp-invalid    the code was rejected
+ *
+ * Three of these write their own `box-shadow`, which is why they cannot be
+ * utilities: the focus halo, the completion ring and the marker's pulse are all
+ * shadows on elements the base components already style, and a class that only
+ * adds has to be unlayered to win. That is also why the rules below reach for
+ * `[data-slot="input"]` — the field is the thing that has a focus state, and
+ * the control inside it is stripped back to text.
+ *
+ * The ambient layer centres itself with Tailwind's transform utilities, so the
+ * keyframes below animate the independent `translate` property instead of
+ * `transform` — animating `transform` here would overwrite the centring. */
+
+@keyframes login-form-ambient {
+  from {
+    translate: -2.5rem -1.5rem;
+    opacity: 0.55;
+  }
+  to {
+    translate: 2.5rem 2rem;
+    opacity: 0.9;
+  }
+}
+
+.login-form-ambient {
+  background: radial-gradient(
+    circle,
+    color-mix(in oklab, var(--brand) 9%, transparent) 0%,
+    transparent 62%
+  );
+  animation: login-form-ambient 26s cubic-bezier(0.4, 0, 0.2, 1) infinite
+    alternate;
+}
+
+/* The marker lands on a node and then breathes there, so the rail is never
+ * completely still between steps. Position is the element's own `left`, owned
+ * by motion; only the halo is here. */
+@keyframes login-form-marker {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in oklab, var(--brand) 38%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 5px color-mix(in oklab, var(--brand) 0%, transparent);
+  }
+}
+
+.login-form-marker {
+  animation: login-form-marker 2.4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+/* A field's frame. The Input keeps its own focus ring everywhere else in the
+ * product; here the box around it owns the focus state, because the accent bar
+ * and the halo are drawn against the box and have to appear together. */
+.login-field {
+  position: relative;
+  border: 1px solid var(--input);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  transition:
+    border-color 220ms cubic-bezier(0.23, 1, 0.32, 1),
+    box-shadow 220ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.login-field [data-slot="input"] {
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  box-shadow: none;
+}
+
+/* Armed but short while the field is idle, full height the moment focus lands
+ * in it. It grows from its own middle, so the movement reads as the field
+ * opening rather than as the bar sliding up the edge. */
+.login-field::before {
+  content: "";
+  position: absolute;
+  left: 0.25rem;
+  top: 50%;
+  width: 2px;
+  height: 55%;
+  border-radius: 9999px;
+  background: var(--brand);
+  translate: 0 -50%;
+  scale: 1 0.14;
+  opacity: 0;
+  transition:
+    scale 320ms cubic-bezier(0.23, 1, 0.32, 1),
+    opacity 200ms linear;
+}
+
+.login-field:focus-within {
+  border-color: color-mix(in oklab, var(--brand) 55%, var(--input));
+  box-shadow: 0 0 0 4px color-mix(in oklab, var(--brand) 11%, transparent);
+}
+
+.login-field:focus-within::before {
+  scale: 1 1;
+  opacity: 1;
+}
+
+/* One digit of the login code. The six cells share the field's width, so the
+ * block lines up with the label row above it the way the email field does. */
+.login-otp-cell {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 3.25rem;
+  border: 1px solid var(--input);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  font-family: var(--font-mono);
+  transition:
+    border-color 220ms cubic-bezier(0.23, 1, 0.32, 1),
+    box-shadow 220ms cubic-bezier(0.23, 1, 0.32, 1),
+    color 220ms linear;
+}
+
+/* The slot's own active state is a ring in `--ring`; the focus language here is
+ * the field's, so the cell takes the same border and halo the email field does. */
+.login-otp-cell[data-active="true"] {
+  border-color: color-mix(in oklab, var(--brand) 55%, var(--input));
+  box-shadow: 0 0 0 4px color-mix(in oklab, var(--brand) 11%, transparent);
+}
+
+/* Lift on hover, settle on press. The curve is UI_EASE_OUT from
+ * `@quickwork/ui/lib/motion`; the rest of the list is repeated from the base
+ * button because an unlayered rule replaces its `transition-property`
+ * wholesale, and dropping `opacity` there would make `disabled` snap.
+ *
+ * The height and radius are here rather than on the call sites: a hero control
+ * is the same size in all three steps, and `--radius-lg` is the frame radius
+ * the fields beside it use. */
+.login-cta {
+  height: 2.75rem;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  transition:
+    transform 180ms cubic-bezier(0.23, 1, 0.32, 1),
+    box-shadow 180ms cubic-bezier(0.23, 1, 0.32, 1),
+    color 150ms cubic-bezier(0.23, 1, 0.32, 1),
+    background-color 150ms cubic-bezier(0.23, 1, 0.32, 1),
+    border-color 150ms cubic-bezier(0.23, 1, 0.32, 1),
+    opacity 150ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.login-cta:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px -6px color-mix(in oklab, var(--foreground) 45%, transparent);
+}
+
+.login-cta:active:not(:disabled) {
+  transform: translateY(0.5px) scale(0.995);
+  box-shadow: none;
+}
+
+/* Waiting on the server. The label already says what is happening; this says
+ * that something is, and keeps saying it for as long as the request takes —
+ * which a state that only changes the words cannot do.
+ *
+ * The CTA is `disabled` while it waits so it cannot be pressed twice, and the
+ * base button reads `disabled` as half opacity — which is the right signal for
+ * "you cannot press this" and the wrong one for "this is working". A request in
+ * flight is fully alive, so the busy state keeps the button solid and lets the
+ * sweep carry the state instead. */
+@keyframes login-cta-sweep {
+  from {
+    transform: translateX(-110%);
+  }
+  to {
+    transform: translateX(410%);
+  }
+}
+
+.login-cta-busy {
+  position: relative;
+  opacity: 1;
+}
+
+.login-cta-busy::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 24%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in oklab, var(--brand-foreground) 26%, transparent),
+    transparent
+  );
+  animation: login-cta-sweep 1.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+@keyframes login-form-shake {
+  0%,
   100% {
     transform: translateX(0);
   }
-}
-
-@keyframes dispatch-receipt {
-  0%,
-  74% {
-    opacity: 0;
+  20% {
+    transform: translateX(-5px);
   }
-  78% {
-    opacity: 1;
+  40% {
+    transform: translateX(5px);
   }
-  92% {
-    opacity: 1;
+  60% {
+    transform: translateX(-3px);
   }
-  96%,
-  100% {
-    opacity: 0;
+  80% {
+    transform: translateX(3px);
   }
 }
 
-/* The receipt lands in the source zone: one blink, timed to the instant the
- * flight ends at 88%. */
-@keyframes dispatch-receipt-blink {
-  0%,
-  86% {
-    background-color: color-mix(in oklab, var(--brand) 12%, transparent);
-    box-shadow: 0 0 0 0 transparent;
-  }
-  89% {
-    background-color: color-mix(in oklab, var(--brand) 28%, transparent);
-    box-shadow: 0 0 0 4px color-mix(in oklab, var(--brand) 20%, transparent);
-  }
-  92%,
-  100% {
-    background-color: color-mix(in oklab, var(--brand) 12%, transparent);
-    box-shadow: 0 0 0 0 transparent;
+.login-form-shake {
+  animation: login-form-shake 420ms linear both;
+}
+
+/* The resting state is the settled one, so `animation: none` under reduced
+ * motion leaves the field green rather than unmarked; the keyframes only
+ * describe the ring expanding into place. */
+@keyframes login-form-otp-complete {
+  from {
+    box-shadow: 0 0 0 0 color-mix(in oklab, var(--success) 55%, transparent);
   }
 }
 
-/* Status labels are stacked in one grid cell and cross-faded, which is how a
- * keyframe timeline swaps text without React. The handovers overlap by one
- * percent: a hard cut from one label to the next, or a fade that finished
- * before the next one started, would leave the card with no status at all for
- * a visible beat. */
-@keyframes dispatch-status-todo {
-  0%,
-  32% {
-    opacity: 1;
-  }
-  33%,
-  100% {
-    opacity: 0;
-  }
+.login-form-otp-complete {
+  position: relative;
+  box-shadow: 0 0 0 4px color-mix(in oklab, var(--success) 16%, transparent);
+  animation: login-form-otp-complete 420ms cubic-bezier(0.23, 1, 0.32, 1) both;
 }
 
-@keyframes dispatch-status-running {
-  0%,
-  32% {
-    opacity: 0;
-  }
-  33%,
-  66% {
-    opacity: 1;
-  }
-  67%,
-  100% {
-    opacity: 0;
-  }
+.login-form-otp-complete [data-slot="input-otp-slot"] {
+  border-color: color-mix(in oklab, var(--success) 55%, var(--input));
+  color: var(--success);
 }
 
-@keyframes dispatch-status-done {
-  0%,
-  66% {
-    opacity: 0;
-  }
-  67%,
-  100% {
-    opacity: 1;
-  }
-}
-
-/* Both properties declared at every stop, for the same reason as the card:
- * without the trailing `scaleX(1)` the bar drained itself over the last third
- * of the cycle instead of staying full through the run. */
-@keyframes dispatch-progress-fill {
-  0%,
-  36% {
+/* The rule the six cells draw under themselves as the last digit lands: the
+ * code is a whole, and this is the one mark that spans all six rather than
+ * repeating per cell. It stays drawn — the cells hold their green while the
+ * code is verified, and the rule is part of that state. */
+@keyframes login-form-otp-sweep {
+  from {
     transform: scaleX(0);
-    opacity: 1;
+    opacity: 0.2;
   }
-  66%,
-  88% {
+  to {
     transform: scaleX(1);
     opacity: 1;
   }
-  96%,
-  100% {
-    transform: scaleX(1);
-    opacity: 0;
-  }
 }
 
-/* The receiving agent: dim while idle, a scale bump and a ring on arrival,
- * ring held for the run, then back to idle. */
-@keyframes dispatch-agent {
-  0%,
-  31% {
-    opacity: 0.55;
-    transform: scale(1);
-    box-shadow: 0 0 0 0 transparent;
-  }
-  33% {
-    opacity: 1;
-    transform: scale(1.14);
-    box-shadow: 0 0 0 4px color-mix(in oklab, var(--brand) 28%, transparent);
-  }
-  36% {
-    transform: scale(1);
-    box-shadow: 0 0 0 2px color-mix(in oklab, var(--brand) 32%, transparent);
-  }
-  66% {
-    opacity: 1;
-    transform: scale(1);
-    box-shadow: 0 0 0 2px color-mix(in oklab, var(--brand) 32%, transparent);
-  }
-  74%,
-  100% {
-    opacity: 0.55;
-    transform: scale(1);
-    box-shadow: 0 0 0 0 transparent;
-  }
-}
-
-@keyframes dispatch-agent-pulse {
-  0%,
-  32% {
-    opacity: 0;
-    transform: scale(1);
-  }
-  34% {
-    opacity: 0.55;
-  }
-  40%,
-  100% {
-    opacity: 0;
-    transform: scale(1.9);
-  }
-}
-
-.dispatch-card-run {
-  animation-name: dispatch-card-run;
-  animation-duration: 10s;
-  animation-iteration-count: infinite;
-  animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-  will-change: transform;
-}
-
-.dispatch-card {
-  background-color: var(--surface-raised);
-  border-color: var(--surface-border);
-  animation-name: dispatch-card;
-  animation-duration: 10s;
-  animation-iteration-count: infinite;
-  animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-/* Resting state, which is what survives `animation: none`: a lane that is not
- * running shows a card waiting in its source zone, an empty progress bar, an
- * idle agent and no in-flight parts at all. The animations outrank these
- * declarations for as long as they run, so they never affect the live board. */
-.dispatch-trail {
-  opacity: 0;
-  transform-origin: right center;
-  animation-name: dispatch-trail;
-  animation-duration: 10s;
-  animation-iteration-count: infinite;
-  animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.dispatch-receipt {
-  opacity: 0;
-  animation-name: dispatch-receipt-run, dispatch-receipt;
-  animation-duration: 10s;
-  animation-iteration-count: infinite;
-  animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1), linear;
-  will-change: transform, opacity;
-}
-
-.dispatch-receipt-label {
-  animation-name: dispatch-receipt-blink;
-  animation-duration: 10s;
-  animation-iteration-count: infinite;
-  animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-/* Hidden by default so the resting frame of a lane (reduced motion) shows the
- * queued label only — an animation outranks a normal declaration, so while
- * the timeline runs these defaults never win. */
-.dispatch-status {
-  opacity: 0;
-}
-
-.dispatch-status-todo {
-  opacity: 1;
-  animation-name: dispatch-status-todo;
-  animation-duration: 10s;
-  animation-iteration-count: infinite;
-  animation-timing-function: linear;
-}
-
-.dispatch-status-running {
-  animation-name: dispatch-status-running;
-  animation-duration: 10s;
-  animation-iteration-count: infinite;
-  animation-timing-function: linear;
-}
-
-.dispatch-status-done {
-  animation-name: dispatch-status-done;
-  animation-duration: 10s;
-  animation-iteration-count: infinite;
-  animation-timing-function: linear;
-}
-
-.dispatch-progress-fill {
-  transform: scaleX(0);
-  transform-origin: left center;
-  animation-name: dispatch-progress-fill;
-  animation-duration: 10s;
-  animation-iteration-count: infinite;
-  animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.dispatch-agent {
-  opacity: 0.55;
-  animation-name: dispatch-agent;
-  animation-duration: 10s;
-  animation-iteration-count: infinite;
-  animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.dispatch-agent::after {
+.login-form-otp-complete::after {
   content: "";
   position: absolute;
-  inset: 0;
+  left: 0;
+  right: 0;
+  bottom: -0.5rem;
+  height: 2px;
   border-radius: 9999px;
-  border: 1px solid color-mix(in oklab, var(--brand) 55%, transparent);
-  opacity: 0;
-  animation-name: dispatch-agent-pulse;
-  animation-duration: 10s;
-  animation-iteration-count: infinite;
-  animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  background: linear-gradient(
+    90deg,
+    color-mix(in oklab, var(--success) 0%, transparent),
+    color-mix(in oklab, var(--success) 70%, transparent),
+    color-mix(in oklab, var(--success) 0%, transparent)
+  );
+  transform-origin: left center;
+  animation: login-form-otp-sweep 520ms cubic-bezier(0.23, 1, 0.32, 1) both;
 }
 
-/* One place owns the phase: every animated part of a lane, including the
- * agent's pulse ring, runs the same 10s timeline shifted by the lane's
- * `--dispatch-phase`. No rule above declares a delay of its own, so this is
- * the only thing that decides when a lane's timeline starts. */
-.dispatch-flow,
-.dispatch-agent::after {
-  animation-delay: var(--dispatch-phase, 0s);
+/* Rejections: red digits and a shake. Both ride the same class because a
+ * failed verify clears the code in the same batch, so the class leaves the DOM
+ * and comes back — which is what restarts the shake on a repeat failure. */
+.login-form-otp-invalid {
+  animation: login-form-shake 420ms linear both;
+}
+
+.login-form-otp-invalid [data-slot="input-otp-slot"] {
+  border-color: color-mix(in oklab, var(--destructive) 60%, var(--input));
 }
 
 /* Sign-in code field: each digit pops in as it is typed, so a six-digit code
@@ -695,19 +744,45 @@ html[data-dnd-dragging="true"] * {
   .animate-chat-impulse,
   .animate-chat-text-shimmer,
   .animate-nav-progress-sweep,
-  .dispatch-card-run,
-  .dispatch-card,
-  .dispatch-trail,
-  .dispatch-receipt,
-  .dispatch-receipt-label,
-  .dispatch-status-todo,
-  .dispatch-status-running,
-  .dispatch-status-done,
-  .dispatch-progress-fill,
-  .dispatch-agent,
-  .dispatch-agent::after,
-  .animate-otp-digit {
+  .animate-otp-digit,
+  .login-scene-sweep,
+  .login-scene-pulse,
+  .login-scene-agent,
+  .login-scene-run,
+  .login-scene-check,
+  .login-form-ambient,
+  .login-form-marker,
+  .login-form-shake,
+  .login-form-otp-complete,
+  .login-form-otp-complete::after,
+  .login-form-otp-invalid,
+  .login-cta-busy::after {
     animation: none;
+  }
+
+  /* Resting frames for the two animations whose "off" state would otherwise be
+   * the wrong state: a check that never drew is an invisible check, and a
+   * progress bar that never ran is an empty one. */
+  .login-scene-check {
+    stroke-dashoffset: 0;
+  }
+
+  .login-scene-run {
+    transform: scaleX(1);
+  }
+
+  /* The busy sweep has no resting frame that means anything — a stationary
+   * wedge of light across the button reads as a rendering fault, so the wait is
+   * carried by the label alone. */
+  .login-cta-busy::after {
+    display: none;
+  }
+
+  .login-cta,
+  .login-field,
+  .login-otp-cell,
+  .login-scene-card {
+    transition: none;
   }
 
   [data-right-sidebar-panel] {
