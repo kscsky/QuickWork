@@ -187,10 +187,10 @@ export function StepWelcome({
 
 
 /**
- * A day in a solo user's multi-agent workspace. Five activity cards
- * woven through 3 shared issues (MCA-42 appears 3×) so the reader can
- * *see* agents referencing each other's work — the product's
- * "one workspace, shared context" thesis rendered concretely.
+ * One task crossing a zone boundary, told as five activity cards. Two of them
+ * sit on a source-zone issue (EAST-42) and two on a target-zone issue
+ * (NORTH-18), so the reader can *see* the same work appear under a different
+ * zone and the receipt come back — the product's thesis rendered concretely.
  *
  * Cards use slight rotations + indents to feel like a hand-stacked
  * pile rather than a neat feed, which matches the editorial-hero
@@ -206,7 +206,7 @@ function WelcomeIllustration() {
           name: t(($) => $.welcome.illustration.card1_actor_name),
           initial: t(($) => $.welcome.illustration.card1_actor_initial),
         }}
-        issueId="MCA-42"
+        issueId="EAST-42"
         content={
           <>
             <Mention>{t(($) => $.welcome.illustration.card1_mention_content)}</Mention>
@@ -223,7 +223,7 @@ function WelcomeIllustration() {
           name: t(($) => $.welcome.illustration.card2_actor_name),
           provider: "codex",
         }}
-        issueId="MCA-42"
+        issueId="NORTH-18"
         content={t(($) => $.welcome.illustration.card2_body)}
         status="in_progress"
       />
@@ -234,7 +234,7 @@ function WelcomeIllustration() {
           name: t(($) => $.welcome.illustration.card3_actor_name),
           provider: "hermes",
         }}
-        issueId="MCA-38"
+        issueId="NORTH-18"
         content={t(($) => $.welcome.illustration.card3_body)}
         status="done"
         timestamp={t(($) => $.welcome.illustration.card3_timestamp)}
@@ -246,7 +246,7 @@ function WelcomeIllustration() {
           name: t(($) => $.welcome.illustration.card4_actor_name),
           provider: "openclaw",
         }}
-        issueId="MCA-42"
+        issueId="EAST-42"
         content={t(($) => $.welcome.illustration.card4_body)}
         status="in_review"
       />
@@ -257,7 +257,7 @@ function WelcomeIllustration() {
           name: t(($) => $.welcome.illustration.card5_actor_name),
           provider: "claude",
         }}
-        issueId="MCA-35"
+        issueId="EAST-42"
         content={
           <>
             {t(($) => $.welcome.illustration.card5_body_prefix)}
