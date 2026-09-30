@@ -54,6 +54,10 @@ var (
 	opencodeFlagProbeCache = map[string]bool{}
 )
 
+// opencodeFlagProbeTimeout bounds one `run --help` probe when the caller's own
+// context allows more time than that.
+const opencodeFlagProbeTimeout = 15 * time.Second
+
 // supportsSkipPermissionsFlag reports whether this opencode binary still
 // accepts --dangerously-skip-permissions. The flag has already been removed
 // once upstream: passing an unknown flag makes `opencode run` print its usage
@@ -61,23 +65,37 @@ var (
 // below documents), while versions that still have it rely on the flag for
 // non-interactive tool auto-approval. Probe `run --help` once per path and
 // pass the flag only when the CLI advertises it.
-func (b *opencodeBackend) supportsSkipPermissionsFlag(execPath string) bool {
+//
+// Two things about the probe are load-bearing. It is bounded by the caller's
+// context as well as by its own timeout, because it runs on the task's Execute
+// path: a fixed bound rooted at context.Background() outlives a task whose own
+// deadline is shorter, and the task then fails with a context error raised
+// against work it never started. And the cache lock is not held while the
+// probe runs, because that would make every path wait on every other path's
+// CLI — one slow binary would stall unrelated tasks. Concurrent first-time
+// probes of the same path are merely redundant, not incorrect.
+func (b *opencodeBackend) supportsSkipPermissionsFlag(ctx context.Context, execPath string) bool {
 	if b.cfg.opencodeSkipPermissionsProbe != nil {
 		return b.cfg.opencodeSkipPermissionsProbe(execPath)
 	}
 	opencodeFlagProbeMu.Lock()
-	defer opencodeFlagProbeMu.Unlock()
-	if v, ok := opencodeFlagProbeCache[execPath]; ok {
+	v, cached := opencodeFlagProbeCache[execPath]
+	opencodeFlagProbeMu.Unlock()
+	if cached {
 		return v
 	}
-	v := false
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+
+	probeCtx, cancel := context.WithTimeout(ctx, opencodeFlagProbeTimeout)
 	defer cancel()
-	probe := b.cfg.commandAt(execPath).exec(ctx, "run", "--help")
+	v = false
+	probe := b.cfg.commandAt(execPath).exec(probeCtx, "run", "--help")
 	if out, err := combinedOutputOwned(probe, b.cfg.Logger); err == nil {
 		v = strings.Contains(string(out), "--dangerously-skip-permissions")
 	}
+
+	opencodeFlagProbeMu.Lock()
 	opencodeFlagProbeCache[execPath] = v
+	opencodeFlagProbeMu.Unlock()
 	return v
 }
 
@@ -102,7 +120,7 @@ func (b *opencodeBackend) Execute(ctx context.Context, prompt string, opts ExecO
 	runCtx, cancel := runContext(ctx, timeout)
 
 	args := []string{"run", "--format", "json"}
-	if b.supportsSkipPermissionsFlag(execPath) {
+	if b.supportsSkipPermissionsFlag(runCtx, execPath) {
 		args = append(args, "--dangerously-skip-permissions")
 	}
 	// Anchor OpenCode's project discovery (AGENTS.md walk-up + .opencode/skills/
