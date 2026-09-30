@@ -74,7 +74,7 @@ brews:
       branch: main
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
     directory: Formula
-    homepage: "https://github.com/multica-ai/multica"
+    homepage: "https://quickwork.ai"
     description: "QuickWork CLI — local agent runtime and management tool for the QuickWork platform"
     # No license stanza: QuickWork ships under the QuickWork License (Apache 2.0
     # terms with additional conditions, see LICENSE), which has no SPDX

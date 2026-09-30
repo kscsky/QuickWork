@@ -691,7 +691,7 @@ func TestPrepareThenCleanupSidecarsSameSlugCollisionPerProvider(t *testing.T) {
 					{
 						Name:        "Issue Review",
 						Description: "QuickWork's version",
-						Content:     "---\nname: issue-review\n---\n\nMultica skill content.\n",
+						Content:     "---\nname: issue-review\n---\n\nQuickWork skill content.\n",
 						Files: []SkillFileContextForEnv{
 							{Path: "templates/checklist.md", Content: "- [ ] check"},
 						},

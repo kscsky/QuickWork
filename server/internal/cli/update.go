@@ -30,6 +30,15 @@ import (
 // changes one place.
 const ChecksumManifestName = "checksums.txt"
 
+// ReleaseRepo is the GitHub "owner/name" whose releases carry the CLI
+// archives, and BrewTapPackage the formula that installs them. Constants for
+// the same reason as ChecksumManifestName: a rename touches one place, and the
+// updater never fetches a release from a repo this binary did not come from.
+const (
+	ReleaseRepo    = "kscsky/QuickWork"
+	BrewTapPackage = "kscsky/tap/quickwork"
+)
+
 const DefaultUpdateDownloadTimeout = 120 * time.Second
 
 // GitHubRelease is the subset of the GitHub releases API response we need.
@@ -226,7 +235,7 @@ func verifyAssetSHA256(data []byte, expectedHex, assetName string) error {
 
 func fetchReleaseByTag(tag string) (*GitHubRelease, error) {
 	client := &http.Client{Timeout: 10 * time.Second}
-	req, err := http.NewRequest(http.MethodGet, "https://api.github.com/repos/multica-ai/multica/releases/tags/"+tag, nil)
+	req, err := http.NewRequest(http.MethodGet, "https://api.github.com/repos/"+ReleaseRepo+"/releases/tags/"+tag, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -249,10 +258,10 @@ func fetchReleaseByTag(tag string) (*GitHubRelease, error) {
 	return &release, nil
 }
 
-// FetchLatestRelease fetches the latest release tag from the quickwork GitHub repo.
+// FetchLatestRelease fetches the latest release tag from the QuickWork GitHub repo.
 func FetchLatestRelease() (*GitHubRelease, error) {
 	client := &http.Client{Timeout: 10 * time.Second}
-	req, err := http.NewRequest(http.MethodGet, "https://api.github.com/repos/multica-ai/multica/releases/latest", nil)
+	req, err := http.NewRequest(http.MethodGet, "https://api.github.com/repos/"+ReleaseRepo+"/releases/latest", nil)
 	if err != nil {
 		return nil, err
 	}
@@ -326,10 +335,10 @@ func GetBrewPrefix() string {
 	return strings.TrimSpace(string(out))
 }
 
-// UpdateViaBrew runs `brew upgrade multica-ai/tap/quickwork`.
+// UpdateViaBrew runs `brew upgrade kscsky/tap/quickwork`.
 // Returns the combined output and any error.
 func UpdateViaBrew() (string, error) {
-	cmd := exec.Command("brew", "upgrade", "multica-ai/tap/quickwork")
+	cmd := exec.Command("brew", "upgrade", BrewTapPackage)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return string(out), fmt.Errorf("brew upgrade failed: %w", err)

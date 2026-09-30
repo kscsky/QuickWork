@@ -14,8 +14,7 @@ import {
 } from "@/features/landing/utils/os-detect";
 import type { LatestRelease } from "@/features/landing/utils/github-release";
 
-const ALL_RELEASES_URL =
-  "https://github.com/multica-ai/multica/releases";
+const ALL_RELEASES_URL = "https://github.com/kscsky/QuickWork/releases";
 
 export function DownloadClient({ release }: { release: LatestRelease }) {
   const [detected, setDetected] = useState<DetectResult | null>(null);

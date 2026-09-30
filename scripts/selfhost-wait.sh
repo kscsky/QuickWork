@@ -84,13 +84,13 @@ if [ "$mode" = "build" ]; then
   echo "Built images locally via docker-compose.selfhost.build.yml."
   echo "Local tags: quickwork-backend:dev and quickwork-web:dev."
 else
-  echo "Images: ${QUICKWORK_BACKEND_IMAGE:-ghcr.io/multica-ai/multica-backend}:${QUICKWORK_IMAGE_TAG:-latest}"
-  echo "        ${QUICKWORK_WEB_IMAGE:-ghcr.io/multica-ai/multica-web}:${QUICKWORK_IMAGE_TAG:-latest}"
+  echo "Images: ${QUICKWORK_BACKEND_IMAGE:-ghcr.io/kscsky/quickwork-backend}:${QUICKWORK_IMAGE_TAG:-latest}"
+  echo "        ${QUICKWORK_WEB_IMAGE:-ghcr.io/kscsky/quickwork-web}:${QUICKWORK_IMAGE_TAG:-latest}"
 fi
 echo ""
 echo "Log in: configure RESEND_API_KEY in .env for email codes,"
 echo "        or read the generated code from backend logs when Resend is unset."
 echo ""
 echo "Next — install the CLI and connect your machine:"
-echo "  brew install multica-ai/tap/quickwork"
+echo "  brew install kscsky/tap/quickwork"
 echo "  quickwork setup self-host"

@@ -8,7 +8,7 @@ version: 0.1.0
 appVersion: "latest"
 home: https://quickwork.ai
 sources:
-  - https://github.com/multica-ai/multica
+  - https://github.com/kscsky/QuickWork
 keywords:
   - quickwork
   - issue-tracker

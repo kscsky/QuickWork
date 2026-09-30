@@ -56,7 +56,7 @@ services:
       retries: 5
 
   backend:
-    image: ${QUICKWORK_BACKEND_IMAGE:-ghcr.io/multica-ai/multica-backend}:${QUICKWORK_IMAGE_TAG:-latest}
+    image: ${QUICKWORK_BACKEND_IMAGE:-ghcr.io/kscsky/quickwork-backend}:${QUICKWORK_IMAGE_TAG:-latest}
     depends_on:
       postgres:
         condition: service_healthy
@@ -215,7 +215,7 @@ services:
     restart: unless-stopped
 
   frontend:
-    image: ${QUICKWORK_WEB_IMAGE:-ghcr.io/multica-ai/multica-web}:${QUICKWORK_IMAGE_TAG:-latest}
+    image: ${QUICKWORK_WEB_IMAGE:-ghcr.io/kscsky/quickwork-web}:${QUICKWORK_IMAGE_TAG:-latest}
     depends_on:
       - backend
     ports:

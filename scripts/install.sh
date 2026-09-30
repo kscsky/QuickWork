@@ -2,10 +2,10 @@
 # QuickWork installer — installs the CLI and optionally provisions a self-host server.
 #
 # Install / upgrade CLI only:
-#   curl -fsSL https://raw.githubusercontent.com/multica-ai/multica/main/scripts/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/kscsky/QuickWork/main/scripts/install.sh | bash
 #
 # Install CLI + provision self-host server:
-#   curl -fsSL https://raw.githubusercontent.com/multica-ai/multica/main/scripts/install.sh | bash -s -- --with-server
+#   curl -fsSL https://raw.githubusercontent.com/kscsky/QuickWork/main/scripts/install.sh | bash -s -- --with-server
 #
 # After installation, run `quickwork setup` to configure your environment.
 #
@@ -14,10 +14,10 @@ set -euo pipefail
 # ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------
-REPO_URL="https://github.com/multica-ai/multica.git"
-REPO_WEB_URL="https://github.com/multica-ai/multica"  # without .git, for GitHub web APIs
+REPO_URL="https://github.com/kscsky/QuickWork.git"
+REPO_WEB_URL="https://github.com/kscsky/QuickWork"  # without .git, for GitHub web APIs
 INSTALL_DIR="${QUICKWORK_INSTALL_DIR:-$HOME/.quickwork/server}"
-BREW_PACKAGE="multica-ai/tap/quickwork"
+BREW_PACKAGE="kscsky/tap/quickwork"
 
 # Host ports Compose reported after `up -d`; set by setup_server and reused by
 # the summary so the health check and the printed URLs cannot diverge.
@@ -93,7 +93,7 @@ detect_os() {
     Linux)  OS="linux" ;;
     MINGW*|MSYS*|CYGWIN*)
             fail "This script does not support Windows. Use the PowerShell installer instead:
-  irm https://raw.githubusercontent.com/multica-ai/multica/main/scripts/install.ps1 | iex" ;;
+  irm https://raw.githubusercontent.com/kscsky/QuickWork/main/scripts/install.ps1 | iex" ;;
     *)      fail "Unsupported operating system: $(uname -s). QuickWork supports macOS, Linux, and Windows." ;;
   esac
 
@@ -121,7 +121,7 @@ install_cli_brew() {
   info "Installing QuickWork CLI via Homebrew..."
   local brew_log
   brew_log=$(mktemp)
-  if ! brew tap multica-ai/tap >"$brew_log" 2>&1; then
+  if ! brew tap kscsky/tap >"$brew_log" 2>&1; then
     warn "Failed to add Homebrew tap. Falling back to GitHub Releases binary install."
     _dump_brew_log "$brew_log"
     rm -f "$brew_log"
@@ -155,7 +155,7 @@ install_cli_binary() {
   fi
 
   local version="${latest#v}"
-  local url="https://github.com/multica-ai/multica/releases/download/${latest}/quickwork-cli-${version}-${OS}-${ARCH}.tar.gz"
+  local url="https://github.com/kscsky/QuickWork/releases/download/${latest}/quickwork-cli-${version}-${OS}-${ARCH}.tar.gz"
   local tmp_dir
   tmp_dir=$(mktemp -d)
 
@@ -443,7 +443,7 @@ run_default() {
   printf "\n"
   print_remote_server_token_hint
   printf "  ${BOLD}Self-hosting?${RESET} Install the server first:\n"
-  printf "     curl -fsSL https://raw.githubusercontent.com/multica-ai/multica/main/scripts/install.sh | bash -s -- --with-server\n"
+  printf "     curl -fsSL https://raw.githubusercontent.com/kscsky/QuickWork/main/scripts/install.sh | bash -s -- --with-server\n"
   printf "\n"
 }
 
@@ -478,7 +478,7 @@ run_with_server() {
   printf "  or read the generated code from backend logs when Resend is unset.\n"
   printf "\n"
   printf "  ${BOLD}To stop all services:${RESET}\n"
-  printf "     curl -fsSL https://raw.githubusercontent.com/multica-ai/multica/main/scripts/install.sh | bash -s -- --stop\n"
+  printf "     curl -fsSL https://raw.githubusercontent.com/kscsky/QuickWork/main/scripts/install.sh | bash -s -- --stop\n"
   printf "\n"
 }
 
