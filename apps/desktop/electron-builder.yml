@@ -57,10 +57,10 @@ linux:
   # package name (`@quickwork/desktop`) into the installed binary, the
   # `.desktop` file, and the hicolor icon filename. Without this override
   # electron-builder defaults `executableName` to the package `name`,
-  # which after slash-stripping becomes `@multicadesktop` — producing
-  # `/usr/share/applications/@multicadesktop.desktop`,
-  # `Icon=@multicadesktop`, and
-  # `/usr/share/icons/hicolor/*/apps/@multicadesktop.png`. The leading `@`
+  # which after slash-stripping becomes `@quickworkdesktop` — producing
+  # `/usr/share/applications/@quickworkdesktop.desktop`,
+  # `Icon=@quickworkdesktop`, and
+  # `/usr/share/icons/hicolor/*/apps/@quickworkdesktop.png`. The leading `@`
   # violates the freedesktop desktop-entry naming guidance, so GNOME /
   # Ubuntu fail to associate the running window with the `.desktop` entry
   # and fall back to the theme's default app icon (the Settings gear on
@@ -123,7 +123,7 @@ win:
   artifactName: quickwork-desktop-${version}-windows-${arch}.${ext}
 publish:
   provider: github
-  owner: multica-ai
+  owner: kscsky
   repo: quickwork
   # Align with our CLI release flow which pre-creates a *published* GitHub
   # Release via `gh release create`. The electron-builder default of
