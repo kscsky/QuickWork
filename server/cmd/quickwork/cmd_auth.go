@@ -24,7 +24,13 @@ import (
 // loginTokenPrefixes are the token prefixes `quickwork login --token` accepts.
 // Keep this list in sync with the prefix branches in
 // server/internal/middleware/auth.go.
-var loginTokenPrefixes = []string{"mul_"}
+//
+// `mcn_` is the managed-cloud Cloud Node PAT. This build's middleware does not
+// verify it, so a self-hosted server rejects it later — but the CLI must still
+// accept the format, because `login --token mcn_...` is what the cloud's own
+// token page tells users to paste, and failing it here reads as "your token is
+// malformed" rather than "this server can't verify it".
+var loginTokenPrefixes = []string{"mul_", "mcn_"}
 
 // validateLoginTokenPrefix returns nil if token starts with one of the
 // CLI-recognised PAT prefixes, or an error describing the accepted set.
