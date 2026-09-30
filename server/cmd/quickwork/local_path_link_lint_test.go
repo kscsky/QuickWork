@@ -130,7 +130,7 @@ func TestFindLocalPathLinksAllowsLegitimateContent(t *testing.T) {
 		},
 		{
 			name: "external http link",
-			body: "the PR is at [#42](https://github.com/multica-ai/quickwork/pull/42)",
+			body: "the PR is at [#42](https://github.com/multica-ai/multica/pull/42)",
 		},
 		{
 			name: "mention link",

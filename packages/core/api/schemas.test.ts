@@ -1862,10 +1862,10 @@ describe("Plugin schemas", () => {
     // state where a component could render it.
     const parsed = PluginInstallationSchema.parse({
       id: "installation-1",
-      config: { repo: "multica-ai/quickwork" },
+      config: { repo: "multica-ai/multica" },
       configured_secrets: ["token"],
     });
-    expect(parsed.config).toEqual({ repo: "multica-ai/quickwork" });
+    expect(parsed.config).toEqual({ repo: "multica-ai/multica" });
     expect(parsed.configured_secrets).toEqual(["token"]);
     expect(Object.keys(parsed)).not.toContain("secrets");
   });

@@ -652,7 +652,7 @@ func normalizeCodexMcpServerConfig(server map[string]any) map[string]any {
 	if !isCodexRemoteMcpServer(server) {
 		normalized := make(map[string]any, len(server))
 		for k, v := range server {
-			if isMulticaMcpSelectorKey(k) {
+			if isQuickWorkMcpSelectorKey(k) {
 				continue
 			}
 			normalized[k] = v
@@ -663,7 +663,7 @@ func normalizeCodexMcpServerConfig(server map[string]any) map[string]any {
 	normalized := make(map[string]any, len(server)+1)
 	for k, v := range server {
 		switch {
-		case isMulticaMcpSelectorKey(k):
+		case isQuickWorkMcpSelectorKey(k):
 			continue
 		case k == "type":
 			continue
@@ -679,7 +679,7 @@ func normalizeCodexMcpServerConfig(server map[string]any) map[string]any {
 	return normalized
 }
 
-func isMulticaMcpSelectorKey(k string) bool {
+func isQuickWorkMcpSelectorKey(k string) bool {
 	switch k {
 	case "tools", "prompts", "resources":
 		return true

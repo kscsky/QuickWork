@@ -211,7 +211,7 @@ func TestClaim_UnboundSessionReportsNoChannelType(t *testing.T) {
 	}
 }
 
-func TestClaim_ChannelOriginChatWithoutTaskDeliveryIsPrivateMulticaTurn(t *testing.T) {
+func TestClaim_ChannelOriginChatWithoutTaskDeliveryIsPrivateQuickWorkTurn(t *testing.T) {
 	if testHandler == nil {
 		t.Skip("database not available")
 	}

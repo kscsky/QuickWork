@@ -4056,7 +4056,7 @@ func (h *Handler) BatchUpdateIssues(w http.ResponseWriter, r *http.Request) {
 	// real-world cases that hit this path are caller mistakes (status placed
 	// at the top level, "update" misspelled as singular). Telling the truth
 	// here — `{"updated": 0}` — keeps the wire shape stable while making the
-	// count match reality. See multica-ai/quickwork#1660.
+	// count match reality. See multica-ai/multica#1660.
 	hasMutation := req.Updates.Title != nil ||
 		req.Updates.Description != nil ||
 		req.Updates.Status != nil ||

@@ -799,8 +799,8 @@ func resolveAgentExecutablePath(cmd string) (string, error) {
 	if strings.ContainsAny(cmd, "/\\") {
 		return canonicalConfiguredExecutablePath(resolved), nil
 	}
-	if isInMulticaHooksDir(resolved) {
-		if unshadowed, err := lookPathExcludingMulticaHooks(cmd); err == nil {
+	if isInQuickWorkHooksDir(resolved) {
+		if unshadowed, err := lookPathExcludingQuickWorkHooks(cmd); err == nil {
 			return unshadowed, nil
 		}
 	}
@@ -848,12 +848,12 @@ func reresolveAgentCommand(cmd string) (string, bool) {
 	return "", false
 }
 
-func lookPathExcludingMulticaHooks(cmd string) (string, error) {
+func lookPathExcludingQuickWorkHooks(cmd string) (string, error) {
 	for _, dir := range filepath.SplitList(os.Getenv("PATH")) {
 		if dir == "" {
 			dir = "."
 		}
-		if isMulticaHooksDir(dir) {
+		if isQuickWorkHooksDir(dir) {
 			continue
 		}
 		candidate := filepath.Join(dir, cmd)
@@ -864,14 +864,14 @@ func lookPathExcludingMulticaHooks(cmd string) (string, error) {
 	return "", exec.ErrNotFound
 }
 
-func isInMulticaHooksDir(path string) bool {
+func isInQuickWorkHooksDir(path string) bool {
 	if path == "" {
 		return false
 	}
-	return isMulticaHooksDir(filepath.Dir(path))
+	return isQuickWorkHooksDir(filepath.Dir(path))
 }
 
-func isMulticaHooksDir(dir string) bool {
+func isQuickWorkHooksDir(dir string) bool {
 	home, err := os.UserHomeDir()
 	if err != nil || home == "" {
 		return false

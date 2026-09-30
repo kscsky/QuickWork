@@ -29,7 +29,7 @@ import (
 //   - Codex CLI may also read user-level state from `~/.codex/memories/`
 //     entirely outside the daemon's per-task isolation, dragging
 //     unrelated host-project context into QuickWork tasks. The reproduction
-//     in github.com/multica-ai/quickwork#3130 saw Raw Memories from
+//     in github.com/multica-ai/multica#3130 saw Raw Memories from
 //     `D:\Project\MoHaYu\WowChat` (a host-local project) injected into a
 //     brand-new QuickWork issue's first Codex turn.
 //
@@ -115,10 +115,10 @@ func codexMemoryEnabled() bool {
 	return false
 }
 
-// renderMulticaMemoryFeatureBlock returns the daemon-managed memory-feature
+// renderQuickWorkMemoryFeatureBlock returns the daemon-managed memory-feature
 // block. The body uses `memories = false` when injected inside a
 // `[features]` table, and `features.memories = false` otherwise.
-func renderMulticaMemoryFeatureBlock(inFeaturesTable bool) string {
+func renderQuickWorkMemoryFeatureBlock(inFeaturesTable bool) string {
 	var b strings.Builder
 	b.WriteString(quickworkMemoryFeatureBeginMarker)
 	b.WriteString("\n")
@@ -132,10 +132,10 @@ func renderMulticaMemoryFeatureBlock(inFeaturesTable bool) string {
 	return b.String()
 }
 
-// renderMulticaMemoryConfigBlock returns the daemon-managed memory-config
+// renderQuickWorkMemoryConfigBlock returns the daemon-managed memory-config
 // block. The body uses bare keys when injected inside a `[memories]` table
 // and dotted-key form otherwise.
-func renderMulticaMemoryConfigBlock(inMemoriesTable bool) string {
+func renderQuickWorkMemoryConfigBlock(inMemoriesTable bool) string {
 	var b strings.Builder
 	b.WriteString(quickworkMemoryConfigBeginMarker)
 	b.WriteString("\n")
@@ -224,7 +224,7 @@ func hasRootMemoriesTable(content string) bool {
 // line. Caller must have already stripped any prior managed block and any
 // user-set `memories` directive from inside the table.
 func injectMemoryFeatureBlockIntoFeaturesTable(content string) string {
-	return injectAfterHeader(content, rootFeaturesTableHeaderRe, renderMulticaMemoryFeatureBlock(true))
+	return injectAfterHeader(content, rootFeaturesTableHeaderRe, renderQuickWorkMemoryFeatureBlock(true))
 }
 
 // injectMemoryConfigBlockIntoMemoriesTable inserts the in-table
@@ -233,7 +233,7 @@ func injectMemoryFeatureBlockIntoFeaturesTable(content string) string {
 // user-set `generate_memories` / `use_memories` directive from inside the
 // table.
 func injectMemoryConfigBlockIntoMemoriesTable(content string) string {
-	return injectAfterHeader(content, rootMemoriesTableHeaderRe, renderMulticaMemoryConfigBlock(true))
+	return injectAfterHeader(content, rootMemoriesTableHeaderRe, renderQuickWorkMemoryConfigBlock(true))
 }
 
 // injectAfterHeader inserts block right after the first line matching
@@ -316,10 +316,10 @@ func ensureCodexMemoryConfig(configPath string, logger *slog.Logger) error {
 	// Build the root-form blocks (if any) and prepend them.
 	var prepend strings.Builder
 	if !hasFeatures {
-		prepend.WriteString(renderMulticaMemoryFeatureBlock(false))
+		prepend.WriteString(renderQuickWorkMemoryFeatureBlock(false))
 	}
 	if !hasMemories {
-		prepend.WriteString(renderMulticaMemoryConfigBlock(false))
+		prepend.WriteString(renderQuickWorkMemoryConfigBlock(false))
 	}
 	prependStr := prepend.String()
 

@@ -733,8 +733,8 @@ type WorktreeParams struct {
 	// inside WorkDir instead of a linked worktree whose gitdir lives under the
 	// shared cache. Codex tasks need this because workspace-write keeps a
 	// resolved external worktree gitdir read-only even when it is explicitly
-	// listed as a writable root — on Linux (multica-ai/quickwork#2925) and on the
-	// Windows native sandbox (multica-ai/quickwork#6449).
+	// listed as a writable root — on Linux (multica-ai/multica#2925) and on the
+	// Windows native sandbox (multica-ai/multica#6449).
 	IsolatedGitMetadata bool
 }
 

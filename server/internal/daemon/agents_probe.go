@@ -225,7 +225,7 @@ var probeAgentCLIs = func() map[string]AgentEntry {
 	// DSH is registered only when its QuickWork runtime profile is installed.
 	// A bare dsh binary is not enough: without the bundle it has no --stdio
 	// protocol and every task would fail after being advertised as healthy.
-	if e, ok := probe("QUICKWORK_DSH_PATH", "dsh", "QUICKWORK_DSH_MODEL"); ok && probeDshMulticaProfile(e.Path) {
+	if e, ok := probe("QUICKWORK_DSH_PATH", "dsh", "QUICKWORK_DSH_MODEL"); ok && probeDshQuickWorkProfile(e.Path) {
 		agents["dsh"] = e
 	}
 	if e, ok := probe("QUICKWORK_KIRO_PATH", "kiro-cli", "QUICKWORK_KIRO_MODEL"); ok {
@@ -306,7 +306,7 @@ var probeAgentCLIs = func() map[string]AgentEntry {
 	return agents
 }
 
-func probeDshMulticaProfile(executablePath string) bool {
+func probeDshQuickWorkProfile(executablePath string) bool {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, executablePath, "--profile", "quickwork", "--probe")

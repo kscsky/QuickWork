@@ -13,7 +13,7 @@ brew install multica-ai/tap/quickwork
 ### Build from Source
 
 ```bash
-git clone https://github.com/multica-ai/quickwork.git
+git clone https://github.com/multica-ai/multica.git
 cd quickwork
 make build
 cp server/bin/quickwork /usr/local/bin/quickwork

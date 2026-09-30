@@ -474,7 +474,7 @@ func TestPluginInstallConfigureAndUninstall(t *testing.T) {
 	}
 
 	params := map[string]string{"id": testWorkspaceID, "installationId": installed.ID}
-	configure, _ := json.Marshal(map[string]any{"values": map[string]any{"repo": "multica-ai/quickwork", "token": "sk-super-secret"}})
+	configure, _ := json.Marshal(map[string]any{"values": map[string]any{"repo": "multica-ai/multica", "token": "sk-super-secret"}})
 	recorder = httptest.NewRecorder()
 	testHandler.ConfigurePlugin(recorder, pluginHandlerRequest(http.MethodPut, "/plugins/config", configure, params))
 	if recorder.Code != http.StatusOK {
@@ -492,7 +492,7 @@ func TestPluginInstallConfigureAndUninstall(t *testing.T) {
 	if err := json.Unmarshal(recorder.Body.Bytes(), &configured); err != nil {
 		t.Fatalf("decode configured installation: %v", err)
 	}
-	if configured.Config["repo"] != "multica-ai/quickwork" {
+	if configured.Config["repo"] != "multica-ai/multica" {
 		t.Fatalf("plain config value was not stored: %v", configured.Config)
 	}
 	if _, present := configured.Config["token"]; present {

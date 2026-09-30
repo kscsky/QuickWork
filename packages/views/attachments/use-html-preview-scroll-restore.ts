@@ -48,7 +48,7 @@ import { hashString } from "../editor/utils/hash-string";
 /** Container key the Coordinator stores this under in the tab memento. */
 export const HTML_IFRAME_SCROLL_KEY = "html-iframe";
 
-const BRIDGE_MARK = "__multica";
+const BRIDGE_MARK = "__quickwork";
 
 type BridgeMessage =
   | { kind: "scroll"; y: number; height: number }

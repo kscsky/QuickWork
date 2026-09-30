@@ -11,11 +11,11 @@
 // that it happened at all.
 
 const pending = new Map();
-const port = globalThis.__multicaPluginBridgePortV2;
+const port = globalThis.__quickworkPluginBridgePortV2;
 let sequence = 0;
 
 if (!(port instanceof MessagePort)) throw new Error("QuickWork surface bridge is unavailable");
-delete globalThis.__multicaPluginBridgePortV2;
+delete globalThis.__quickworkPluginBridgePortV2;
 port.onmessage = (message) => {
   const payload = message.data;
   if (payload?.kind === "theme") return applyTheme(payload.theme);

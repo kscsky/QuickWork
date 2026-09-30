@@ -2007,7 +2007,7 @@ func TestCodexStartOrResumeThreadResumesPriorThread(t *testing.T) {
 
 // codexRuntimeBriefCanary stands in for the QuickWork runtime brief the daemon
 // would inline if developerInstructions were ever wired back up.
-const codexRuntimeBriefCanary = "MULTICA-RUNTIME-BRIEF-CANARY"
+const codexRuntimeBriefCanary = "QUICKWORK-RUNTIME-BRIEF-CANARY"
 
 // assertNoDeveloperInstructions pins the MUL-5392 contract: Codex loads the
 // per-task AGENTS.md from the thread's cwd, so the daemon never inlines the

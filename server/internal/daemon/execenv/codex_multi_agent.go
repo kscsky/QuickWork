@@ -90,10 +90,10 @@ func codexMultiAgentEnabled() bool {
 	return false
 }
 
-// renderMulticaMultiAgentBlock returns the daemon-managed multi-agent
+// renderQuickWorkMultiAgentBlock returns the daemon-managed multi-agent
 // block. The body uses `multi_agent = false` when injected inside a
 // `[features]` table, and `features.multi_agent = false` otherwise.
-func renderMulticaMultiAgentBlock(inFeaturesTable bool) string {
+func renderQuickWorkMultiAgentBlock(inFeaturesTable bool) string {
 	var b strings.Builder
 	b.WriteString(quickworkMultiAgentBeginMarker)
 	b.WriteString("\n")
@@ -164,7 +164,7 @@ func hasRootFeaturesTable(content string) bool {
 // already stripped any prior managed block and any user-set `multi_agent`
 // directive from inside the table.
 func injectManagedBlockIntoFeaturesTable(content string) string {
-	block := renderMulticaMultiAgentBlock(true)
+	block := renderQuickWorkMultiAgentBlock(true)
 	// Drop the trailing `\n` so we don't introduce a stray blank line when
 	// splicing block lines between existing lines.
 	blockLines := strings.Split(strings.TrimRight(block, "\n"), "\n")
@@ -219,7 +219,7 @@ func ensureCodexMultiAgentConfig(configPath string, logger *slog.Logger) error {
 		updated = injectManagedBlockIntoFeaturesTable(existing)
 	} else {
 		existing = strings.TrimLeft(existing, "\n")
-		block := renderMulticaMultiAgentBlock(false)
+		block := renderQuickWorkMultiAgentBlock(false)
 		if existing == "" {
 			updated = block
 		} else {

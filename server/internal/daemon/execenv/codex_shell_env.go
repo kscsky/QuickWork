@@ -109,7 +109,7 @@ func codexDefaultExcludesEnvKey(upperKey string) bool {
 		strings.Contains(upperKey, "TOKEN")
 }
 
-func renderMulticaShellEnvBlock(includeOnly []string) (string, error) {
+func renderQuickWorkShellEnvBlock(includeOnly []string) (string, error) {
 	policy, err := toml.Marshal(codexShellEnvironmentPolicy{
 		Inherit:               "all",
 		IgnoreDefaultExcludes: true,
@@ -269,7 +269,7 @@ func EnsureCodexShellEnvPolicyConfig(configPath string, includeOnly []string, lo
 	if err != nil {
 		return err
 	}
-	block, err := renderMulticaShellEnvBlock(includeOnly)
+	block, err := renderQuickWorkShellEnvBlock(includeOnly)
 	if err != nil {
 		return err
 	}

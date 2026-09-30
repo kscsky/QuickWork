@@ -17,7 +17,7 @@ import (
 // in the quickwork binary. The daemon runs Prepare/Reuse in that subprocess so a
 // blocked filesystem syscall can be terminated without leaving an in-process
 // goroutine that may resume writing after the task has already been retried.
-const PreparationHelperArg = "__multica_execenv_prepare"
+const PreparationHelperArg = "__quickwork_execenv_prepare"
 
 const (
 	preparationActionPrepare = "prepare"

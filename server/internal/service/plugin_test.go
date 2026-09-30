@@ -80,7 +80,7 @@ func TestNormalizeConfigValue(t *testing.T) {
 		return got
 	}
 
-	if value, err := normalizeConfigValue(field("repo"), "multica-ai/quickwork"); err != nil || value != "multica-ai/quickwork" {
+	if value, err := normalizeConfigValue(field("repo"), "multica-ai/multica"); err != nil || value != "multica-ai/multica" {
 		t.Fatalf("string field = (%v, %v)", value, err)
 	}
 	if value, err := normalizeConfigValue(field("count"), float64(3)); err != nil || value != float64(3) {

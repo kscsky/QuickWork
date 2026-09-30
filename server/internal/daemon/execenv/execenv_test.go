@@ -564,7 +564,7 @@ func TestPrepareWithProjectResources(t *testing.T) {
 			{
 				ID:           "33333333-4444-5555-6666-777777777777",
 				ResourceType: "github_repo",
-				ResourceRef:  json.RawMessage(`{"url":"https://github.com/multica-ai/quickwork","ref":"release/v2","default_branch_hint":"main"}`),
+				ResourceRef:  json.RawMessage(`{"url":"https://github.com/multica-ai/multica","ref":"release/v2","default_branch_hint":"main"}`),
 			},
 		},
 	}
@@ -627,7 +627,7 @@ func TestPrepareWithProjectResources(t *testing.T) {
 		"Agent UX 2026",
 		"Always write copy in British English. Ship behind a feature flag.",
 		"GitHub repo",
-		"https://github.com/multica-ai/quickwork",
+		"https://github.com/multica-ai/multica",
 		"checkout ref: `release/v2`",
 		"default branch hint: `main`",
 		".quickwork/project/resources.json",
@@ -1772,7 +1772,7 @@ func TestWriteContextFilesFrontmatterNameFollowsCollisionSlug(t *testing.T) {
 	ctx := TaskContextForEnv{
 		IssueID: "collision-test",
 		AgentSkills: []SkillContextForEnv{
-			{Name: "Review", Content: "---\nname: whatever-upstream-said\n---\n\nmultica body"},
+			{Name: "Review", Content: "---\nname: whatever-upstream-said\n---\n\nquickwork body"},
 		},
 	}
 
@@ -1794,7 +1794,7 @@ func TestWriteContextFilesFrontmatterNameFollowsCollisionSlug(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read relocated SKILL.md: %v", err)
 	}
-	want := "---\nname: review-quickwork\n---\n\nmultica body"
+	want := "---\nname: review-quickwork\n---\n\nquickwork body"
 	if string(moved) != want {
 		t.Errorf("frontmatter name did not follow the collision slug; got:\n%s\nwant:\n%s", moved, want)
 	}

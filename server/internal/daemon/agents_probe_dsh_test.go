@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-func TestProbeDshMulticaProfile(t *testing.T) {
+func TestProbeDshQuickWorkProfile(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("shell fixture")
 	}
@@ -27,14 +27,14 @@ func TestProbeDshMulticaProfile(t *testing.T) {
 			if err := os.WriteFile(path, []byte(script), 0o755); err != nil {
 				t.Fatal(err)
 			}
-			if got := probeDshMulticaProfile(path); got != tc.want {
-				t.Fatalf("probeDshMulticaProfile() = %v, want %v", got, tc.want)
+			if got := probeDshQuickWorkProfile(path); got != tc.want {
+				t.Fatalf("probeDshQuickWorkProfile() = %v, want %v", got, tc.want)
 			}
 		})
 	}
 }
 
-func TestProbeAgentCLIsRequiresDshMulticaProfile(t *testing.T) {
+func TestProbeAgentCLIsRequiresDshQuickWorkProfile(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("shell fixture")
 	}

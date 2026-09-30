@@ -534,7 +534,7 @@ func TestTaskScopedAuthToken(t *testing.T) {
 	}
 }
 
-func TestTaskMulticaEnvironmentIncludesPrivateConfigRoot(t *testing.T) {
+func TestTaskQuickWorkEnvironmentIncludesPrivateConfigRoot(t *testing.T) {
 	t.Parallel()
 
 	const (
@@ -547,7 +547,7 @@ func TestTaskMulticaEnvironmentIncludesPrivateConfigRoot(t *testing.T) {
 		AgentID:     "agent-test",
 		WorkspaceID: "workspace-test",
 	}
-	env := taskMulticaEnvironment(task, "agent-name", fakeToken, taskRoot, workspacesRoot, "https://task.example", 19514, 3, "/task/tmp")
+	env := taskQuickWorkEnvironment(task, "agent-name", fakeToken, taskRoot, workspacesRoot, "https://task.example", 19514, 3, "/task/tmp")
 
 	want := map[string]string{
 		"QUICKWORK_TOKEN":                fakeToken,
@@ -565,7 +565,7 @@ func TestTaskMulticaEnvironmentIncludesPrivateConfigRoot(t *testing.T) {
 		"TEMP":                         "/task/tmp",
 	}
 	if !maps.Equal(env, want) {
-		t.Fatalf("taskMulticaEnvironment() = %#v, want %#v", env, want)
+		t.Fatalf("taskQuickWorkEnvironment() = %#v, want %#v", env, want)
 	}
 
 	layerCustomEnvAndHermesHome(env, map[string]string{

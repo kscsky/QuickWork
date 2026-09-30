@@ -25,7 +25,7 @@ const (
 	pluginSurfaceLaunchTTL       = 2 * time.Minute
 	pluginSurfaceProtocolVersion = 2
 	pluginSurfaceConnectMessage  = "quickwork:plugin-bridge-connect"
-	pluginSurfacePortGlobal      = "__multicaPluginBridgePortV2"
+	pluginSurfacePortGlobal      = "__quickworkPluginBridgePortV2"
 )
 
 var errInvalidPluginSurfaceOrigin = errors.New("plugin surface origin must be an absolute HTTP(S) origin without a path")

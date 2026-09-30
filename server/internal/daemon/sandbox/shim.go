@@ -12,7 +12,7 @@
 // Config.LaunchPrefix at [ShimArg, <real CLI path>], so the argv a backend
 // builds for `claude --flag ...` becomes
 //
-//	quickwork __multica_sandbox_exec claude --flag ...
+//	quickwork __quickwork_sandbox_exec claude --flag ...
 //
 // and this file is what runs.
 package sandbox
@@ -30,7 +30,7 @@ import (
 
 // ShimArg selects the private shim mode in the quickwork binary. Naming follows
 // execenv.PreparationHelperArg: a double-underscore argument no user types.
-const ShimArg = "__multica_sandbox_exec"
+const ShimArg = "__quickwork_sandbox_exec"
 
 // Environment variables the daemon sets on the shimmed process.
 const (

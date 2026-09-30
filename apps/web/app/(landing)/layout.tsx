@@ -21,7 +21,7 @@ const jsonLd = {
       "@type": "Organization",
       name: "QuickWork",
       url: "https://www.quickwork.ai",
-      sameAs: ["https://github.com/multica-ai/quickwork"],
+      sameAs: ["https://github.com/multica-ai/multica"],
     },
     {
       "@type": "SoftwareApplication",

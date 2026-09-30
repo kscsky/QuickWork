@@ -1680,7 +1680,7 @@ func checkUntrackedReplayable(gitRoot string, logger *slog.Logger) error {
 		skipped int
 	)
 	for _, rel := range strings.Split(out, "\x00") {
-		if rel == "" || isMulticaSidecarPath(rel) {
+		if rel == "" || isQuickWorkSidecarPath(rel) {
 			continue
 		}
 		info, statErr := os.Lstat(filepath.Join(gitRoot, rel))
@@ -1726,13 +1726,13 @@ var quickworkSidecarDirNames = []string{
 	".quickwork",
 }
 
-// isMulticaSidecarPath reports whether a repo-relative path is one of the
+// isQuickWorkSidecarPath reports whether a repo-relative path is one of the
 // daemon's own sidecars rather than the user's content. Matched as a whole
 // path segment at ANY depth, not just the repo root: an in_place resource may
 // point at a subdirectory of this repo, in which case its sidecars sit at
 // <subdir>/.agent_context — replaying those would put another issue's brief
 // inside this task's worktree and commit it to the delivered branch.
-func isMulticaSidecarPath(rel string) bool {
+func isQuickWorkSidecarPath(rel string) bool {
 	for _, seg := range strings.Split(filepath.ToSlash(rel), "/") {
 		for _, name := range quickworkSidecarDirNames {
 			if seg == name {

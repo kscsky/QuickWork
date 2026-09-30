@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 async function loadSdk(port: MessagePort | null) {
   vi.resetModules();
-  if (port) vi.stubGlobal("__multicaPluginBridgePortV2", port);
+  if (port) vi.stubGlobal("__quickworkPluginBridgePortV2", port);
   return import("@quickwork/plugin-sdk");
 }
 
@@ -25,7 +25,7 @@ describe("surface SDK guest port", () => {
 
     expect(asked).toHaveLength(1);
     expect(asked[0]).toMatchObject({ kind: "action", method: "GET", path: "/context" });
-    expect((globalThis as Record<string, unknown>).__multicaPluginBridgePortV2).toBeUndefined();
+    expect((globalThis as Record<string, unknown>).__quickworkPluginBridgePortV2).toBeUndefined();
   });
 
   it("applies theme events delivered before a plugin makes its first request", async () => {

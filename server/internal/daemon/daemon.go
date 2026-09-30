@@ -110,8 +110,8 @@ var pendingWorkHintMinInterval = time.Second
 // worktree's gitdir resolves into the shared cache and stays read-only even
 // when the task workdir is an explicit writable root, so `git add` /
 // `git commit` fail from inside the checkout — Linux hit this in
-// multica-ai/quickwork#2925, Codex's native Windows sandbox in
-// multica-ai/quickwork#6449.
+// multica-ai/multica#2925, Codex's native Windows sandbox in
+// multica-ai/multica#6449.
 //
 // Both platforms now default to danger-full-access (execenv's
 // codexSandboxPolicyFor), so in practice only a user who opted into
@@ -161,7 +161,7 @@ func taskScopedAuthToken(task Task) (string, error) {
 	return token, nil
 }
 
-func taskMulticaEnvironment(task Task, agentName, token, configRoot, workspacesRoot, serverURL string, healthPort, slot int, tempDir string) map[string]string {
+func taskQuickWorkEnvironment(task Task, agentName, token, configRoot, workspacesRoot, serverURL string, healthPort, slot int, tempDir string) map[string]string {
 	return map[string]string{
 		"QUICKWORK_TOKEN":        token,
 		cli.TaskConfigRootEnv:  configRoot,
@@ -7534,7 +7534,7 @@ func (d *Daemon) runTask(ctx context.Context, task Task, provider string, slot i
 		taskLog.Error("task auth token invalid; refusing to start agent", "error", err)
 		return TaskResult{}, err
 	}
-	agentEnv := taskMulticaEnvironment(task, agentName, agentToken, env.QuickworkConfigRoot, d.cfg.WorkspacesRoot, d.cfg.ServerBaseURL, d.cfg.HealthPort, slot, taskTempDir)
+	agentEnv := taskQuickWorkEnvironment(task, agentName, agentToken, env.QuickworkConfigRoot, d.cfg.WorkspacesRoot, d.cfg.ServerBaseURL, d.cfg.HealthPort, slot, taskTempDir)
 	if checkoutMode := repoCheckoutModeFor(provider, runtime.GOOS); checkoutMode != "" {
 		agentEnv[repoCheckoutModeEnv] = checkoutMode
 	}
@@ -7684,7 +7684,7 @@ func (d *Daemon) runTask(ctx context.Context, task Task, provider string, slot i
 		}
 		// The shim takes the real CLI path as its first argument, so the argv
 		// the backend builds — `claude --flag ...` — becomes
-		// `quickwork __multica_sandbox_exec claude --flag ...`.
+		// `quickwork __quickwork_sandbox_exec claude --flag ...`.
 		sandboxExecPath = self
 		sandboxPrefix = append([]string{sandbox.ShimArg, sandbox.RemoteCommandName(entry.Path)}, profileFixedArgs...)
 	}

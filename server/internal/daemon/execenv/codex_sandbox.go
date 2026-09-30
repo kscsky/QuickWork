@@ -334,7 +334,7 @@ const (
 	quickworkManagedEndMarker   = "# END quickwork-managed"
 )
 
-// renderMulticaManagedBlock produces the managed block for the given policy.
+// renderQuickWorkManagedBlock produces the managed block for the given policy.
 //
 // The block contains only top-level key=value assignments — no `[table]`
 // headers — and uses TOML dotted-key syntax for nested values. This is
@@ -348,8 +348,8 @@ const (
 //     key would be parsed as a child of that preceding table.
 //
 // Keeping the block as pure top-level dotted-key assignments, and placing it
-// at the top of the file (see upsertMulticaManagedBlock), avoids both traps.
-func renderMulticaManagedBlock(policy codexSandboxPolicy) string {
+// at the top of the file (see upsertQuickWorkManagedBlock), avoids both traps.
+func renderQuickWorkManagedBlock(policy codexSandboxPolicy) string {
 	var b strings.Builder
 	b.WriteString(quickworkManagedBeginMarker)
 	b.WriteString("\n")
@@ -370,7 +370,7 @@ var managedBlockRe = regexp.MustCompile(
 	`(?ms)^` + regexp.QuoteMeta(quickworkManagedBeginMarker) +
 		`.*?^` + regexp.QuoteMeta(quickworkManagedEndMarker) + `\n*`)
 
-// upsertMulticaManagedBlock returns the config content with the quickwork-managed
+// upsertQuickWorkManagedBlock returns the config content with the quickwork-managed
 // block placed at the very top of the file. Any previously written managed
 // block is removed in place; user content outside the markers is preserved.
 //
@@ -378,12 +378,12 @@ var managedBlockRe = regexp.MustCompile(
 // appended to EOF) so that its top-level keys are parsed at the TOML root,
 // regardless of whether the user's config ends inside a table like
 // `[permissions.quickwork]` or `[profiles.foo]`. Combined with the dotted-key
-// form used by renderMulticaManagedBlock, this means the managed block neither
+// form used by renderQuickWorkManagedBlock, this means the managed block neither
 // leaks into nor inherits from any surrounding table scope.
-func upsertMulticaManagedBlock(content string, policy codexSandboxPolicy) string {
+func upsertQuickWorkManagedBlock(content string, policy codexSandboxPolicy) string {
 	// Drop any previously written managed block (wherever it sits).
 	content = managedBlockRe.ReplaceAllString(content, "")
-	block := renderMulticaManagedBlock(policy)
+	block := renderQuickWorkManagedBlock(policy)
 	// Trim leading blank lines left behind by the removal so we don't grow
 	// the file on every idempotent rewrite.
 	content = strings.TrimLeft(content, "\n")
@@ -450,7 +450,7 @@ func ensureCodexSandboxConfig(configPath string, policy codexSandboxPolicy, dete
 		existing = stripLegacySandboxDirectives(existing)
 	}
 
-	updated := upsertMulticaManagedBlock(existing, policy)
+	updated := upsertQuickWorkManagedBlock(existing, policy)
 	if updated == string(data) {
 		return nil
 	}

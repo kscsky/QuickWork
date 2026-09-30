@@ -71,7 +71,7 @@ describe("scroll bridge runtime", () => {
     );
     expect(ready).toBeTruthy();
     expect(ready?.[0]).toMatchObject({
-      __multica: "__multica",
+      __quickwork: "__quickwork",
       token: TOKEN,
       y: expect.any(Number),
       height: expect.any(Number),
@@ -102,7 +102,7 @@ describe("scroll bridge runtime", () => {
     postMessage.mockClear();
     window.dispatchEvent(
       new MessageEvent("message", {
-        data: { __multica: "__multica", kind: "request-sync", token: TOKEN },
+        data: { __quickwork: "__quickwork", kind: "request-sync", token: TOKEN },
       }),
     );
     expect(
@@ -115,7 +115,7 @@ describe("scroll bridge runtime", () => {
     scrollTo.mockClear();
     window.dispatchEvent(
       new MessageEvent("message", {
-        data: { __multica: "__multica", kind: "restore", y: 100, token: "old" },
+        data: { __quickwork: "__quickwork", kind: "restore", y: 100, token: "old" },
       }),
     );
     expect(scrollTo).not.toHaveBeenCalled();
@@ -156,7 +156,7 @@ describe("scroll bridge runtime", () => {
       window.dispatchEvent(
         new MessageEvent("message", {
           data: {
-            __multica: "__multica",
+            __quickwork: "__quickwork",
             kind: "restore",
             y,
             token: TOKEN,

@@ -19,7 +19,7 @@ import (
 // we don't lose signal when the user actually depends on the metadata
 // endpoint working.
 //
-// Background: GitHub issue multica-ai/quickwork#3711 — on self-hosted
+// Background: GitHub issue multica-ai/multica#3711 — on self-hosted
 // backends that pre-date the per-issue metadata route, agent runtime
 // bootstrap calls `quickwork issue metadata list <issue> --output json`
 // best-effort and any non-zero exit was being escalated by the Hermes

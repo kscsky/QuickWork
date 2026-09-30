@@ -9,7 +9,7 @@ import { copyText } from "@quickwork/ui/lib/clipboard";
 import { useT } from "../../i18n";
 
 const INSTALL_CMD =
-  "curl -fsSL https://raw.githubusercontent.com/multica-ai/quickwork/main/scripts/install.sh | bash";
+  "curl -fsSL https://raw.githubusercontent.com/multica-ai/multica/main/scripts/install.sh | bash";
 const SETUP_CMD = "quickwork setup";
 
 function CopyButton({ text }: { text: string }) {

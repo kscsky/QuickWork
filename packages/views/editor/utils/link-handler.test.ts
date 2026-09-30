@@ -86,10 +86,10 @@ describe("openLink", () => {
   });
 
   it("opens an external URL in a new window", () => {
-    openLink("https://github.com/multica-ai/quickwork/pull/1", "acme", APP_ORIGIN);
+    openLink("https://github.com/multica-ai/multica/pull/1", "acme", APP_ORIGIN);
     expect(dispatched).toHaveLength(0);
     expect(openSpy).toHaveBeenCalledWith(
-      "https://github.com/multica-ai/quickwork/pull/1",
+      "https://github.com/multica-ai/multica/pull/1",
       "_blank",
       "noopener,noreferrer",
     );

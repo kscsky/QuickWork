@@ -529,7 +529,7 @@ func TestFinalizeKeepsWorktreeWhenCommitFails(t *testing.T) {
 // in the user's tree while it runs. A concurrent worktree snapshot sees them as
 // untracked files; copying them would hand this task another issue's brief and
 // commit it to the branch.
-func TestPrepareLocalWorktreeSkipsMulticaSidecars(t *testing.T) {
+func TestPrepareLocalWorktreeSkipsQuickWorkSidecars(t *testing.T) {
 	repo := newTestRepo(t)
 	writeFile(t, filepath.Join(repo, ".agent_context", "issue_context.md"), "OTHER issue's brief\n")
 	writeFile(t, filepath.Join(repo, ".quickwork", "project", "resources.json"), "{}\n")
@@ -1371,7 +1371,7 @@ func TestPrepareLocalWorktreePrunesSnapshotsOfDeletedBranches(t *testing.T) {
 
 // The snapshot is the user's directory, not the daemon's view of it: a sidecar
 // left in their tree by a concurrent in_place task must never reach the branch.
-func TestCaptureUserSnapshotExcludesMulticaSidecars(t *testing.T) {
+func TestCaptureUserSnapshotExcludesQuickWorkSidecars(t *testing.T) {
 	repo := newTestRepo(t)
 	writeFile(t, filepath.Join(repo, ".agent_context", "brief.md"), "another task's brief\n")
 	writeFile(t, filepath.Join(repo, "sub", ".quickwork", "state.json"), "{}\n")

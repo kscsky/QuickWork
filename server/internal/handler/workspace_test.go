@@ -181,7 +181,7 @@ VALUES ($1, 123456789, 'multica-ai', 'quickwork', 3366, 987654321, 'abc123', 153
 		"pr_number":       5265,
 		"title":           "Workspace cleanup snapshot",
 		"state":           "open",
-		"html_url":        "https://github.com/multica-ai/quickwork/pull/5265",
+		"html_url":        "https://github.com/multica-ai/multica/pull/5265",
 		"pr_created_at":   testutil.Raw("now()"),
 		"pr_updated_at":   testutil.Raw("now()"),
 		"head_sha":        "head-a",
@@ -717,14 +717,14 @@ VALUES ($1, $2, 'owner')
 		req := newRequest("PATCH", "/api/workspaces/"+wsID, map[string]any{
 			"repos": []map[string]any{
 				{
-					"url":         "  https://github.com/multica-ai/quickwork.git  ",
+					"url":         "  https://github.com/multica-ai/multica.git  ",
 					"description": "  main monorepo  ",
 				},
 				{
-					"url": "https://github.com/multica-ai/quickwork.git",
+					"url": "https://github.com/multica-ai/multica.git",
 				},
 				{
-					"url": "git@github.com:multica-ai/quickwork-cloud.git",
+					"url": "git@github.com:multica-ai/multica-cloud.git",
 				},
 			},
 		})
@@ -740,10 +740,10 @@ VALUES ($1, $2, 'owner')
 		if len(repos) != 2 {
 			t.Fatalf("expected duplicate URL to be deduped, got %d repos: %s", len(repos), raw)
 		}
-		if repos[0].URL != "https://github.com/multica-ai/quickwork.git" || repos[0].Description != "main monorepo" {
+		if repos[0].URL != "https://github.com/multica-ai/multica.git" || repos[0].Description != "main monorepo" {
 			t.Fatalf("first repo not normalized: %+v", repos[0])
 		}
-		if repos[1].URL != "git@github.com:multica-ai/quickwork-cloud.git" {
+		if repos[1].URL != "git@github.com:multica-ai/multica-cloud.git" {
 			t.Fatalf("second repo not preserved: %+v", repos[1])
 		}
 	})

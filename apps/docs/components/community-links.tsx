@@ -18,7 +18,7 @@ export function CommunityLinks({
     },
     {
       label: "GitHub",
-      href: "https://github.com/multica-ai/quickwork",
+      href: "https://github.com/multica-ai/multica",
       description: githubDescription,
       Icon: GitHubMark,
     },

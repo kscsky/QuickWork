@@ -478,7 +478,7 @@ func TestLoadConfig_DiscoversQwenCode(t *testing.T) {
 	}
 }
 
-func TestLoadConfig_SkipsMulticaHooksShadowingAgentBinaries(t *testing.T) {
+func TestLoadConfig_SkipsQuickWorkHooksShadowingAgentBinaries(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("POSIX shell not available on Windows")
 	}
@@ -534,7 +534,7 @@ func TestLoadConfig_SkipsMulticaHooksShadowingAgentBinaries(t *testing.T) {
 	}
 }
 
-func TestLoadConfig_SkipsMulticaHooksFromLoginShellFallback(t *testing.T) {
+func TestLoadConfig_SkipsQuickWorkHooksFromLoginShellFallback(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("POSIX shell not available on Windows")
 	}

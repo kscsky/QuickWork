@@ -1,6 +1,6 @@
 import { cn } from "@quickwork/ui/lib/utils";
 
-export const githubUrl = "https://github.com/multica-ai/quickwork";
+export const githubUrl = "https://github.com/multica-ai/multica";
 export const twitterUrl = "https://x.com/QuickWorkAI";
 export const discordUrl = "https://discord.gg/W8gYBn226t";
 
