@@ -1,0 +1,55 @@
+---
+title: Cross-zone hand-off
+description: Route a card out of this workspace, into another one, and get the receipt back.
+---
+
+A hand-off rule watches one status in **this** workspace. When a card enters that
+status, QuickWork creates a task in another workspace and wakes that workspace's
+agent. When the target card reaches its receipt status, this card is told.
+
+Work crosses the boundary; the card does not. The source card stays here and
+keeps its own status, assignee and history. What travels is a new task built from
+the rule, plus the context you chose to carry.
+
+## Where rules live
+
+A rule belongs to the **source** workspace and is managed from its settings.
+Each workspace keeps its own rules, so a workspace only decides what it sends,
+never what it receives.
+
+The target side is validated when you save, and it is validated with the **relay
+token** rather than your own account. The token is what actually performs
+deliveries, so a rule the token could not execute is rejected while you are
+looking at the form, instead of failing silently the first time a real card
+fires it.
+
+## What a rule is made of
+
+| Field | What it decides |
+| --- | --- |
+| Rule name | A label for the rule list. Nothing else reads it. |
+| Trigger status | The status **in this workspace** that fires the hand-off. |
+| Target workspace | Where the work goes. |
+| Target agent | The agent in that workspace that picks the task up. |
+| Hand-off note | Optional extra instruction appended to the target task. |
+| Receipt status | The status on the **target** card that reports back to this one. |
+
+## Deciding which cards fire
+
+By default the rule is a lane rule: **any** card entering the trigger status
+fires it. That is the right shape for a standing pipeline — "everything we mark
+Ready goes to the build zone".
+
+When that is too broad, pick specific tasks instead. Only the tasks you pick
+fire the rule; every other card entering the same status is left alone. Use it
+when you want to push three particular cards across, not open a lane.
+
+## The receipt leg
+
+A hand-off is not fire-and-forget. When the target card reaches the receipt
+status, the source card is told — so the person watching this workspace sees the
+work finish without switching workspaces to check.
+
+The receipt status is a status on the **target** card, not on this one, and it is
+what completes the round trip. A rule with a receipt status nothing ever reaches
+will deliver the work and never report back.

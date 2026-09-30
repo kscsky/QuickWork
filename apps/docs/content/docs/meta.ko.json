@@ -3,9 +3,10 @@
   "pages": [
     "---시작하기---",
     "index",
-    "cloud-quickstart",
     "concepts",
     "how-quickwork-works",
+    "---Cross-zone work---",
+    "handoff",
     "tutorial",
     "self-host-quickstart",
     "---워크스페이스---",
@@ -44,7 +45,6 @@
     "vcs-integration",
     "---앱---",
     "desktop-app",
-    "mobile-app",
     "---자체 호스팅---",
     "security-model",
     "environment-variables",
@@ -53,8 +53,6 @@
     "---레퍼런스---",
     "cli",
     "auth-tokens",
-    "---커뮤니티---",
-    "community-maintained",
     "---개발 참여---",
     "developers"
   ]

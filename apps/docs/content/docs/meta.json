@@ -3,9 +3,10 @@
   "pages": [
     "---Get started---",
     "index",
-    "cloud-quickstart",
     "concepts",
     "how-quickwork-works",
+    "---Cross-zone work---",
+    "handoff",
     "tutorial",
     "self-host-quickstart",
     "---Workspace---",
@@ -44,7 +45,6 @@
     "vcs-integration",
     "---Apps---",
     "desktop-app",
-    "mobile-app",
     "---Self-hosting---",
     "security-model",
     "environment-variables",
@@ -53,8 +53,6 @@
     "---Reference---",
     "cli",
     "auth-tokens",
-    "---Community---",
-    "community-maintained",
     "---Development---",
     "developers"
   ]

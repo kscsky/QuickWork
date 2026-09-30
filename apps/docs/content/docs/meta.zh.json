@@ -3,9 +3,10 @@
   "pages": [
     "---开始使用---",
     "index",
-    "cloud-quickstart",
     "concepts",
     "how-quickwork-works",
+    "---Cross-zone work---",
+    "handoff",
     "tutorial",
     "self-host-quickstart",
     "---工作区---",
@@ -44,7 +45,6 @@
     "vcs-integration",
     "---客户端---",
     "desktop-app",
-    "mobile-app",
     "---自托管---",
     "security-model",
     "environment-variables",
@@ -53,8 +53,6 @@
     "---参考---",
     "cli",
     "auth-tokens",
-    "---社区---",
-    "community-maintained",
     "---参与开发---",
     "developers"
   ]
