@@ -722,7 +722,12 @@ export class ApiClient {
     if (!res.ok) {
       if (res.status === 401) this.handleUnauthorized();
       const { message, body } = await this.parseErrorBody(res, `API error: ${res.status} ${res.statusText}`);
-      const logLevel = res.status === 404 ? "warn" : "error";
+      // 401 and 404 are control-flow signals, not failures. A 401 is answered
+      // by handleUnauthorized above (and, on the sign-in page, is simply what
+      // "not logged in yet" looks like); a 404 is often a feature probe. Both
+      // were being logged at error level, which painted a red console error and
+      // tripped the dev error overlay on a page that was working correctly.
+      const logLevel = res.status === 401 || res.status === 404 ? "warn" : "error";
       this.logger[logLevel](`← ${res.status} ${path}`, { rid, duration: `${Date.now() - start}ms`, error: message });
       throw new ApiError(message, res.status, res.statusText, body);
     }
