@@ -66,10 +66,10 @@ func TestCodexShellEnvAllowlistUsesExactTaskAndSafeInheritedNames(t *testing.T) 
 		"HTTPS_PROXY",
 		"LANG",
 		"LOCALAPPDATA",
-		"QUICKWORK_SERVER_URL",
-		"QUICKWORK_TOKEN",
 		"PATH",
 		"PATHEXT",
+		"QUICKWORK_SERVER_URL",
+		"QUICKWORK_TOKEN",
 		"SDKROOT",
 		"SSL_CERT_FILE",
 		"SystemRoot",
@@ -106,8 +106,8 @@ func TestCodexShellEnvAllowlistOnlyAuthorizesExplicitCustomSecrets(t *testing.T)
 	got := CodexShellEnvAllowlist(inherited, explicit, authorizedExplicit)
 	want := []string{
 		"CUSTOM_ACCESS_TOKEN",
-		"QUICKWORK_TOKEN",
 		"PATH",
+		"QUICKWORK_TOKEN",
 		"x_secret",
 		"Y_KEY",
 	}
