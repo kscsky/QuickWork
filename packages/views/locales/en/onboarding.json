@@ -7,7 +7,7 @@
       "description": "Your role, and what you want done."
     },
     "workspace": {
-      "label": "Workspace",
+      "label": "Space",
       "description": "Name it and pick its URL."
     },
     "runtime": {
@@ -18,8 +18,7 @@
   "welcome": {
     "wordmark": "Welcome to QuickWork",
     "headline_line1": "Your task starts here.",
-    "headline_line2": "An agent in",
-    "headline_emphasis": "another zone finishes it.",
+    "headline_line2": "An agent in another zone finishes it.",
     "lede": "Hand a task to another zone and an agent there picks it up — sandboxed, with a receipt back to the card you started from.",
     "lede_web": "Desktop bundles the runtime — nothing to install. Continue on web to connect your own CLI.",
     "lede_desktop": "By the end, a real agent will be replying to your first issue.",
@@ -27,27 +26,17 @@
     "continue_on_web": "Continue on web",
     "start_exploring": "Start exploring",
     "skip_existing": "I've done this before",
-    "illustration_caption": "One task, two zones, and the receipt that closes the loop.",
-    "illustration": {
-      "card1_actor_name": "You",
-      "card1_actor_initial": "N",
-      "card1_body_prefix": " hand this quarter's reconciliation to the northern zone — ",
-      "card1_body_suffix": " holds the ledger access we don't.",
-      "card1_mention_content": "@Fleet",
-      "card1_mention_research": "@Northern Ops",
-      "card2_actor_name": "Fleet",
-      "card2_body": "Picked it up. The ledger is readable from this zone — running it in the sandbox now.",
-      "card3_actor_name": "Fleet",
-      "card3_body": "Reconciliation done: 3 mismatched lines, detail attached.",
-      "card3_timestamp": "4 min ago",
-      "card4_actor_name": "Sentry",
-      "card4_body": "Receipt landed back here. Verifying the three lines against our own copy.",
-      "card5_actor_name": "You",
-      "card5_body_prefix": "Receipt confirmed — ",
-      "card5_body_suffix": " closed it out.",
-      "card5_mention_you": "@Sentry",
-      "card5_timestamp": "just now"
-    }
+    "waybill": {
+      "zone_origin": "Origin zone",
+      "zone_target": "Target zone",
+      "agent": "Fleet",
+      "sandbox": "sandboxed",
+      "stamp": "Receipt returned",
+      "checkpoint_received": "Accepted",
+      "checkpoint_dispatched": "Dispatched",
+      "checkpoint_running": "Running"
+    },
+    "illustration_caption": "One task, two zones, and the receipt that closes the loop."
   },
   "common": {
     "back": "Back",
@@ -141,7 +130,7 @@
   },
   "welcome_after_onboarding": {
     "skip": {
-      "loading": "Setting up your workspace…",
+      "loading": "Setting up your space…",
       "title": "Welcome to QuickWork!",
       "subtitle": "We've added one issue to help you connect a runtime. When it's ready, start with Mika from Runtimes.",
       "got_it": "Got it",
@@ -159,13 +148,13 @@
     }
   },
   "step_workspace": {
-    "eyebrow_first": "Your first workspace",
+    "eyebrow_first": "Your first space",
     "eyebrow_resume": "Pick up or start fresh",
-    "headline_first": "Name your workspace.",
+    "headline_first": "Name your space.",
     "headline_resume": "Continue with {{name}}, or start another.",
-    "lede_first": "A workspace is where your issues, agents, and projects live. You can invite teammates or spin up more workspaces later.",
-    "lede_resume": "Resume setup with the workspace you already have, or create a new one alongside it — you can belong to any number of workspaces.",
-    "name_label": "Workspace name",
+    "lede_first": "A space is where your issues, agents, and projects live. You can invite teammates or spin up more spaces later.",
+    "lede_resume": "Resume setup with the space you already have, or create a new one alongside it — you can belong to any number of spaces.",
+    "name_label": "Space name",
     "name_placeholder": "Acme Inc, My Lab, Side Projects…",
     "random_name": "Random",
     "url_label": "URL",
@@ -174,30 +163,30 @@
     "issue_prefix_prefix": "Issues will look like ",
     "issue_prefix_suffix": ". You can change this later in settings.",
     "issue_prefix_pending": "Set the URL above and issue numbers will follow it — or type a prefix here.",
-    "create_new_title": "Create a new workspace",
+    "create_new_title": "Create a new space",
     "create_new_subtitle": "Start fresh — a separate space for a different side of your work.",
     "hint_opening": "Opening {{name}}.",
     "hint_creating": "Creating {{name}}.",
     "hint_creating_pending": "Creating {{name}}…",
-    "hint_creating_fallback": "your workspace",
-    "hint_name_first": "Name your workspace to create it.",
-    "hint_pick": "Pick your workspace or start a new one.",
+    "hint_creating_fallback": "your space",
+    "hint_name_first": "Name your space to create it.",
+    "hint_pick": "Pick your space or start a new one.",
     "cta_open": "Open {{name}}",
     "cta_create_named": "Create {{name}}",
-    "cta_create_workspace": "Create workspace",
+    "cta_create_workspace": "Create space",
     "cta_creating": "Creating…",
     "slug_format_error": "Only lowercase letters, numbers, and hyphens",
-    "slug_taken_error": "That workspace URL is already taken.",
-    "slug_reserved_error": "That workspace URL is reserved and cannot be used.",
-    "slug_conflict_toast": "Choose a different workspace URL",
-    "create_failed_toast": "Failed to create workspace",
-    "creation_disabled_eyebrow": "Workspace creation is disabled",
+    "slug_taken_error": "That space URL is already taken.",
+    "slug_reserved_error": "That space URL is reserved and cannot be used.",
+    "slug_conflict_toast": "Choose a different space URL",
+    "create_failed_toast": "Failed to create space",
+    "creation_disabled_eyebrow": "Space creation is disabled",
     "creation_disabled_headline": "Ask your administrator for an invitation.",
-    "creation_disabled_lede": "This QuickWork instance does not allow new workspaces to be created. Once an administrator invites you to a workspace, accept the invitation and refresh to continue.",
+    "creation_disabled_lede": "This QuickWork instance does not allow new spaces to be created. Once an administrator invites you to a space, accept the invitation and refresh to continue.",
     "creation_disabled_logout": "Log out",
-    "creation_disabled_eyebrow_resume": "Your workspace",
+    "creation_disabled_eyebrow_resume": "Your space",
     "creation_disabled_headline_resume": "Continue with {{name}}.",
-    "creation_disabled_lede_resume": "Workspace creation is disabled on this instance, so you'll continue into your existing workspace."
+    "creation_disabled_lede_resume": "Space creation is disabled on this instance, so you'll continue into your existing space."
   },
   "step_runtime": {
     "scanning_headline": "Connecting this computer…",
@@ -216,7 +205,7 @@
     "empty_lede_prefix": "An agent runtime is an AI coding tool we connect to — like ",
     "empty_lede_suffix": ". Install one and refresh, or pick a path below.",
     "empty_skip_title": "Skip for now",
-    "empty_skip_subtitle": "Enter your workspace now. Your agent can't run tasks until an agent runtime is connected on this computer — but you can still browse, plan, and invite teammates.",
+    "empty_skip_subtitle": "Enter your space now. Your agent can't run tasks until an agent runtime is connected on this computer — but you can still browse, plan, and invite teammates.",
     "empty_skip_action": "Skip",
     "empty_waitlist_title": "Use a cloud computer",
     "empty_waitlist_subtitle": "We'll run a computer for you in the cloud. Not live yet.",
@@ -227,13 +216,13 @@
     "hint_selected": "Selected: {{name}}",
     "hint_pick": "Pick an agent runtime above to start with Mika.",
     "hint_waiting": "Waiting for the first result…",
-    "hint_skip_or_refresh": "Refresh after installing one, or skip to enter your workspace.",
+    "hint_skip_or_refresh": "Refresh after installing one, or skip to enter your space.",
     "continue": "Start with Mika"
   },
   "step_platform": {
     "eyebrow": "Connect a computer",
     "headline": "Connect a computer to run your agent.",
-    "lede": "Mika, your workspace's Chief of Staff, runs on a real computer that you connect to QuickWork. Pick how you want to connect one.",
+    "lede": "Mika, your space's Chief of Staff, runs on a real computer that you connect to QuickWork. Pick how you want to connect one.",
     "hint_default": "Pick a way to connect — or skip and connect a computer later.",
     "download_title": "Use this computer",
     "download_subtitle": "Install our desktop app to connect this computer. Opens in a new tab — pick your platform there.",
@@ -263,7 +252,7 @@
   },
   "errors": {
     "skip_failed": "Failed to finish onboarding",
-    "mika_setup_failed": "Couldn't start your Mika workspace"
+    "mika_setup_failed": "Couldn't start your Mika space"
   },
   "mika_intro": {
     "headline": "Meet Mika, your first agent teammate.",

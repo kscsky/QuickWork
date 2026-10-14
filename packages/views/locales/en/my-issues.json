@@ -1,7 +1,7 @@
 {
   "page": {
     "breadcrumb": "My Issues",
-    "workspace_fallback": "Workspace",
+    "workspace_fallback": "Space",
     "empty_title": "No issues assigned to you",
     "empty_description": "Issues you create or are assigned to will appear here."
   },

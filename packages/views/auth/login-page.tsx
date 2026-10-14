@@ -23,7 +23,7 @@ import { UI_EASE_OUT, UI_MOTION_DURATION } from "@quickwork/ui/lib/motion";
 import { cn } from "@quickwork/ui/lib/utils";
 import { useAuthStore } from "@quickwork/core/auth";
 import { workspaceKeys } from "@quickwork/core/workspace/queries";
-import { api } from "@quickwork/core/api";
+import { ApiError, api } from "@quickwork/core/api";
 import type { User } from "@quickwork/core/types";
 import { DispatchScene } from "./dispatch-scene";
 import { useT } from "../i18n";
@@ -552,6 +552,26 @@ export function LoginPage({
   // Which way the column should travel when the step changes: forward when
   // progressing, back when returning to the email field. Read by `Reveal`.
   const [direction, setDirection] = useState<1 | -1>(1);
+  /**
+   * A burst of code requests is answered with 429 and an English sentence. The
+   * status is the contract; the sentence is not — it is prose the server has no
+   * way to localize, and showing it verbatim tells a Japanese member nothing
+   * the product can say in their own language. Everything else still falls
+   * through to the server's message, which is the useful one for failures that
+   * are not this one.
+   */
+  const sendCodeError = useCallback(
+    (err: unknown) => {
+      if (err instanceof ApiError && err.status === 429) {
+        return t(($) => $.errors.rate_limited);
+      }
+      return err instanceof Error
+        ? err.message
+        : `${t(($) => $.errors.send_failed)} ${t(($) => $.errors.server_unreachable)}`;
+    },
+    [t],
+  );
+
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
   const [error, setError] = useState("");
@@ -634,11 +654,7 @@ export function LoginPage({
         setCode("");
         setCooldown(60);
       } catch (err) {
-        setError(
-          err instanceof Error
-            ? err.message
-            : `${t(($) => $.errors.send_failed)} ${t(($) => $.errors.server_unreachable)}`,
-        );
+        setError(sendCodeError(err));
       } finally {
         setLoading(false);
       }
@@ -679,7 +695,7 @@ export function LoginPage({
         setLoading(false);
       }
     },
-    [email, onSuccess, cliCallback, onTokenObtained, qc, t],
+    [email, onSuccess, cliCallback, onTokenObtained, qc, t, sendCodeError],
   );
 
   const handleResend = async () => {
@@ -689,9 +705,7 @@ export function LoginPage({
       await useAuthStore.getState().sendCode(email);
       setCooldown(60);
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : t(($) => $.errors.resend_failed),
-      );
+      setError(sendCodeError(err));
     }
   };
 

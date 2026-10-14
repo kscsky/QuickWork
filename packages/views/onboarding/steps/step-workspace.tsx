@@ -1,17 +1,9 @@
 "use client";
 
 import { type ReactNode, useRef, useEffect, useState } from "react";
-import { Dices, Plus } from "lucide-react";
+import { ArrowLeft, Dices, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@quickwork/ui/components/ui/button";
-import { Input } from "@quickwork/ui/components/ui/input";
-import {
-  Field,
-  FieldDescription,
-  FieldError,
-  FieldGroup,
-  FieldLabel,
-} from "@quickwork/ui/components/ui/field";
 import { cn } from "@quickwork/ui/lib/utils";
 import { useCreateWorkspace } from "@quickwork/core/workspace/mutations";
 import type { Workspace } from "@quickwork/core/types";
@@ -20,10 +12,7 @@ import { matchLocale } from "@quickwork/core/i18n";
 import { useConfigStore } from "@quickwork/core/config";
 import { workspaceUrlHost } from "@quickwork/core/workspace/workspace-url";
 import { useLogout } from "../../auth";
-import {
-  StepFooter,
-  StepHeading,
-} from "../components/step-shell";
+import { DragStrip } from "../../platform";
 import { RadioMark } from "../components/option-card";
 import { WorkspaceAvatar } from "../../workspace/workspace-avatar";
 import { useT } from "../../i18n";
@@ -86,17 +75,33 @@ function normalizePrefix(raw: string): string {
   return raw.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 10);
 }
 
+/** The value side of a row. No box: the row's own hairline is the field's
+ *  only edge, so the input contributes nothing but the text and the caret. */
+const GLASS_FIELD =
+  "h-full w-full min-w-0 bg-transparent text-body text-white outline-none " +
+  "placeholder:text-white/25";
+
+/** Small mono caps — the label is a name for the row, not a sentence about it. */
+const GLASS_LABEL =
+  "font-mono text-micro uppercase tracking-[0.22em] text-white/40";
+
 export function StepWorkspace({
   existing,
   onCreated,
   onBusyChange,
+  onBack,
+  backDisabled,
 }: {
   existing?: Workspace | null;
   onCreated: (workspace: Workspace) => void | Promise<void>;
   /** Reports the create request's in-flight state to the flow, which owns
-   *  the shell: Back and the rail have to lock while a workspace is being
-   *  created, and only this step knows when that is. */
+   *  navigation: Back has to lock while a workspace is being created, and
+   *  only this step knows when that is. */
   onBusyChange?: (busy: boolean) => void;
+  /** Return to the intro. This step renders outside `StepShell`, which is
+   *  where every other step gets its Back from, so it takes one instead. */
+  onBack?: () => void;
+  backDisabled?: boolean;
 }) {
   const { t, i18n } = useT("onboarding");
   const locale = matchLocale([i18n.resolvedLanguage ?? i18n.language]);
@@ -281,140 +286,187 @@ export function StepWorkspace({
     onContinue = () => {};
   }
 
-  // Built on the Field primitives rather than hand-rolled label/hint/error
-  // markup: three `flex flex-col gap-1.5` stacks with their own label sizing
-  // is exactly what Field/FieldLabel/FieldError standardise, and the manual
-  // version had already drifted — the labels were caption-sized and muted
-  // while every other form in the product labels at body weight.
+  // Hand-rolled rather than built on the shared `Field` primitives, which is
+  // the one place this step leaves the product's form language: their resting
+  // state is a filled field whose border only shows itself on error, and on
+  // this pane each row has to read as a strip of the glass panel instead. The
+  // label / hint / error wiring they standardise is reproduced by hand below.
   const createFields = (
-    <FieldGroup>
-      <Field>
-        <FieldLabel htmlFor="ws-name">
-          {t(($) => $.step_workspace.name_label)}
-        </FieldLabel>
-        <div className="flex items-center gap-2">
-          <Input
-            id="ws-name"
-            autoFocus
-            type="text"
-            value={name}
-            onChange={(e) => handleNameChange(e.target.value)}
-            placeholder={t(($) => $.step_workspace.name_placeholder)}
-            className="min-w-0"
-            onKeyDown={(e) => {
-              if (isImeComposing(e)) return;
-              if (e.key === "Enter") handleCreate();
-            }}
-          />
-          <Button
-            type="button"
-            variant="outline"
-            onClick={handleRandomName}
-            disabled={isCreating}
-            className="shrink-0"
-          >
-            <Dices className="h-4 w-4" />
-            {t(($) => $.step_workspace.random_name)}
-          </Button>
-        </div>
-      </Field>
-      <Field data-invalid={slugError ? true : undefined}>
-        <FieldLabel htmlFor="ws-slug">
-          {t(($) => $.step_workspace.url_label)}
-        </FieldLabel>
-        <div className="flex items-center rounded-md border bg-muted transition-colors focus-within:border-foreground aria-invalid:border-destructive">
-          <span className="select-none pl-3 font-mono text-body text-muted-foreground">
-            {`${urlHost}/`}
-          </span>
-          <Input
-            id="ws-slug"
-            type="text"
-            value={slug}
-            onChange={(e) => handleSlugChange(e.target.value)}
-            placeholder={t(($) => $.step_workspace.slug_placeholder)}
-            className="border-0 bg-transparent font-mono shadow-none focus-visible:ring-0"
-            onKeyDown={(e) => {
-              if (isImeComposing(e)) return;
-              if (e.key === "Enter") handleCreate();
-            }}
-          />
-        </div>
-        {slugError ? <FieldError>{slugError}</FieldError> : null}
-      </Field>
-      {/* Editable, pre-filled from the slug. Narrow input — the value is
-          capped at 10 chars, so a full-width field would read as a mistake.
+    <div className="onboarding-glass-card onboarding-glass-rise flex flex-col rounded-2xl px-6">
+      {/* Rows of a dispatch form, not fields of a web form: a mono label
+          holding a fixed left column, the value on the right, and one hairline
+          between rows. No box — a rounded bordered input is the generic shape
+          every tracker draws, and a boxed field would also fight the panel it
+          sits on. Focus moves the rule to the product's own `--inflight` and
+          turns the caret with it. */}
 
-          Nothing is invented while the slug is empty: a name that romanizes
-          to nothing — kana, Hangul, emoji — derives no slug (see
-          nameToWorkspaceSlug), and the placeholder used to fill that gap with
-          "WS", telling the user they were getting the exact prefix this whole
-          change exists to eliminate. Empty field plus a hint is the honest
-          state; the user is picking a URL next anyway, and the prefix appears
-          the moment they do. */}
-      <Field>
-        <FieldLabel htmlFor="ws-issue-prefix">
-          {t(($) => $.step_workspace.issue_prefix_label)}
-        </FieldLabel>
-        <Input
-          id="ws-issue-prefix"
+      {/* Name — the only thing this step asks for. */}
+      <div
+        className="onboarding-glass-row flex items-center gap-4 border-b border-white/[0.07] py-5 transition-colors focus-within:border-inflight/50"
+        style={{ animationDelay: "80ms" }}
+      >
+        <label htmlFor="ws-name" className={cn(GLASS_LABEL, "w-[7.5rem] shrink-0")}>
+          {t(($) => $.step_workspace.name_label)}
+        </label>
+        <input
+          id="ws-name"
+          autoFocus
           type="text"
-          value={prefix}
-          onChange={(e) => handlePrefixChange(e.target.value)}
-          placeholder={derivedPrefix}
-          autoComplete="off"
-          autoCapitalize="characters"
-          spellCheck={false}
-          maxLength={10}
-          className="w-32 font-mono uppercase"
+          value={name}
+          onChange={(e) => handleNameChange(e.target.value)}
+          placeholder={t(($) => $.step_workspace.name_placeholder)}
+          className={cn(GLASS_FIELD, "caret-inflight")}
           onKeyDown={(e) => {
             if (isImeComposing(e)) return;
             if (e.key === "Enter") handleCreate();
           }}
         />
-        <FieldDescription>
+        <button
+          type="button"
+          onClick={handleRandomName}
+          disabled={isCreating}
+          title={t(($) => $.step_workspace.random_name)}
+          aria-label={t(($) => $.step_workspace.random_name)}
+          className="flex size-8 shrink-0 items-center justify-center rounded-md text-white/40 transition-colors hover:bg-white/[0.06] hover:text-white disabled:opacity-40"
+        >
+          <Dices className="size-4" />
+        </button>
+      </div>
+
+      {/* Address — derived from the name, so it is shown rather than asked
+          for. The editable form appears only when the derivation produced
+          nothing (a kana, Hangul or emoji name has no ASCII slug), which is
+          also the only case where the value has to come from the member. */}
+      <div
+        className="onboarding-glass-row flex items-center gap-4 border-b border-white/[0.07] py-5 transition-colors focus-within:border-inflight/50"
+        style={{ animationDelay: "160ms" }}
+        data-invalid={slugError ? true : undefined}
+      >
+        <label htmlFor="ws-slug" className={cn(GLASS_LABEL, "w-[7.5rem] shrink-0")}>
+          {t(($) => $.step_workspace.url_label)}
+        </label>
+        {slug ? (
+          <span className="min-w-0 truncate font-mono text-body text-white/70">
+            {`${urlHost}/`}
+            <span className="text-white">{slug}</span>
+          </span>
+        ) : (
+          <input
+            id="ws-slug"
+            type="text"
+            value={slug}
+            onChange={(e) => handleSlugChange(e.target.value)}
+            placeholder={t(($) => $.step_workspace.slug_placeholder)}
+            className={cn(GLASS_FIELD, "caret-inflight font-mono")}
+            onKeyDown={(e) => {
+              if (isImeComposing(e)) return;
+              if (e.key === "Enter") handleCreate();
+            }}
+          />
+        )}
+      </div>
+      {slugError ? (
+        <p className="-mt-2 pb-3 pl-[8.5rem] text-caption text-destructive">
+          {slugError}
+        </p>
+      ) : null}
+
+      {/* Issue prefix — pre-filled from the address, and what the member's
+          issues will read as from here on. */}
+      <div
+        className="onboarding-glass-row flex flex-col gap-2 py-5 transition-colors focus-within:border-inflight/50"
+        style={{ animationDelay: "240ms" }}
+      >
+        <div className="flex items-center gap-4">
+          <label
+            htmlFor="ws-issue-prefix"
+            className={cn(GLASS_LABEL, "w-[7.5rem] shrink-0")}
+          >
+            {t(($) => $.step_workspace.issue_prefix_label)}
+          </label>
+          <input
+            id="ws-issue-prefix"
+            type="text"
+            value={prefix}
+            onChange={(e) => handlePrefixChange(e.target.value)}
+            placeholder={derivedPrefix}
+            autoComplete="off"
+            autoCapitalize="characters"
+            spellCheck={false}
+            maxLength={10}
+            className={cn(GLASS_FIELD, "caret-inflight w-24 font-mono uppercase tracking-[0.14em]")}
+            onKeyDown={(e) => {
+              if (isImeComposing(e)) return;
+              if (e.key === "Enter") handleCreate();
+            }}
+          />
+        </div>
+        <p className="pl-[8.5rem] text-caption text-white/40">
           {effectivePrefix ? (
             <>
               {t(($) => $.step_workspace.issue_prefix_prefix)}
-              <span className="font-mono text-foreground">
-                {effectivePrefix}-123
-              </span>
+              <span className="font-mono text-white">{effectivePrefix}-123</span>
               {t(($) => $.step_workspace.issue_prefix_suffix)}
             </>
           ) : (
             t(($) => $.step_workspace.issue_prefix_pending)
           )}
-        </FieldDescription>
-      </Field>
-    </FieldGroup>
+        </p>
+      </div>
+    </div>
   );
 
   return (
-    <>
-      <div className="flex flex-col gap-8 pt-2 sm:pt-6">
+    <div className="dark onboarding-glass-pane flex h-full min-h-0 flex-col overflow-y-auto bg-background text-foreground">
+      <DragStrip />
+
+      {/* No rail on this step, so Back has to carry itself. */}
+      <div className="flex shrink-0 items-center px-6 pt-5 sm:px-10">
+        {onBack && (
+          <button
+            type="button"
+            onClick={onBack}
+            disabled={backDisabled}
+            className="flex items-center gap-1.5 rounded-md text-caption text-muted-foreground transition-colors hover:text-foreground disabled:opacity-40"
+          >
+            <ArrowLeft className="size-3.5" />
+            {t(($) => $.common.back)}
+          </button>
+        )}
+      </div>
+
+      <div className="flex flex-1 items-center justify-center px-6 py-10 sm:px-10">
+        <div className="animate-onboarding-enter flex w-full max-w-[540px] flex-col gap-9">
         {/* The eyebrow is gone with the rest of them, but its disabled-state
             wording is not: "Workspace creation is disabled" was the only
             thing on this screen that said so before the notice below, so
             that variant is folded into the heading's own copy. */}
-        <StepHeading
-          title={
-            reusing
+        {/* Display scale, not a form label: this is the first decision the
+            product asks a member to make, and `StepHeading`'s title-lg reads
+            as one field of a longer form. */}
+        <header className="flex flex-col gap-4">
+          <span className="font-mono text-micro uppercase tracking-[0.3em] text-white/35">
+            {t(($) => $.step_nav.wordmark)}
+          </span>
+          <h1 className="text-balance text-3xl font-semibold leading-[1.06] tracking-[-0.035em] text-white sm:text-4xl">
+            {reusing
               ? workspaceCreationAllowed
                 ? t(($) => $.step_workspace.headline_resume, { name: reusing.name })
                 : t(($) => $.step_workspace.creation_disabled_headline_resume, { name: reusing.name })
               : workspaceCreationAllowed
                 ? t(($) => $.step_workspace.headline_first)
-                : t(($) => $.step_workspace.creation_disabled_headline)
-          }
-          description={
-            reusing
+                : t(($) => $.step_workspace.creation_disabled_headline)}
+          </h1>
+          <p className="max-w-[46ch] text-pretty text-body leading-relaxed text-white/55">
+            {reusing
               ? workspaceCreationAllowed
                 ? t(($) => $.step_workspace.lede_resume)
                 : t(($) => $.step_workspace.creation_disabled_lede_resume)
               : workspaceCreationAllowed
                 ? t(($) => $.step_workspace.lede_first)
-                : t(($) => $.step_workspace.creation_disabled_lede)
-          }
-        />
+                : t(($) => $.step_workspace.creation_disabled_lede)}
+          </p>
+        </header>
 
         <div>
           {reusing ? (
@@ -444,20 +496,25 @@ export function StepWorkspace({
           )}
         </div>
 
+        {!(workspaceCreationDisabled && !reusing) && (
+          <div className="flex flex-col gap-3">
+            <Button
+              className="onboarding-glass-cta h-12 rounded-xl text-body font-semibold"
+              disabled={continueDisabled}
+              onClick={onContinue}
+            >
+              {continueLabel}
+            </Button>
+            {hint ? (
+              <p className="text-center text-caption text-muted-foreground">
+                {hint}
+              </p>
+            ) : null}
+          </div>
+        )}
+        </div>
       </div>
-
-      {!(workspaceCreationDisabled && !reusing) && (
-        <StepFooter hint={hint}>
-          <Button
-            className="w-full"
-            disabled={continueDisabled}
-            onClick={onContinue}
-          >
-            {continueLabel}
-          </Button>
-        </StepFooter>
-      )}
-    </>
+    </div>
   );
 }
 
@@ -496,10 +553,13 @@ function ExistingWorkspaceCard({
       aria-checked={selected}
       onClick={onSelect}
       className={cn(
-        "flex w-full items-center gap-4 rounded-lg border bg-card px-5 py-4 text-left transition-all",
+        "onboarding-glass-card flex w-full items-center gap-4 rounded-lg border px-5 py-4 text-left transition-all",
+        // Hover moves the border, not the fill: the fill is translucent glass
+        // shared with the pane behind it, so tinting it reads as smudge rather
+        // than as response.
         selected
           ? "border-foreground shadow-[inset_0_0_0_1px_var(--color-foreground)]"
-          : "hover:border-foreground/20 hover:bg-accent/30",
+          : "hover:border-foreground/40",
       )}
     >
       <WorkspaceAvatar name={workspace.name} avatarUrl={workspace.avatar_url} size="lg" />
@@ -536,10 +596,10 @@ function CreateNewWorkspaceCard({
   return (
     <div
       className={cn(
-        "overflow-hidden rounded-lg border bg-card transition-all",
+        "onboarding-glass-card overflow-hidden rounded-lg border transition-all",
         selected
           ? "border-foreground shadow-[inset_0_0_0_1px_var(--color-foreground)]"
-          : "hover:border-foreground/20",
+          : "hover:border-foreground/40",
       )}
     >
       <button

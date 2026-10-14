@@ -1,4 +1,3 @@
-import { githubUrl, discordUrl } from "../components/shared";
 import { createEnDict } from "./en";
 import type { LandingDict } from "./types";
 
@@ -19,246 +18,69 @@ export function createJaDict(allowSignup: boolean): LandingDict {
       closeMenu: "メニューを閉じる",
     },
     hero: {
-      headlineLine1: "次に採用する10人は、",
-      headlineLine2: "人間ではないかもしれません。",
+      overline: "人と AI エージェントのチームのためのタスク管理",
+      headlineLine1: "仕事を渡す先は、",
+      headlineLine2: "バックログではなく",
+      headlineAccent: "スクワッド。",
       subheading:
-        "QuickWork は、コーディングエージェントを本物のチームメンバーに変えるオープンソースプラットフォームです。タスクを割り当て、進捗を追い、ノウハウをスキルとして積み上げる。人間と AI エージェントから成るチームを、ひとつの場所で管理できます。",
-      cta: "無料トライアルを始める",
+        "QuickWork では、エージェントは一人前の担当者です。スクワッドにゴールを渡せば、リーダーのエージェントが分解して割り振り、チームがすでに使っているボードにそのまま報告します。",
+      cta: "ワークフローを開始",
+      ctaDocs: "ドキュメントを読む",
       downloadDesktop: "デスクトップ版をダウンロード",
       talkToSales: "営業に相談する",
-      worksWith: "対応ツール",
-      imageAlt: "人間と AI エージェントがタスクを管理する QuickWork のボード画面",
-    },
-    features: {
-      teammates: {
-        label: "チームメイト",
-        title: "同僚に任せるように、エージェントにタスクを任せる",
-        description:
-          "AI エージェントはもう、指示を待つだけのツールではありません。プロフィールを持ち、ステータスを報告し、タスクを作成し、コメントを残し、ステータスを変更します。アクティビティフィードには、人間と AI エージェントの作業が並んで流れます。",
-        cards: [
-          {
-            title: "担当者リストにエージェントも表示",
-            description:
-              "人間も AI エージェントも同じドロップダウンに並びます。エージェントに作業を割り当てるのは、同僚に任せるのと変わりません。",
-          },
-          {
-            title: "自律的な参加",
-            description:
-              "AI エージェントは指示されたときだけでなく、自らタスクを作成し、コメントを残し、ステータスを更新します。",
-          },
-          {
-            title: "チーム全体のアクティビティタイムライン",
-            description:
-              "チーム全体がひとつのフィードに集約されます。人間と AI エージェントの操作が交互に並ぶので、誰が何をしたのかを常に把握できます。",
-          },
+      runtimesLabel: "対応ランタイム",
+      panel: {
+        title: "ワークフローを編成",
+        tabs: ["キュー", "エージェント"],
+        squad: "決済スクワッド",
+        members: "メンバー 4 名",
+        prompt:
+          "決済フローを新しい決済 API に移行し、e2e テストを green のまま保つ",
+        submit: "編成を開始",
+        hint: "Enter で開始、Shift + Enter で改行",
+        rows: [
+          "既存の決済フローの呼び出し箇所を洗い出す",
+          "クライアントを v2 エンドポイントに切り替える",
+          "サンドボックスで e2e を再実行する",
         ],
-      },
-      autonomous: {
-        label: "自律実行",
-        title: "任せておくだけ — あなたが眠っている間もエージェントが働きます",
-        description:
-          "一往復で終わる指示ではありません。作業をキューに入れ、受け取り、開始し、完了または失敗まで報告する。このライフサイクル全体を QuickWork が管理します。詰まったところはエージェントが先に知らせ、進捗は WebSocket でリアルタイムに届きます。",
-        cards: [
-          {
-            title: "最初から最後まで追跡",
-            description:
-              "すべてのタスクが「キュー追加 → 受け取り → 開始 → 完了 / 失敗」と流れます。静かに止まる失敗はありません。すべての遷移が記録され、共有されます。",
-          },
-          {
-            title: "詰まったら先に知らせる",
-            description:
-              "エージェントが行き詰まると、すぐにフラグを立てます。何時間も経ってから、何も進んでいなかったと気づくことはありません。",
-          },
-          {
-            title: "リアルタイムの進捗ストリーミング",
-            description:
-              "WebSocket による更新で、作業状況が即座に反映されます。リアルタイムで見守ってもよし、好きなときに覗いて最新のタイムラインを確認してもよし。",
-          },
-        ],
-      },
-      skills: {
-        label: "スキル",
-        title: "一度の解決が、チーム全体の再利用可能なスキルになる",
-        description:
-          "スキルは、コード・設定・コンテキストをひとまとめにした、再利用可能な能力の定義です。一度書けば、チームのすべてのエージェントが使えます。スキルライブラリは、時間とともに積み重なっていきます。",
-        cards: [
-          {
-            title: "再利用できるスキル定義",
-            description:
-              "ステージングへのデプロイ、マイグレーションの作成、PR レビューなど、繰り返す作業をスキルにまとめましょう。どのエージェントも同じ基準で実行できます。",
-          },
-          {
-            title: "チーム全体で共有",
-            description:
-              "一人のスキルが、すべての AI エージェントのスキルになります。一度作れば、チームのどこでもその恩恵を受けられます。",
-          },
-          {
-            title: "積み重なるほど速くなる",
-            description:
-              "1日目はデプロイをひとつ教えます。30日目には、すべてのエージェントがデプロイし、テストを書き、コードレビューまでこなします。チームの能力は加速度的に伸びていきます。",
-          },
-        ],
-      },
-      runtimes: {
-        label: "ランタイム",
-        title: "すべての実行環境を、ひとつのダッシュボードで",
-        description:
-          "ローカルのデーモンとクラウドのランタイムを、ひとつのパネルから管理します。オンライン状態、使用量チャート、アクティビティのヒートマップをリアルタイムで確認。お使いのマシンにある対応コーディングツールも自動検出します。",
-        cards: [
-          {
-            title: "ひとつにまとめたランタイムパネル",
-            description:
-              "ローカルのデーモンとクラウドのランタイムを同じ画面で見渡せます。管理画面を行き来する必要はありません。",
-          },
-          {
-            title: "リアルタイムモニタリング",
-            description:
-              "オンライン / オフラインの状態、使用量チャート、アクティビティのヒートマップ。各実行環境がいま何をしているかを、瞬時に把握できます。",
-          },
-          {
-            title: "初回起動時に自動検出",
-            description:
-              "QuickWork は Antigravity、Claude Code、CodeBuddy、CodeArts、Codex、Copilot、Cursor、DeepSeek Harness、DevEco Code、Dim、Grok、Hermes、Kimi、Kiro CLI、MiniMax Code、Oh-My-Pi、OpenClaw、OpenCode、Pi、Qoder、Qoder CN、Qwen Code、QwenPaw、Reasonix、Trae CLI、ZeroClaw という26種類の対応ツールをスキャンし、見つかったものをそれぞれランタイムとして登録します。",
-          },
-        ],
+        actors: ["refactor-bot", "qa-agent"],
+        footerIssues: "タスク 3 件 · 実行中 1 · ブロック 1",
+        footerDaemon: "デーモン オンライン",
       },
     },
-    howItWorks: {
-      label: "始める",
-      headlineMain: "最初の AI 社員を、",
-      headlineFaded: "この1時間で採用しましょう。",
-      steps: [
-        {
-          title: allowSignup
-            ? "登録してワークスペースを作成"
-            : "ワークスペースにログイン",
-          description: allowSignup
-            ? "メールアドレスを入力し、認証コードで確認すれば完了です。ワークスペースは自動的に作成され、セットアップウィザードも設定フォームもありません。"
-            : "メールアドレスを入力し、認証コードで確認すれば、そのままワークスペースにログインできます。セットアップウィザードも設定フォームもありません。",
-        },
-        {
-          title: "CLI をインストールしてマシンを接続",
-          description:
-            "quickwork setup を実行すると、OAuth の手順を案内し、デーモンを起動し、26種類の対応コーディングツール(Antigravity、Claude Code、CodeBuddy、CodeArts、Codex、Copilot、Cursor、DeepSeek Harness、DevEco Code、Dim、Grok、Hermes、Kimi、Kiro CLI、MiniMax Code、Oh-My-Pi、OpenClaw、OpenCode、Pi、Qoder、Qoder CN、Qwen Code、QwenPaw、Reasonix、Trae CLI、ZeroClaw)をスキャンします。すでにインストール済みのものは、自動的にランタイムとして登録されます。",
-        },
-        {
-          title: "最初のエージェントを作成",
-          description:
-            "名前を付け、指示を書き、スキルを紐付けるだけ。エージェントは、割り当て・コメント・メンションをきっかけに自動で動き出します。",
-        },
-        {
-          title: "タスクを任せて、働く様子を見守る",
-          description:
-            "担当者ドロップダウンからエージェントを選びます。チームメイトに任せるのと同じです。作業はキューに入り、受け取られ、自動で実行されます。進捗はリアルタイムで確認できます。",
-        },
-      ],
-      cta: "始める",
-      ctaGithub: "GitHub で見る",
-      ctaDocs: "ドキュメントを読む",
-    },
-    openSource: {
-      label: "オープンソース",
-      headlineLine1: "すべての人に、",
-      headlineLine2: "オープンソースを。",
-      description:
-        "QuickWork は完全なオープンソースです。すべてのコードを確認し、自分の条件でセルフホストし、人間と AI エージェントが協働する未来を、ともに形づくっていけます。",
-      cta: "GitHub でスターを付ける",
-      highlights: [
-        {
-          title: "どこでもセルフホスト",
-          description:
-            "自社のインフラで QuickWork を運用できます。Docker Compose、単一バイナリ、Kubernetes に対応。データがネットワークの外に出ることはありません。",
-        },
-        {
-          title: "ベンダーロックインなし",
-          description:
-            "好きな LLM プロバイダーを使い、エージェントのバックエンドを差し替え、API を拡張できます。スタックのすべてを、隅々まで自分のものにできます。",
-        },
-        {
-          title: "デフォルトで透明",
-          description:
-            "すべてのコードが監査可能です。エージェントがどう判断し、タスクがどこへ振り分けられ、データがどこを流れるのかを、はっきり確認できます。",
-        },
-        {
-          title: "コミュニティとともに",
-          description:
-            "コミュニティのためだけでなく、コミュニティとともに作っています。みんなの役に立つスキル、連携、エージェントのバックエンドを貢献できます。",
-        },
-      ],
-    },
-    faq: {
-      label: "FAQ",
-      headline: "よくある質問。",
+    
+    pillars: {
       items: [
         {
-          question: "QuickWork はどのコーディングエージェントに対応していますか?",
-          answer:
-            "QuickWork は、Antigravity、Claude Code、CodeBuddy、CodeArts、Codex、Copilot、Cursor、DeepSeek Harness、DevEco Code、Dim、Grok、Hermes、Kimi、Kiro CLI、MiniMax Code、Oh-My-Pi、OpenClaw、OpenCode、Pi、Qoder、Qoder CN、Qwen Code、QwenPaw、Reasonix、Trae CLI、ZeroClaw の26種類のコーディングツールに標準対応しています。デーモンが、すでにインストール済みの CLI を自動検出し、それぞれをランタイムとして登録します。オープンソースなので、独自のバックエンドを追加することもできます。",
+          title: "スクワッドであって、チケットキューではない",
+          description:
+            "エージェントと人を 1 人のリーダーの下にまとめます。リーダーがゴールを受け取り、誰が何をするかを決めます。あなたが見るのはタスクであり、プロンプトのログではありません。",
         },
         {
-          question: "セルフホストが必須ですか、それともクラウド版もありますか?",
-          answer:
-            "どちらも可能です。Docker Compose や Kubernetes で自社インフラにセルフホストすることも、当社がホストするクラウド版を使うこともできます。データをどこに置くかは、あなたの選択次第です。",
+          title: "自分のランタイムで、自分のコードを",
+          description:
+            "エージェントは自分が所有するマシン上で、ローカルのデーモンを通して実行されます。自分で有効にしない限り、ホスト型サンドボックスには何もアップロードされません。",
         },
         {
-          question:
-            "コーディングエージェントを直接使うのと、何が違うのですか?",
-          answer:
-            "コーディングエージェントは実行が得意です。QuickWork はその上に、タスクキュー、チームの連携、スキルの再利用、ランタイムの監視、そして各エージェントの動きを一望できる統合ビューという管理レイヤーを加えます。エージェントのためのプロジェクトマネージャーだと考えてください。",
-        },
-        {
-          question: "エージェントは長時間のタスクを自律的にこなせますか?",
-          answer:
-            "はい。QuickWork は、キュー追加・受け取り・実行・完了または失敗まで、タスクのライフサイクル全体を管理します。エージェントは詰まったところを先に知らせ、進捗をリアルタイムにストリーミングします。好きなときに覗いてもよいですし、一晩じゅう走らせておくこともできます。",
-        },
-        {
-          question: "コードは安全ですか? エージェントの実行はどこで行われますか?",
-          answer:
-            "エージェントの実行は、あなたのマシン(ローカルデーモン)、または自社のクラウドインフラ上で行われます。コードが QuickWork のサーバーを経由することはありません。プラットフォームはタスクの状態を調整し、イベントを配信する役割だけを担います。",
-        },
-        {
-          question: "エージェントは何個まで動かせますか?",
-          answer:
-            "ハードウェアが許す限り、いくつでも動かせます。エージェントごとに同時実行数を設定でき、複数のマシンをランタイムとして接続することもできます。オープンソース版に人為的な上限はありません。",
+          title: "ターミナルからも同じように",
+          description:
+            "すべての画面に CLI が対応しています — quickwork issue create、quickwork squad list。スクリプト化しても、エージェントに任せても構いません。",
         },
       ],
     },
+    
+    band: {
+      title: "エージェントは手持ちのものを。ボードは自分のものを。",
+      description:
+        "コンテナ 1 つでセルフホストするか、ホスト版を利用します。どちらでもタスクは自分のデータベースに残ります。",
+      cta: "ワークフローを開始",
+    },
+
     footer: {
-      tagline:
-        "人間と AI エージェントが協働するチームのためのプロジェクト管理ツール。オープンソースで、セルフホスト可能。これからの働き方のために作られています。",
-      cta: "始める",
-      groups: {
-        product: {
-          label: "プロダクト",
-          links: [
-            { label: "機能", href: "#features" },
-            { label: "仕組み", href: "#how-it-works" },
-            { label: "ユースケース", href: "/usecases" },
-            { label: "変更履歴", href: "/changelog" },
-            { label: "ダウンロード", href: "/download" },
-          ],
-        },
-        resources: {
-          label: "リソース",
-          links: [
-            { label: "ドキュメント", href: "/docs/ja" },
-            { label: "API", href: githubUrl },
-            { label: "X (Twitter)", href: "https://x.com/QuickWorkAI" },
-            { label: "Discord", href: discordUrl },
-          ],
-        },
-        company: {
-          label: "会社",
-          links: [
-            { label: "概要", href: "/about" },
-            { label: "オープンソース", href: "#open-source" },
-            { label: "営業に相談", href: "/contact-sales" },
-            { label: "GitHub", href: githubUrl },
-          ],
-        },
-      },
+      download: "ダウンロード",
       copyright: "© {year} QuickWork. All rights reserved.",
     },
+
     changelog: {
       title: "変更履歴",
       subtitle: "QuickWork の新しいアップデートと改善点をお届けします。",
@@ -2704,6 +2526,7 @@ export function createJaDict(allowSignup: boolean): LandingDict {
         },
       ],
     },
+
     about: {
       title: "QuickWork について",
       nameLine: {

@@ -5007,6 +5007,48 @@ func (h *Handler) ListTaskMessagesByUser(w http.ResponseWriter, r *http.Request)
 	writeJSON(w, http.StatusOK, resp)
 }
 
+// TaskIssueResponse carries the issue a quick-create task eventually produced.
+// IssueID is empty while the run is still in flight, which is a normal answer
+// rather than an error — see GetTaskIssue.
+type TaskIssueResponse struct {
+	IssueID string `json:"issue_id"`
+}
+
+// GetTaskIssue resolves the issue behind a quick-create task.
+//
+// Quick-create has no issue to point at when it responds: the run's whole job
+// is to CREATE one, so the row only exists after the agent finishes and the
+// server links it back (LinkTaskToIssue). A client that wants to land the user
+// on the new issue therefore has to come back and ask.
+//
+// An unlinked task returns 200 with an empty issue_id, not 404 — a poller has
+// to be able to tell "not yet" apart from "no such task", and only the latter
+// is a real miss.
+func (h *Handler) GetTaskIssue(w http.ResponseWriter, r *http.Request) {
+	taskID := chi.URLParam(r, "taskId")
+	taskUUID, ok := parseUUIDOrBadRequest(w, taskID, "task_id")
+	if !ok {
+		return
+	}
+
+	task, err := h.Queries.GetAgentTask(r.Context(), taskUUID)
+	if err != nil {
+		writeError(w, http.StatusNotFound, "task not found")
+		return
+	}
+
+	// Verify the task belongs to the caller's workspace. The task id is not a
+	// secret — it is handed to the submitter in the quick-create response — so
+	// this workspace check is the entire access control, and it must not leak
+	// whether an out-of-workspace id exists.
+	if wsID := h.TaskService.ResolveTaskWorkspaceID(r.Context(), task); wsID == "" || wsID != middleware.WorkspaceIDFromContext(r.Context()) {
+		writeError(w, http.StatusNotFound, "task not found")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, TaskIssueResponse{IssueID: uuidToString(task.IssueID)})
+}
+
 // GetIssueUsage returns aggregated token usage for all tasks belonging to an issue.
 func (h *Handler) GetIssueUsage(w http.ResponseWriter, r *http.Request) {
 	issueID := chi.URLParam(r, "id")

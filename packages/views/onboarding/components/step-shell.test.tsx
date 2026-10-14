@@ -63,11 +63,11 @@ describe("onboarding step shell", () => {
   it("announces the step heading and renders it as the page h1", () => {
     render(
       <I18nProvider locale="en" resources={TEST_RESOURCES}>
-        <StepHeading title="Name your workspace" description="Pick a URL." />
+        <StepHeading title="Name your space" description="Pick a URL." />
       </I18nProvider>,
     );
 
-    const heading = screen.getByRole("heading", { name: "Name your workspace" });
+    const heading = screen.getByRole("heading", { name: "Name your space" });
     expect(heading.tagName).toBe("H1");
     expect(heading.closest("[aria-live]")).not.toBeNull();
     expect(screen.getByText("Pick a URL.")).toBeInTheDocument();
@@ -110,7 +110,7 @@ describe("onboarding step shell", () => {
   // is only safe because the compact bar carries the same jobs.
   it("keeps a compact progress bar for widths where the rail is hidden", () => {
     const { container } = renderShell({
-      currentStep: "runtime",
+      currentStep: "workspace",
       onBack: () => {},
     });
 
@@ -126,7 +126,7 @@ describe("onboarding step shell", () => {
   // every step but Welcome with no way to log out on a narrow screen.
   it("renders the escape hatch in whichever chrome is visible", () => {
     const { container } = renderShell({
-      currentStep: "runtime",
+      currentStep: "workspace",
       chromeFooter: <button type="button">Log out</button>,
     });
 
@@ -146,14 +146,13 @@ describe("onboarding progress rail", () => {
   // The rail replaced a row of dots plus a "Step 2 of 3" counter, which said
   // how much was left but never what was coming — so the runtime step always
   // arrived unannounced. Naming every step is the whole point of the change.
-  it("names all three steps up front", () => {
-    const { container } = renderShell({ currentStep: "about_you" });
+  it("names every step up front", () => {
+    const { container } = renderShell({ currentStep: "workspace" });
 
     // Scoped to the rail: the compact bar also prints the current step's name,
     // so an unscoped query matches it twice.
     const rail = within(container.querySelector("aside")!);
-    expect(rail.getByText("About you")).toBeInTheDocument();
-    expect(rail.getByText("Workspace")).toBeInTheDocument();
+    expect(rail.getByText("Space")).toBeInTheDocument();
     expect(rail.getByText("Meet Mika")).toBeInTheDocument();
   });
 
@@ -162,7 +161,7 @@ describe("onboarding progress rail", () => {
 
     const current = container.querySelector('[aria-current="step"]')!;
     expect(current).toBeInTheDocument();
-    expect(current.textContent).toContain("Workspace");
+    expect(current.textContent).toContain("Space");
   });
 
   // Forward navigation has to run the current step's validation and submit, so
@@ -171,19 +170,20 @@ describe("onboarding progress rail", () => {
     const onStepChange = vi.fn();
     renderShell({ currentStep: "workspace", onStepChange });
 
-    const back = screen.getByRole("button", { name: /about you/i });
+    // Workspace is the first persisted step, so it is the only one that can
+    // ever be behind the member — there is nothing before it to walk back to.
+    const back = screen.getByRole("button", { name: /space/i });
     await userEvent.click(back);
-    expect(onStepChange).toHaveBeenCalledWith("about_you");
+    expect(onStepChange).toHaveBeenCalledWith("workspace");
 
     expect(screen.queryByRole("button", { name: /meet mika/i })).toBeNull();
-    expect(screen.queryByRole("button", { name: /^workspace/i })).toBeNull();
   });
 
   it("is display-only when the flow supplies no step handler", () => {
-    renderShell({ currentStep: "runtime" });
+    renderShell({ currentStep: "workspace" });
 
     expect(screen.queryByRole("button", { name: /about you/i })).toBeNull();
-    expect(screen.queryByRole("button", { name: /^workspace/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^space/i })).toBeNull();
   });
 
   // Back is disabled precisely while a step has a request in flight; letting

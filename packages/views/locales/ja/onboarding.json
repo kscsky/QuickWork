@@ -7,7 +7,7 @@
       "description": "役割と、実現したいこと。"
     },
     "workspace": {
-      "label": "ワークスペース",
+      "label": "スペース",
       "description": "名前と URL を決める。"
     },
     "runtime": {
@@ -18,8 +18,7 @@
   "welcome": {
     "wordmark": "QuickWork へようこそ",
     "headline_line1": "タスクはここで生まれ、",
-    "headline_line2": "別のゾーンの",
-    "headline_emphasis": "エージェントが完了させます。",
+    "headline_line2": "別のゾーンのエージェントが完了させます。",
     "lede": "タスクを別のゾーンに渡すと、そこのエージェントが引き受けます。サンドボックス内で実行され、受領が元のカードに戻ります。",
     "lede_web": "デスクトップ版にはランタイムが同梱されており、何もインストールする必要はありません。ご自身の CLI を接続するには、ウェブで続けてください。",
     "lede_desktop": "完了するころには、実際のエージェントがあなたの最初のタスクに返信しています。",
@@ -27,27 +26,17 @@
     "continue_on_web": "ウェブで続ける",
     "start_exploring": "探索を始める",
     "skip_existing": "以前にやったことがあります",
-    "illustration_caption": "1 つのタスク、2 つのゾーン、そして輪を閉じる受領。",
-    "illustration": {
-      "card1_actor_name": "あなた",
-      "card1_actor_initial": "あ",
-      "card1_body_prefix": " 今四半期の照合を北部ゾーンへ——",
-      "card1_body_suffix": " なら台帳にアクセスできます。こちらにはありません。",
-      "card1_mention_content": "@Fleet",
-      "card1_mention_research": "@北部オペレーション",
-      "card2_actor_name": "Fleet",
-      "card2_body": "引き受けました。このゾーンから台帳を読めるので、サンドボックスで実行中です。",
-      "card3_actor_name": "Fleet",
-      "card3_body": "照合完了：不一致 3 件、明細を添付しました。",
-      "card3_timestamp": "4 分前",
-      "card4_actor_name": "Sentry",
-      "card4_body": "受領がこちらに戻りました。手元の控えと 3 件を突き合わせています。",
-      "card5_actor_name": "あなた",
-      "card5_body_prefix": "受領を確認——",
-      "card5_body_suffix": " がクローズしました。",
-      "card5_mention_you": "@Sentry",
-      "card5_timestamp": "たった今"
-    }
+    "waybill": {
+      "zone_origin": "自ゾーン",
+      "zone_target": "別ゾーン",
+      "agent": "Fleet",
+      "sandbox": "サンドボックス",
+      "stamp": "受領済み",
+      "checkpoint_received": "受付済み",
+      "checkpoint_dispatched": "派発済み",
+      "checkpoint_running": "実行中"
+    },
+    "illustration_caption": "1 つのタスク、2 つのゾーン、そして輪を閉じる受領。"
   },
   "common": {
     "back": "戻る",
@@ -141,7 +130,7 @@
   },
   "welcome_after_onboarding": {
     "skip": {
-      "loading": "ワークスペースを準備中…",
+      "loading": "スペースを準備中…",
       "title": "QuickWork へようこそ!",
       "subtitle": "ランタイム接続を案内するタスクを 1 つ追加しました。準備できたら Runtimes から Mika と始められます。",
       "got_it": "了解",
@@ -159,13 +148,13 @@
     }
   },
   "step_workspace": {
-    "eyebrow_first": "最初のワークスペース",
+    "eyebrow_first": "最初のスペース",
     "eyebrow_resume": "続きから、または新規作成",
-    "headline_first": "ワークスペースに名前を付けましょう。",
-    "headline_resume": "{{name}} で続けるか、別のワークスペースを始めましょう。",
-    "lede_first": "ワークスペースは、タスク、エージェント、プロジェクトが集まる場所です。あとでチームメイトを招待したり、ワークスペースを増やしたりできます。",
-    "lede_resume": "すでにあるワークスペースでセットアップを続けるか、別に新しいワークスペースを作成してください。いくつでもワークスペースに所属できます。",
-    "name_label": "ワークスペース名",
+    "headline_first": "スペースに名前を付けましょう。",
+    "headline_resume": "{{name}} で続けるか、別のスペースを始めましょう。",
+    "lede_first": "スペースは、タスク、エージェント、プロジェクトが集まる場所です。あとでチームメイトを招待したり、スペースを増やしたりできます。",
+    "lede_resume": "すでにあるスペースでセットアップを続けるか、別に新しいスペースを作成してください。いくつでもスペースに所属できます。",
+    "name_label": "スペース名",
     "name_placeholder": "Acme Inc、My Lab、Side Projects…",
     "random_name": "ランダム",
     "url_label": "URL",
@@ -174,30 +163,30 @@
     "issue_prefix_prefix": "タスクは ",
     "issue_prefix_suffix": " のように表示されます。あとで設定から変更できます。",
     "issue_prefix_pending": "上の URL を入力すると、タスク番号はそれに合わせて決まります。ここに直接入力することもできます。",
-    "create_new_title": "新しいワークスペースを作成",
+    "create_new_title": "新しいスペースを作成",
     "create_new_subtitle": "新しく始めましょう — 別の業務領域のための独立した場所です。",
     "hint_opening": "{{name}} を開いています。",
     "hint_creating": "{{name}} を作成しています。",
     "hint_creating_pending": "{{name}} を作成中…",
-    "hint_creating_fallback": "ワークスペース",
-    "hint_name_first": "ワークスペースを作成するには名前を入力してください。",
-    "hint_pick": "ワークスペースを選ぶか、新しく始めてください。",
+    "hint_creating_fallback": "スペース",
+    "hint_name_first": "スペースを作成するには名前を入力してください。",
+    "hint_pick": "スペースを選ぶか、新しく始めてください。",
     "cta_open": "{{name}} を開く",
     "cta_create_named": "{{name}} を作成",
-    "cta_create_workspace": "ワークスペースを作成",
+    "cta_create_workspace": "スペースを作成",
     "cta_creating": "作成中…",
     "slug_format_error": "使用できるのは小文字、数字、ハイフンのみです",
-    "slug_taken_error": "そのワークスペース URL はすでに使われています。",
-    "slug_reserved_error": "そのワークスペース URL は予約済みのため使用できません。",
-    "slug_conflict_toast": "別のワークスペース URL を選んでください",
-    "create_failed_toast": "ワークスペースを作成できませんでした",
-    "creation_disabled_eyebrow": "ワークスペースの作成は無効です",
+    "slug_taken_error": "そのスペース URL はすでに使われています。",
+    "slug_reserved_error": "そのスペース URL は予約済みのため使用できません。",
+    "slug_conflict_toast": "別のスペース URL を選んでください",
+    "create_failed_toast": "スペースを作成できませんでした",
+    "creation_disabled_eyebrow": "スペースの作成は無効です",
     "creation_disabled_headline": "管理者に招待を依頼してください。",
-    "creation_disabled_lede": "この QuickWork インスタンスでは新しいワークスペースを作成できません。管理者からワークスペースに招待されたら、招待を承諾して更新し、続けてください。",
+    "creation_disabled_lede": "この QuickWork インスタンスでは新しいスペースを作成できません。管理者からスペースに招待されたら、招待を承諾して更新し、続けてください。",
     "creation_disabled_logout": "ログアウト",
-    "creation_disabled_eyebrow_resume": "あなたのワークスペース",
+    "creation_disabled_eyebrow_resume": "あなたのスペース",
     "creation_disabled_headline_resume": "{{name}} で続けましょう。",
-    "creation_disabled_lede_resume": "このインスタンスではワークスペースの作成が無効になっているため、既存のワークスペースへ続けて移動します。"
+    "creation_disabled_lede_resume": "このインスタンスではスペースの作成が無効になっているため、既存のスペースへ続けて移動します。"
   },
   "step_runtime": {
     "scanning_headline": "このコンピュータを接続中…",
@@ -215,7 +204,7 @@
     "empty_lede_prefix": "エージェントランタイムとは、私たちが接続する AI コーディングツールです — たとえば ",
     "empty_lede_suffix": " など。1 つインストールして更新するか、下から進む方法を選んでください。",
     "empty_skip_title": "今はスキップ",
-    "empty_skip_subtitle": "先にワークスペースに入ります。このコンピュータにエージェントランタイムが接続されるまでエージェントは作業を実行できませんが、閲覧、計画、チームメイトの招待は可能です。",
+    "empty_skip_subtitle": "先にスペースに入ります。このコンピュータにエージェントランタイムが接続されるまでエージェントは作業を実行できませんが、閲覧、計画、チームメイトの招待は可能です。",
     "empty_skip_action": "スキップ",
     "empty_waitlist_title": "クラウドコンピュータを使う",
     "empty_waitlist_subtitle": "クラウドでコンピュータを動かします。まだ提供されていません。",
@@ -226,13 +215,13 @@
     "hint_selected": "選択中: {{name}}",
     "hint_pick": "Mika と始めるには、上でエージェントランタイムを選んでください。",
     "hint_waiting": "最初の結果を待っています…",
-    "hint_skip_or_refresh": "インストール後に更新するか、スキップしてワークスペースに入ってください。",
+    "hint_skip_or_refresh": "インストール後に更新するか、スキップしてスペースに入ってください。",
     "continue": "Mika と始める"
   },
   "step_platform": {
     "eyebrow": "コンピュータを接続",
     "headline": "エージェントを実行するコンピュータを接続しましょう。",
-    "lede": "このワークスペースの参謀長である Mika は、QuickWork に接続した実際のコンピュータで動きます。どう接続するかを選んでください。",
+    "lede": "このスペースの参謀長である Mika は、QuickWork に接続した実際のコンピュータで動きます。どう接続するかを選んでください。",
     "hint_default": "接続方法を選んでください。スキップしてあとでコンピュータを接続することもできます。",
     "download_title": "このコンピュータを使う",
     "download_subtitle": "デスクトップアプリをインストールして、このコンピュータを接続します。新しいタブで開くので、そこでプラットフォームを選んでください。",
@@ -261,7 +250,7 @@
   },
   "errors": {
     "skip_failed": "オンボーディングを完了できませんでした",
-    "mika_setup_failed": "Mika ワークスペースを開始できませんでした"
+    "mika_setup_failed": "Mika スペースを開始できませんでした"
   },
   "mika_intro": {
     "headline": "最初のエージェント仲間、Mika を紹介します。",

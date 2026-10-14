@@ -25,18 +25,6 @@ export function isZhLocale(locale: Locale): boolean {
   return locale === "zh-Hans";
 }
 
-type FeatureSection = {
-  label: string;
-  title: string;
-  description: string;
-  cards: { title: string; description: string }[];
-};
-
-type FooterGroup = {
-  label: string;
-  links: { label: string; href: string }[];
-};
-
 export type ContactSalesOption = { value: string; label: string };
 
 export type LandingDict = {
@@ -52,51 +40,53 @@ export type LandingDict = {
     closeMenu: string;
   };
   hero: {
+    overline: string;
+    /** Three parts so the last word can carry the brand colour: the heading
+     *  renders as `line1 <br> line2 <em>accent</em>`. Keep whole words in
+     *  `accent` — a locale that cannot split the sentence that way should
+     *  still read naturally with it at the end. */
     headlineLine1: string;
     headlineLine2: string;
+    headlineAccent: string;
     subheading: string;
     cta: string;
+    ctaDocs: string;
     downloadDesktop: string;
     talkToSales: string;
-    worksWith: string;
-    imageAlt: string;
+    runtimesLabel: string;
+    /** Copy for the orchestration panel the hero renders instead of a product
+     *  screenshot. The panel's status pills are deliberately NOT part of this
+     *  dictionary — issue statuses stay lowercase English in every locale, per
+     *  the i18n glossary in apps/docs/content/docs/developers/conventions.mdx.
+     *  `actors` is mixed on purpose: the first row is the squad (localised),
+     *  the rest are agent handles, which are names and never translate. */
+    panel: {
+      title: string;
+      tabs: string[];
+      squad: string;
+      members: string;
+      prompt: string;
+      submit: string;
+      hint: string;
+      rows: string[];
+      actors: string[];
+      footerIssues: string;
+      footerDaemon: string;
+    };
   };
-  features: {
-    teammates: FeatureSection;
-    autonomous: FeatureSection;
-    skills: FeatureSection;
-    runtimes: FeatureSection;
+  /** The three numbered cells under the fold. */
+  pillars: {
+    items: { title: string; description: string }[];
   };
-  howItWorks: {
-    label: string;
-    headlineMain: string;
-    headlineFaded: string;
-    steps: { title: string; description: string }[];
-    cta: string;
-    ctaGithub: string;
-    ctaDocs: string;
-  };
-  openSource: {
-    label: string;
-    headlineLine1: string;
-    headlineLine2: string;
+  band: {
+    title: string;
     description: string;
     cta: string;
-    highlights: { title: string; description: string }[];
-  };
-  faq: {
-    label: string;
-    headline: string;
-    items: { question: string; answer: string }[];
   };
   footer: {
-    tagline: string;
-    cta: string;
-    groups: {
-      product: FooterGroup;
-      resources: FooterGroup;
-      company: FooterGroup;
-    };
+    /** Footer-only label. The docs and changelog links reuse `header.docs` /
+     *  `header.changelog` rather than duplicating the same word here. */
+    download: string;
     copyright: string;
   };
   about: {

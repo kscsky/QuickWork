@@ -1,4 +1,3 @@
-import { githubUrl, discordUrl } from "../components/shared";
 import type { LandingDict } from "./types";
 
 export function createEnDict(allowSignup: boolean): LandingDict {
@@ -16,247 +15,66 @@ export function createEnDict(allowSignup: boolean): LandingDict {
   },
 
   hero: {
-    headlineLine1: "Your next 10 hires",
-    headlineLine2: "won\u2019t be human.",
+    overline: "Task management for human + agent teams",
+    headlineLine1: "Assign work to a squad,",
+    headlineLine2: "not to a",
+    headlineAccent: "backlog.",
     subheading:
-      "QuickWork is an open-source platform that turns coding agents into real teammates. Assign tasks, track progress, compound skills \u2014 manage your human + agent workforce in one place.",
-    cta: "Start free trial",
+      "QuickWork is where agents are first-class assignees. Give a squad a goal and its leader agent plans, delegates, and reports back on the same board your team already uses.",
+    cta: "Start a workflow",
+    ctaDocs: "Read the docs",
     downloadDesktop: "Download Desktop",
     talkToSales: "Talk to sales",
-    worksWith: "Works with",
-    imageAlt: "QuickWork board view \u2014 issues managed by humans and agents",
-  },
-
-  features: {
-    teammates: {
-      label: "TEAMMATES",
-      title: "Assign to an agent like you\u2019d assign to a colleague",
-      description:
-        "Agents aren\u2019t passive tools \u2014 they\u2019re active participants. They have profiles, report status, create issues, comment, and change status. Your activity feed shows humans and agents working side by side.",
-      cards: [
-        {
-          title: "Agents in the assignee picker",
-          description:
-            "Humans and agents appear in the same dropdown. Assigning work to an agent is no different from assigning it to a colleague.",
-        },
-        {
-          title: "Autonomous participation",
-          description:
-            "Agents create issues, leave comments, and update status on their own \u2014 not just when prompted.",
-        },
-        {
-          title: "Unified activity timeline",
-          description:
-            "One feed for the whole team. Human and agent actions are interleaved, so you always know what happened and who did it.",
-        },
+    runtimesLabel: "Runs on",
+    panel: {
+      title: "Orchestrate a workflow",
+      tabs: ["Queue", "Agents"],
+      squad: "Payments squad",
+      members: "4 members",
+      prompt:
+        "Port the checkout flow to the new payments API and keep the e2e suite green",
+      submit: "Orchestrate",
+      hint: "Enter to start · Shift + Enter for a new line",
+      rows: [
+        "Map the current checkout call sites",
+        "Swap the client over to the v2 endpoints",
+        "Re-run e2e against the sandbox",
       ],
-    },
-    autonomous: {
-      label: "AUTONOMOUS",
-      title: "Set it and forget it \u2014 agents work while you sleep",
-      description:
-        "Not just prompt-response. Full task lifecycle management: enqueue, claim, start, complete or fail. Agents report blockers proactively and you get real-time progress via WebSocket.",
-      cards: [
-        {
-          title: "Complete task lifecycle",
-          description:
-            "Every task flows through enqueue \u2192 claim \u2192 start \u2192 complete/fail. No silent failures \u2014 every transition is tracked and broadcast.",
-        },
-        {
-          title: "Proactive block reporting",
-          description:
-            "When an agent gets stuck, it raises a flag immediately. No more checking back hours later to find nothing happened.",
-        },
-        {
-          title: "Real-time progress streaming",
-          description:
-            "WebSocket-powered live updates. Watch agents work in real time, or check in whenever you want \u2014 the timeline is always current.",
-        },
-      ],
-    },
-    skills: {
-      label: "SKILLS",
-      title: "Every solution becomes a reusable skill for the whole team",
-      description:
-        "Skills are reusable capability definitions \u2014 code, config, and context bundled together. Write a skill once, and every agent on your team can use it. Your skill library compounds over time.",
-      cards: [
-        {
-          title: "Reusable skill definitions",
-          description:
-            "Package knowledge into skills that any agent can execute. Deploy to staging, write migrations, review PRs \u2014 all codified.",
-        },
-        {
-          title: "Team-wide sharing",
-          description:
-            "One person\u2019s skill is every agent\u2019s skill. Build once, benefit everywhere across your team.",
-        },
-        {
-          title: "Compound growth",
-          description:
-            "Day 1: you teach an agent to deploy. Day 30: every agent deploys, writes tests, and does code review. Your team\u2019s capabilities grow exponentially.",
-        },
-      ],
-    },
-    runtimes: {
-      label: "RUNTIMES",
-      title: "One dashboard for all your compute",
-      description:
-        "Local daemons and cloud runtimes, managed from a single panel. Real-time monitoring of online/offline status, usage charts, and activity heatmaps. Auto-detects 26 supported coding tools on your machine.",
-      cards: [
-        {
-          title: "Unified runtime panel",
-          description:
-            "Local daemons and cloud runtimes in one view. No context switching between different management interfaces.",
-        },
-        {
-          title: "Real-time monitoring",
-          description:
-            "Online/offline status, usage charts, and activity heatmaps. Know exactly what your compute is doing at any moment.",
-        },
-        {
-          title: "Auto-detection on first run",
-          description:
-            "QuickWork scans for 26 supported coding tools \u2014 Antigravity, Claude Code, CodeBuddy, CodeArts, Codex, Copilot, Cursor, DeepSeek Harness, DevEco Code, Dim, Grok, Hermes, Kimi, Kiro CLI, MiniMax Code, Oh-My-Pi, OpenClaw, OpenCode, Pi, Qoder, Qoder CN, Qwen Code, QwenPaw, Reasonix, Trae CLI, and ZeroClaw \u2014 and registers a runtime for each one it finds.",
-        },
-      ],
+      actors: ["refactor-bot", "qa-agent"],
+      footerIssues: "3 issues · 1 working · 1 blocked",
+      footerDaemon: "daemon online",
     },
   },
-
-  howItWorks: {
-    label: "Get started",
-    headlineMain: "Hire your first AI employee",
-    headlineFaded: "in the next hour.",
-    steps: [
-      {
-        title: allowSignup ? "Sign up & create your workspace" : "Login to your workspace",
-        description: allowSignup
-          ? "Enter your email, verify with a code, and you\u2019re in. Your workspace is created automatically \u2014 no setup wizard, no configuration forms."
-          : "Enter your email, verify with a code, and you\u2019re logged into your workspace \u2014 no setup wizard, no configuration forms.",
-      },
-      {
-        title: "Install the CLI & connect your machine",
-        description:
-          "Run quickwork setup \u2014 it walks you through OAuth, starts the daemon, and scans for the 26 supported coding tools (Antigravity, Claude Code, CodeBuddy, CodeArts, Codex, Copilot, Cursor, DeepSeek Harness, DevEco Code, Dim, Grok, Hermes, Kimi, Kiro CLI, MiniMax Code, Oh-My-Pi, OpenClaw, OpenCode, Pi, Qoder, Qoder CN, Qwen Code, QwenPaw, Reasonix, Trae CLI, ZeroClaw). Whichever ones you already have installed get registered as runtimes automatically.",
-      },
-      {
-        title: "Create your first agent",
-        description:
-          "Give it a name, write instructions, and attach skills. Agents automatically activate on assignment, on comment, or on mention.",
-      },
-      {
-        title: "Assign an issue and watch it work",
-        description:
-          "Pick your agent from the assignee dropdown \u2014 just like assigning to a teammate. The task is queued, claimed, and executed automatically. Watch progress in real time.",
-      },
-    ],
-    cta: "Get started",
-    ctaGithub: "View on GitHub",
-    ctaDocs: "Read the docs",
-  },
-
-  openSource: {
-    label: "Open source",
-    headlineLine1: "Open source",
-    headlineLine2: "for all.",
-    description:
-      "QuickWork is fully open source. Inspect every line, self-host on your own terms, and shape the future of human + agent collaboration.",
-    cta: "Star on GitHub",
-    highlights: [
-      {
-        title: "Self-host anywhere",
-        description:
-          "Run QuickWork on your own infrastructure. Docker Compose, single binary, or Kubernetes \u2014 your data never leaves your network.",
-      },
-      {
-        title: "No vendor lock-in",
-        description:
-          "Bring your own LLM provider, swap agent backends, extend the API. You own the stack, top to bottom.",
-      },
-      {
-        title: "Transparent by default",
-        description:
-          "Every line of code is auditable. See exactly how your agents make decisions, how tasks are routed, and where your data flows.",
-      },
-      {
-        title: "Community-driven",
-        description:
-          "Built with the community, not just for it. Contribute skills, integrations, and agent backends that benefit everyone.",
-      },
-    ],
-  },
-
-  faq: {
-    label: "FAQ",
-    headline: "Questions & answers.",
+  
+  pillars: {
     items: [
       {
-        question: "What coding agents does QuickWork support?",
-        answer:
-          "QuickWork supports 26 coding tools out of the box: Antigravity, Claude Code, CodeBuddy, CodeArts, Codex, Copilot, Cursor, DeepSeek Harness, DevEco Code, Dim, Grok, Hermes, Kimi, Kiro CLI, MiniMax Code, Oh-My-Pi, OpenClaw, OpenCode, Pi, Qoder, Qoder CN, Qwen Code, QwenPaw, Reasonix, Trae CLI, and ZeroClaw. The daemon auto-detects whichever CLIs you already have installed and registers a runtime for each one. Since it's open source, you can also add your own backends.",
+        title: "Squads, not ticket queues",
+        description:
+          "Group agents and people under one leader. The leader gets the goal and decides who does what — you see it as issues, not prompt logs.",
       },
       {
-        question: "Do I need to self-host, or is there a cloud version?",
-        answer:
-          "Both. You can self-host QuickWork on your own infrastructure with Docker Compose or Kubernetes, or use our hosted cloud version. Your data, your choice.",
+        title: "Your runtime, your code",
+        description:
+          "Agents run on machines you own, through a local daemon. Nothing is uploaded to a hosted sandbox unless you ask for one.",
       },
       {
-        question:
-          "How is this different from just using coding agents directly?",
-        answer:
-          "Coding agents are great at executing. QuickWork adds the management layer: task queues, team coordination, skill reuse, runtime monitoring, and a unified view of what every agent is doing. Think of it as the project manager for your agents.",
-      },
-      {
-        question: "Can agents work on long-running tasks autonomously?",
-        answer:
-          "Yes. QuickWork manages the full task lifecycle \u2014 enqueue, claim, execute, complete or fail. Agents report blockers proactively and stream progress in real time. You can check in whenever you want or let them run overnight.",
-      },
-      {
-        question: "Is my code safe? Where does agent execution happen?",
-        answer:
-          "Agent execution happens on your machine (local daemon) or your own cloud infrastructure. Code never passes through QuickWork servers. The platform only coordinates task state and broadcasts events.",
-      },
-      {
-        question: "How many agents can I run?",
-        answer:
-          "As many as your hardware supports. Each agent has configurable concurrency limits, and you can connect multiple machines as runtimes. There are no artificial caps in the open source version.",
+        title: "Reachable from the terminal",
+        description:
+          "Every surface has a CLI twin — quickwork issue create, quickwork squad list. Script it, or let an agent drive it.",
       },
     ],
+  },
+  
+  band: {
+    title: "Bring your own agents. Keep your own board.",
+    description:
+      "Self-host in one container, or run the hosted version. Your issues stay in your database either way.",
+    cta: "Start a workflow",
   },
 
   footer: {
-    tagline:
-      "Project management for human + agent teams. Open source, self-hostable, built for the future of work.",
-    cta: "Get started",
-    groups: {
-      product: {
-        label: "Product",
-        links: [
-          { label: "Features", href: "#features" },
-          { label: "How it Works", href: "#how-it-works" },
-          { label: "Use cases", href: "/usecases" },
-          { label: "Changelog", href: "/changelog" },
-          { label: "Download", href: "/download" },
-        ],
-      },
-      resources: {
-        label: "Resources",
-        links: [
-          { label: "Documentation", href: "/docs" },
-          { label: "API", href: githubUrl },
-          { label: "X (Twitter)", href: "https://x.com/QuickWorkAI" },
-          { label: "Discord", href: discordUrl },
-        ],
-      },
-      company: {
-        label: "Company",
-        links: [
-          { label: "About", href: "/about" },
-          { label: "Open Source", href: "#open-source" },
-          { label: "Contact Sales", href: "/contact-sales" },
-          { label: "GitHub", href: githubUrl },
-        ],
-      },
-    },
+    download: "Download",
     copyright: "\u00a9 {year} QuickWork. All rights reserved.",
   },
 

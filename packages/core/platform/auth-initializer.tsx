@@ -282,7 +282,16 @@ export function AuthInitializer({
         warmWorkspaces();
       } catch (err) {
         if (cancelled) return;
-        if (err instanceof ApiError && err.status === 401) {
+        // 401 is "this session is no longer valid"; 404 from getMe is "the
+        // member this token names is gone". Both are terminal — retrying
+        // either can only fail the same way — but only 401 was handled, so a
+        // token pointing at a deleted member fell through to the transient
+        // branch below and retried forever, leaving the app in `recovering`
+        // and the console red.
+        if (
+          err instanceof ApiError &&
+          (err.status === 401 || err.status === 404)
+        ) {
           rejectSession();
           return;
         }

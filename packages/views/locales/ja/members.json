@@ -11,10 +11,10 @@
     "more_agents_other": "他 {{count}} 件のエージェント"
   },
   "detail": {
-    "workspace_fallback": "ワークスペース",
+    "workspace_fallback": "スペース",
     "members_breadcrumb": "メンバー",
     "breadcrumb_fallback": "メンバー",
     "not_found_title": "メンバーが見つかりません",
-    "not_found_description": "このメンバーはワークスペースから退出した可能性があります。"
+    "not_found_description": "このメンバーはスペースから退出した可能性があります。"
   }
 }

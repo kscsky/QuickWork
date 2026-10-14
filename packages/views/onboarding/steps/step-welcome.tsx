@@ -1,16 +1,12 @@
 "use client";
 
-import { statusCategoryOfKey } from "@quickwork/core/issues";
 import { useState } from "react";
 import { ArrowRight, Download, Loader2 } from "lucide-react";
 import { Button, buttonVariants } from "@quickwork/ui/components/ui/button";
 import { QuickWorkIcon } from "@quickwork/ui/components/common/quickwork-icon";
 import { cn } from "@quickwork/ui/lib/utils";
 import { DragStrip } from "@quickwork/views/platform";
-import { STATUS_CONFIG } from "@quickwork/core/issues/config";
-import type { IssueStatus } from "@quickwork/core/types";
-import { StatusIcon } from "../../issues/components/status-icon";
-import { ProviderLogo } from "../../runtimes/components/provider-logo";
+import { WelcomeSignal } from "../components/welcome-signal";
 import { useT } from "../../i18n";
 
 /**
@@ -19,17 +15,25 @@ import { useT } from "../../i18n";
  * who are already onboarded never reach this screen; they're gated
  * out earlier by `!hasOnboarded`.
  *
- * Layout: two-column editorial hero on lg+, single column below.
- * Left = wordmark + serif headline + lede + CTA; right = a stack of
- * mock issue cards that show what human/agent collaboration looks
- * like on the board — the thing the user is about to create. The
- * right column is an illustration, not content: hidden below lg so
- * the headline and CTA stay the focus on narrow viewports.
+ * One column, read downward: the ask on top (what this is, and the two buttons
+ * that act on it), a rule, then the route underneath — the four handoffs a task
+ * makes, in the order they happen, with the zone each one lands in. An earlier
+ * pass set the same two things side by side, which split every reader's
+ * attention between the claim and its evidence and left the rail with a tall
+ * empty pane to sit in. Stacked, the rail is the page's spine and the sentence
+ * above it is the caption.
  *
- * `onSkip`, when provided, renders a secondary ghost CTA that marks
- * onboarding complete server-side and sends the user straight to
- * their existing workspace. OnboardingFlow only passes it when the
- * user has ≥ 1 workspace — without that, skipping lands in limbo.
+ * The screen is dark and the only saturated thing on it is `--inflight`. That
+ * is the whole art direction: `--inflight` is the mark the board uses for work
+ * an agent is holding, so the colour the user meets here is the colour they
+ * meet again when they assign their first issue. Nothing on this screen
+ * introduces a palette the product does not already have — the dark theme
+ * supplies the canvas and the foreground, and `--inflight-foreground` keeps the
+ * button legible.
+ *
+ * There is one action. It used to have a second, "I've done this before",
+ * which did what the primary one now does whenever a workspace already
+ * exists — so the primary took the behaviour over and the pair collapsed.
  *
  * `isWeb` flips two things when true: the subheading acknowledges
  * that web users have an extra runtime step (so "3 minutes" stops
@@ -39,60 +43,56 @@ import { useT } from "../../i18n";
  */
 export function StepWelcome({
   onNext,
-  onSkip,
   isWeb = false,
 }: {
   onNext: () => void | Promise<void>;
-  onSkip?: () => void | Promise<void>;
   isWeb?: boolean;
 }) {
   const { t } = useT("onboarding");
-  // Tracks which button is mid-flight so we can show a per-button
-  // spinner and disable both while one is in progress.
-  const [pending, setPending] = useState<"next" | "skip" | null>(null);
+  // Tracks whether the primary action is mid-flight, so its spinner shows and
+  // the button cannot be fired twice.
+  const [pending, setPending] = useState(false);
 
   const handleNext = async () => {
     if (pending) return;
-    setPending("next");
+    setPending(true);
     try {
       await onNext();
     } finally {
-      setPending(null);
-    }
-  };
-
-  const handleSkip = async () => {
-    if (pending || !onSkip) return;
-    setPending("skip");
-    try {
-      await onSkip();
-    } finally {
-      setPending(null);
+      setPending(false);
     }
   };
 
   return (
-    <div className="animate-onboarding-enter flex h-full min-h-[640px] flex-col lg:flex-row">
-      {/* Left — prose + CTA */}
-      <div className="flex flex-col lg:flex-1">
-        <DragStrip />
-        <div className="flex flex-1 flex-col justify-center px-6 pb-12 sm:px-10 md:px-20 lg:px-20 xl:px-24">
-          <div className="flex w-full max-w-[540px] flex-col gap-8">
+    <div className="dark flex h-full min-h-[640px] flex-col bg-background text-foreground">
+      <DragStrip />
+
+      <div className="flex-1 overflow-y-auto">
+        {/* 840px is the measure the headline sets: at lg the display size is
+            60px, and the second line is thirteen characters of CJK, so a
+            narrower column breaks it after 接 and leaves 手。 orphaned. */}
+        <div className="animate-onboarding-enter mx-auto flex w-full max-w-[840px] flex-col gap-10 px-6 pb-20 pt-16 sm:px-10">
+          {/* The ask. */}
+          <div className="flex flex-col gap-7">
             <div className="flex items-center gap-2.5">
-              <QuickWorkIcon className="size-5 text-foreground" noSpin />
-              <span className="font-serif text-title-lg font-medium tracking-tight">
+              <QuickWorkIcon className="size-5 text-inflight" noSpin />
+              <span className="font-mono text-micro uppercase tracking-[0.24em] text-inflight">
                 {t(($) => $.welcome.wordmark)}
               </span>
             </div>
 
-            <h1 className="text-balance font-serif text-5xl font-medium leading-[1.04] tracking-tight sm:text-6xl">
+            {/* The accent is a whole line rather than a phrase inside one, so
+                the sentence still reads as one claim and the colour lands on
+                the half the product is actually about. */}
+            <h1 className="text-balance text-4xl font-semibold leading-[1.05] tracking-[-0.03em] sm:text-5xl lg:text-6xl">
               {t(($) => $.welcome.headline_line1)}
               <br />
-              {t(($) => $.welcome.headline_line2)}{" "}
-              <em className="italic text-brand">{t(($) => $.welcome.headline_emphasis)}</em>
+              <span className="text-inflight">
+                {t(($) => $.welcome.headline_line2)}
+              </span>
             </h1>
 
-            <div className="flex flex-col gap-4">
+            <div className="flex max-w-[620px] flex-col gap-4">
               <p className="text-title leading-relaxed text-foreground">
                 {t(($) => $.welcome.lede)}
               </p>
@@ -117,7 +117,10 @@ export function StepWelcome({
                     href="/download"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className={buttonVariants({ size: "lg" })}
+                    className={cn(
+                      buttonVariants({ size: "lg" }),
+                      "bg-inflight text-inflight-foreground hover:bg-inflight/90",
+                    )}
                   >
                     <Download className="h-4 w-4" />
                     {t(($) => $.welcome.download_desktop)}
@@ -126,11 +129,9 @@ export function StepWelcome({
                     size="lg"
                     variant="outline"
                     onClick={handleNext}
-                    disabled={pending !== null}
+                    disabled={pending}
                   >
-                    {pending === "next" && (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    )}
+                    {pending && <Loader2 className="h-4 w-4 animate-spin" />}
                     {t(($) => $.welcome.continue_on_web)}
                     <ArrowRight className="h-4 w-4" />
                   </Button>
@@ -139,263 +140,24 @@ export function StepWelcome({
                 <Button
                   size="lg"
                   onClick={handleNext}
-                  disabled={pending !== null}
+                  disabled={pending}
+                  className="bg-inflight text-inflight-foreground hover:bg-inflight/90"
                 >
-                  {pending === "next" && (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  )}
+                  {pending && <Loader2 className="h-4 w-4 animate-spin" />}
                   {t(($) => $.welcome.start_exploring)}
                   <ArrowRight className="h-4 w-4" />
                 </Button>
               )}
-              {onSkip && (
-                <Button
-                  size="lg"
-                  variant="ghost"
-                  onClick={handleSkip}
-                  disabled={pending !== null}
-                >
-                  {pending === "skip" && (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  )}
-                  {t(($) => $.welcome.skip_existing)}
-                </Button>
-              )}
             </div>
+          </div>
+
+          {/* The proof. The rule is the seam between the two halves; without it
+              the rail reads as another paragraph. */}
+          <div className="max-w-[560px] border-t border-border pt-10">
+            <WelcomeSignal />
           </div>
         </div>
       </div>
-
-      {/* Right — mock issue cards illustration. Hidden on < lg.
-          Flex row on lg+ with `items-stretch` (default) makes both
-          columns take the container's full height, so the muted bg
-          fills the viewport edge-to-edge. `justify-center` inside
-          centers the mock cards vertically, mirroring the left
-          column's copy-center layout. */}
-      <div className="hidden border-l bg-muted/40 lg:flex lg:flex-1 lg:flex-col lg:overflow-hidden">
-        <DragStrip />
-        <div className="flex flex-1 flex-col items-center justify-center gap-7 px-8 py-8">
-          <p className="max-w-[440px] text-balance text-center font-serif text-body-lg italic leading-snug text-muted-foreground">
-            {t(($) => $.welcome.illustration_caption)}
-          </p>
-          <WelcomeIllustration />
-        </div>
-      </div>
     </div>
   );
-}
-
-
-/**
- * One task crossing a zone boundary, told as five activity cards. Two of them
- * sit on a source-zone issue (EAST-42) and two on a target-zone issue
- * (NORTH-18), so the reader can *see* the same work appear under a different
- * zone and the receipt come back — the product's thesis rendered concretely.
- *
- * Cards use slight rotations + indents to feel like a hand-stacked
- * pile rather than a neat feed, which matches the editorial-hero
- * aesthetic of the left column.
- */
-function WelcomeIllustration() {
-  const { t } = useT("onboarding");
-  return (
-    <div className="flex w-full max-w-[460px] flex-col gap-3">
-      <MockActivityCard
-        actor={{
-          kind: "user",
-          name: t(($) => $.welcome.illustration.card1_actor_name),
-          initial: t(($) => $.welcome.illustration.card1_actor_initial),
-        }}
-        issueId="EAST-42"
-        content={
-          <>
-            <Mention>{t(($) => $.welcome.illustration.card1_mention_content)}</Mention>
-            {t(($) => $.welcome.illustration.card1_body_prefix)}
-            <Mention>{t(($) => $.welcome.illustration.card1_mention_research)}</Mention>
-            {t(($) => $.welcome.illustration.card1_body_suffix)}
-          </>
-        }
-      />
-      <MockActivityCard
-        className="-translate-x-5 -rotate-[1.2deg]"
-        actor={{
-          kind: "agent",
-          name: t(($) => $.welcome.illustration.card2_actor_name),
-          provider: "codex",
-        }}
-        issueId="NORTH-18"
-        content={t(($) => $.welcome.illustration.card2_body)}
-        status="in_progress"
-      />
-      <MockActivityCard
-        className="translate-x-8 rotate-[1.6deg]"
-        actor={{
-          kind: "agent",
-          name: t(($) => $.welcome.illustration.card3_actor_name),
-          provider: "hermes",
-        }}
-        issueId="NORTH-18"
-        content={t(($) => $.welcome.illustration.card3_body)}
-        status="done"
-        timestamp={t(($) => $.welcome.illustration.card3_timestamp)}
-      />
-      <MockActivityCard
-        className="-translate-x-6 -rotate-[0.8deg]"
-        actor={{
-          kind: "agent",
-          name: t(($) => $.welcome.illustration.card4_actor_name),
-          provider: "openclaw",
-        }}
-        issueId="EAST-42"
-        content={t(($) => $.welcome.illustration.card4_body)}
-        status="in_review"
-      />
-      <MockActivityCard
-        className="translate-x-6 rotate-[1deg]"
-        actor={{
-          kind: "agent",
-          name: t(($) => $.welcome.illustration.card5_actor_name),
-          provider: "claude",
-        }}
-        issueId="EAST-42"
-        content={
-          <>
-            {t(($) => $.welcome.illustration.card5_body_prefix)}
-            <Mention>{t(($) => $.welcome.illustration.card5_mention_you)}</Mention>
-            {t(($) => $.welcome.illustration.card5_body_suffix)}
-          </>
-        }
-        status="done"
-        timestamp={t(($) => $.welcome.illustration.card5_timestamp)}
-      />
-    </div>
-  );
-}
-
-type ProviderName =
-  | "claude"
-  | "codex"
-  | "opencode"
-  | "openclaw"
-  | "hermes"
-  | "kimi"
-  | "kiro"
-  | "qoder"
-  | "pi"
-  | "copilot"
-  | "cursor";
-
-type ActivityActor =
-  | { kind: "user"; name: string; initial: string }
-  | { kind: "agent"; name: string; provider: ProviderName };
-
-function MockActivityCard({
-  actor,
-  issueId,
-  content,
-  status,
-  timestamp,
-  className,
-}: {
-  actor: ActivityActor;
-  issueId: string;
-  content: React.ReactNode;
-  status?: Extract<IssueStatus, "in_progress" | "done" | "in_review">;
-  timestamp?: string;
-  className?: string;
-}) {
-  return (
-    <div
-      className={cn(
-        "rounded-lg border bg-card px-4 py-3.5 shadow-sm",
-        // Decorative hover: lift, straighten, deeper shadow. Cards aren't
-        // clickable — this is ambient polish so the illustration feels like
-        // real app UI rather than a flat screenshot.
-        "transition-all duration-200 ease-out will-change-transform",
-        "hover:-translate-y-0.5 hover:rotate-0 hover:shadow-md",
-        className,
-      )}
-    >
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-2">
-          <MockAvatar actor={actor} />
-          <span className="truncate text-body font-medium text-foreground">
-            {actor.name}
-          </span>
-        </div>
-        <span className="shrink-0 font-mono text-micro text-muted-foreground">
-          {issueId}
-        </span>
-      </div>
-
-      <p className="mt-2.5 text-body leading-snug text-foreground">
-        {content}
-      </p>
-
-      {status && <StatusFooter status={status} timestamp={timestamp} />}
-    </div>
-  );
-}
-
-function MockAvatar({ actor }: { actor: ActivityActor }) {
-  if (actor.kind === "user") {
-    return (
-      <div
-        aria-hidden
-        className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-foreground text-micro font-semibold text-background"
-      >
-        {actor.initial}
-      </div>
-    );
-  }
-  return (
-    <div
-      aria-hidden
-      className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border bg-muted/40 text-foreground"
-    >
-      <ProviderLogo provider={actor.provider} className="h-3.5 w-3.5" />
-    </div>
-  );
-}
-
-function StatusFooter({
-  status,
-  timestamp,
-}: {
-  status: IssueStatus;
-  timestamp?: string;
-}) {
-  // The illustration's statuses are hard-coded BUILT-IN keys, so the label
-  // resolves from i18n exactly the way `useStatusLabel` does for real issues
-  // (MUL-6243) — `STATUS_CONFIG` still owns the icon color, but its `.label`
-  // is the server's English seed and must never reach the screen.
-  const { t } = useT("issues");
-  const category = statusCategoryOfKey(status);
-  const cfg = STATUS_CONFIG[category];
-  return (
-    <div className="mt-3 flex items-center gap-2 text-caption">
-      <span
-        className={cn("flex items-center gap-1.5 font-medium", cfg.iconColor)}
-      >
-        <StatusIcon
-          status={status}
-          className={cn(
-            "h-3.5 w-3.5",
-            status === "in_progress" && "animate-pulse",
-          )}
-        />
-        {t(($) => $.status[category])}
-      </span>
-      {timestamp && (
-        <>
-          <span className="text-muted-foreground">·</span>
-          <span className="text-muted-foreground">{timestamp}</span>
-        </>
-      )}
-    </div>
-  );
-}
-
-function Mention({ children }: { children: React.ReactNode }) {
-  return <span className="font-medium text-brand">{children}</span>;
 }

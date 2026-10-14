@@ -1,7 +1,7 @@
 {
   "page": {
     "breadcrumb": "マイタスク",
-    "workspace_fallback": "ワークスペース",
+    "workspace_fallback": "スペース",
     "empty_title": "あなたに割り当てられたタスクはありません",
     "empty_description": "あなたが作成したタスクや割り当てられたタスクがここに表示されます。"
   },

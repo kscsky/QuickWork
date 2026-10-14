@@ -1,7 +1,7 @@
 {
   "page": {
     "breadcrumb": "내 태스크",
-    "workspace_fallback": "워크스페이스",
+    "workspace_fallback": "스페이스",
     "empty_title": "내게 할당된 태스크가 없습니다",
     "empty_description": "내가 만들었거나 담당자로 지정된 태스크가 여기에 표시됩니다."
   },

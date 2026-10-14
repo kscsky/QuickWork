@@ -50,12 +50,12 @@
     "done_title": "You're bound.",
     "done_description": "Your next message to the Bot in Lark will go straight to the Agent. You can close this tab.",
     "error_title": "Couldn't complete the binding",
-    "error_admin_hint": "If this keeps happening, ask the workspace admin to re-send the binding link from Lark.",
+    "error_admin_hint": "If this keeps happening, ask the space admin to re-send the binding link from Lark.",
     "error_missing_token": "The link is missing its binding token. Ask the Bot to send a new one in Lark.",
     "error_expired": "This binding link is invalid or expired (links are valid for 15 minutes). Ask the Bot to send a new one.",
     "error_already_bound": "This Lark account is already bound to a different QuickWork user. Account transfers must go through an explicit unbind first.",
-    "error_not_member": "You're signed in to a QuickWork account that isn't a member of this workspace.",
-    "error_unknown": "Something went wrong. Try again, and if the problem persists, contact the workspace admin."
+    "error_not_member": "You're signed in to a QuickWork account that isn't a member of this space.",
+    "error_unknown": "Something went wrong. Try again, and if the problem persists, contact the space admin."
   },
   "slack_bind": {
     "page_title": "Link your Slack account",
@@ -69,8 +69,8 @@
     "error_missing_token": "The link is missing its token. Message the bot again in Slack to get a new one.",
     "error_expired": "This link is invalid or expired (links are valid for 15 minutes). Message the bot again to get a new one.",
     "error_already_bound": "This Slack account is already linked to a different QuickWork user. Account transfers must go through an explicit unbind first.",
-    "error_not_member": "You're signed in to a QuickWork account that isn't a member of this workspace.",
-    "error_unknown": "Something went wrong. Try again, and if the problem persists, contact the workspace admin."
+    "error_not_member": "You're signed in to a QuickWork account that isn't a member of this space.",
+    "error_unknown": "Something went wrong. Try again, and if the problem persists, contact the space admin."
   },
   "dingtalk_bind": {
     "page_title": "Link your DingTalk account",
@@ -84,8 +84,8 @@
     "error_missing_token": "The link is missing its token. Message the bot again in DingTalk to get a new one.",
     "error_expired": "This link is invalid or expired (links are valid for 15 minutes). Message the bot again to get a new one.",
     "error_already_bound": "This DingTalk account is already linked to a different QuickWork user. Account transfers must go through an explicit unbind first.",
-    "error_not_member": "You're signed in to a QuickWork account that isn't a member of this workspace.",
-    "error_unknown": "Something went wrong. Try again, and if the problem persists, contact the workspace admin."
+    "error_not_member": "You're signed in to a QuickWork account that isn't a member of this space.",
+    "error_unknown": "Something went wrong. Try again, and if the problem persists, contact the space admin."
   },
   "telegram_bind": {
     "page_title": "Link your Telegram account",
@@ -99,8 +99,8 @@
     "error_missing_token": "The link is missing its token. Message the bot again in Telegram to get a new one.",
     "error_expired": "This link is invalid or expired (links are valid for 15 minutes). Message the bot again to get a new one.",
     "error_already_bound": "This Telegram account is already linked to a different QuickWork user. Account transfers must go through an explicit unbind first.",
-    "error_not_member": "You're signed in to a QuickWork account that isn't a member of this workspace.",
-    "error_unknown": "Something went wrong. Try again, and if the problem persists, contact the workspace admin."
+    "error_not_member": "You're signed in to a QuickWork account that isn't a member of this space.",
+    "error_unknown": "Something went wrong. Try again, and if the problem persists, contact the space admin."
   },
   "expandable_description": {
     "expand": "Show more",
@@ -118,8 +118,8 @@
     "error_missing_token": "The link is missing its token. Message the bot again in WeCom to get a new one.",
     "error_expired": "This link is invalid or expired (links are valid for 15 minutes). Message the bot again to get a new one.",
     "error_already_bound": "This WeCom identity is already linked to a different QuickWork user. Account transfers must go through an explicit unbind first.",
-    "error_not_member": "You're signed in to a QuickWork account that isn't a member of this workspace.",
-    "error_unknown": "Something went wrong. Try again, and if the problem persists, contact the workspace admin."
+    "error_not_member": "You're signed in to a QuickWork account that isn't a member of this space.",
+    "error_unknown": "Something went wrong. Try again, and if the problem persists, contact the space admin."
   },
   "navigation": {
     "open_in_new_tab": "Open in new tab"

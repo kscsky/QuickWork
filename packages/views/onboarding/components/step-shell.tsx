@@ -99,6 +99,7 @@ export function StepShell({
   backDisabled,
   onStepChange,
   chromeFooter,
+  paneClassName,
   children,
 }: {
   currentStep: OnboardingStep;
@@ -110,6 +111,12 @@ export function StepShell({
   /** Injected by the flow — the Log out escape hatch. Rendered in whichever
    *  chrome is visible: the rail at `md` and up, the compact bar below it. */
   chromeFooter?: ReactNode;
+  /** Extra classes for the scrolling pane. A step that wants to own its own
+   *  surface — the workspace step draws a lit gradient and scopes `.dark` to
+   *  it — says so here rather than reaching for a different layout. Passed
+   *  through rather than switched on a tone prop because the shell has no
+   *  opinion about what the surface is. */
+  paneClassName?: string;
   children: ReactNode;
 }) {
   const mainRef = useRef<HTMLElement>(null);
@@ -138,7 +145,11 @@ export function StepShell({
         <main
           ref={mainRef}
           style={fadeStyle}
-          className={cn("min-h-0 min-w-0 flex-1 overflow-y-auto", STEP_GUTTER)}
+          className={cn(
+            "min-h-0 min-w-0 flex-1 overflow-y-auto",
+            STEP_GUTTER,
+            paneClassName,
+          )}
         >
           <div className={STEP_COLUMN}>
             <StepProgressBar

@@ -84,7 +84,7 @@
     "run_blocked_attribution": "Not triggered — the run couldn't be attributed to a responsible member",
     "run_blocked_already_active": "Not triggered — a recent run already covers this",
     "run_blocked_quota_exceeded": "Not triggered — the run limit for this period has been reached",
-    "run_blocked_issue_limit_reached": "Not triggered — the workspace has reached its issue limit",
+    "run_blocked_issue_limit_reached": "Not triggered — the space has reached its issue limit",
     "run_blocked_generic": "Not triggered — the run was blocked",
     "section_properties": "Properties",
     "section_triggers": "Triggers",
@@ -125,7 +125,7 @@
     "toast_granted": "Access granted",
     "toast_revoked": "Access removed",
     "toast_failed": "Couldn't update access",
-    "owner_note": "The creator and workspace admins always have access."
+    "owner_note": "The creator and space admins always have access."
   },
   "run_status": {
     "issue_created": "Issue Created",

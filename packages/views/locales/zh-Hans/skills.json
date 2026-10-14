@@ -1,14 +1,14 @@
 {
   "page": {
     "title": "Skills",
-    "tagline": "工作区里任何智能体都能使用的指令。",
+    "tagline": "空间里任何智能体都能使用的指令。",
     "learn_more": "了解更多 →",
     "new_skill": "新建 skill",
     "search_placeholder": "搜索 skill...",
     "scopes": {
       "all": {
         "label": "全部",
-        "description": "工作区里所有 skill"
+        "description": "空间里所有 skill"
       },
       "used": {
         "label": "使用中",
@@ -25,7 +25,7 @@
     },
     "empty": {
       "title": "还没有 skill",
-      "description": "创建第一个 skill、从 URL 或本地文件夹导入、或从已连接的运行时复制——之后工作区里每个智能体都能用它。"
+      "description": "创建第一个 skill、从 URL 或本地文件夹导入、或从已连接的运行时复制——之后空间里每个智能体都能用它。"
     },
     "no_matches": {
       "title": "无匹配",
@@ -35,7 +35,7 @@
       "try_different": " 换个关键词试试。"
     },
     "intro_banner": {
-      "title": "在工作区内共享。",
+      "title": "在空间内共享。",
       "body": "任何成员都可以创建 skill、从 URL 或本地文件夹导入、或从本地运行时复制——之后所有智能体都能用它。",
       "highlight": "本地运行时里的 skill 在你复制过来之前是私有的。"
     },
@@ -44,7 +44,7 @@
       "fallback": "拉取 skill 列表时出错。",
       "retry": "重试"
     },
-    "supporting_data_warning": "部分工作区数据加载失败。创建者归属、运行时名称、编辑权限可能显示不完整。"
+    "supporting_data_warning": "部分空间数据加载失败。创建者归属、运行时名称、编辑权限可能显示不完整。"
   },
   "table": {
     "name": "名称",
@@ -116,7 +116,7 @@
     "read_only": "只读",
     "delete_aria": "删除 skill",
     "delete_tooltip": "删除 skill",
-    "supporting_data_warning": "部分工作区数据加载失败。创建者归属、运行时名称、编辑权限可能要等下次刷新才完整。",
+    "supporting_data_warning": "部分空间数据加载失败。创建者归属、运行时名称、编辑权限可能要等下次刷新才完整。",
     "delete_file": "删除文件",
     "name_placeholder": "skill-name",
     "description_placeholder": "用一句话描述智能体什么时候应该使用这个 skill...",
@@ -210,8 +210,8 @@
       "used_by_other": "被 {{count}} 个智能体使用",
       "used_by_empty": "还未分配给任何智能体。打开某个智能体的 Skills 标签页进行分配。",
       "permissions_owner": "你可以编辑和删除该技能。改动将在智能体下次运行时生效。",
-      "permissions_locked_creator": "只有创建者（{{name}}）或工作区管理员可以编辑该技能。",
-      "permissions_locked": "只有创建者或工作区管理员可以编辑该技能。"
+      "permissions_locked_creator": "只有创建者（{{name}}）或空间管理员可以编辑该技能。",
+      "permissions_locked": "只有创建者或空间管理员可以编辑该技能。"
     },
     "files": {
       "list_aria": "技能文件",
@@ -249,13 +249,13 @@
       },
       "runtime": {
         "title": "从运行时复制",
-        "desc": "把本地运行时里已装好的 skill 提升到工作区。"
+        "desc": "把本地运行时里已装好的 skill 提升到空间。"
       }
     },
     "manual": {
       "name_label": "名称",
       "name_placeholder": "例如：review-helper",
-      "name_hint": "工作区内必须唯一。",
+      "name_hint": "空间内必须唯一。",
       "description_label": "描述",
       "description_placeholder": "用一句话说什么时候应该把这个 skill 分配给智能体。",
       "name_conflict_hint": "请换一个名字再提交。",
@@ -312,12 +312,12 @@
     "no_search_results_hint": "没有本地 skill 匹配 \"{{query}}\"。",
     "ignored_files_hint": "导入时会忽略软链、不可读文件、超大文件以及超大目录。",
     "ready": "准备导入",
-    "into_workspace": "到工作区。",
+    "into_workspace": "到空间。",
     "select_skill": "请选择一个 skill 继续。",
-    "import_button": "导入到工作区",
+    "import_button": "导入到空间",
     "importing": "导入中...",
     "skill_files_other": "{{count}} 个文件",
-    "skill_name_label": "工作区里的 skill 名称",
+    "skill_name_label": "空间里的 skill 名称",
     "skill_description_label": "描述",
     "skill_description_placeholder": "可选——描述智能体什么时候应该使用这个 skill。",
     "toast_imported": "已导入 skill",
@@ -335,9 +335,9 @@
     "bulk_summary_conflicts": "冲突",
     "bulk_summary_skipped": "已跳过",
     "bulk_summary_failed": "失败",
-    "conflict_single_title": "工作区里已存在同名 skill",
+    "conflict_single_title": "空间里已存在同名 skill",
     "conflict_bulk_title": "{{count}} 个 skill 需要处理冲突",
-    "conflict_hint": "选择覆盖现有工作区 skill、改名导入，或跳过。",
+    "conflict_hint": "选择覆盖现有空间 skill、改名导入，或跳过。",
     "conflict_locked_creator": "该 skill 由 {{creator}} 创建，只能由创建者通过本地导入覆盖；如需修改请到 Skill 详情页编辑。",
     "conflict_locked": "该 skill 只能由创建者通过本地导入覆盖；如需修改请到 Skill 详情页编辑。",
     "conflict_overwrite": "覆盖",

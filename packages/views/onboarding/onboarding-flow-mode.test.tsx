@@ -68,7 +68,7 @@ describe("OnboardingFlow — new-workspace mode", () => {
     // The welcome screen teaches what QuickWork is; someone creating a second
     // workspace already knows, so the flow opens on naming it.
     expect(
-      screen.getByRole("heading", { name: /Name your workspace/i }),
+      screen.getByRole("heading", { name: /Name your space/i }),
     ).toBeInTheDocument();
   });
 
@@ -78,14 +78,14 @@ describe("OnboardingFlow — new-workspace mode", () => {
     // First-run onboarding offers "Continue with {name}" when an abandoned
     // workspace exists. Doing that here would defeat the whole intent.
     expect(screen.queryByText(/Continue with/i)).not.toBeInTheDocument();
-    expect(screen.getByLabelText("Workspace name")).toBeInTheDocument();
+    expect(screen.getByLabelText("Space name")).toBeInTheDocument();
   });
 
   it("still opens on the product intro in first-run mode", () => {
     renderFlow({});
 
     expect(
-      screen.queryByRole("heading", { name: /Name your workspace/i }),
+      screen.queryByRole("heading", { name: /Name your space/i }),
     ).not.toBeInTheDocument();
   });
 });

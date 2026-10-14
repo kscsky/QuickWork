@@ -97,9 +97,9 @@ describe("StepWorkspace — DISABLE_WORKSPACE_CREATION gate", () => {
     renderStep({ existing: null, disabled: false });
 
     expect(
-      screen.getByText("Name your workspace.", { exact: false }),
+      screen.getByText("Name your space.", { exact: false }),
     ).toBeInTheDocument();
-    expect(screen.getByLabelText("Workspace name")).toBeInTheDocument();
+    expect(screen.getByLabelText("Space name")).toBeInTheDocument();
     expect(screen.getByLabelText("URL")).toBeInTheDocument();
   });
 
@@ -136,7 +136,7 @@ describe("StepWorkspace — DISABLE_WORKSPACE_CREATION gate", () => {
     // workspace" radio card is gone entirely.
     expect(screen.getAllByText("Acme").length).toBeGreaterThan(0);
     expect(
-      screen.queryByText("Create a new workspace", { exact: false }),
+      screen.queryByText("Create a new space", { exact: false }),
     ).not.toBeInTheDocument();
 
     // CTA is pre-selected to the existing-only action and immediately
@@ -171,7 +171,7 @@ describe("StepWorkspace — random workspace identity", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Random" }));
 
-    const name = screen.getByLabelText("Workspace name") as HTMLInputElement;
+    const name = screen.getByLabelText("Space name") as HTMLInputElement;
     const slug = screen.getByLabelText("URL") as HTMLInputElement;
     const expectedSlugPrefix = name.value
       .toLowerCase()
@@ -197,7 +197,7 @@ describe("StepWorkspace — issue prefix", () => {
   it("derives the prefix from the slug, not the name", () => {
     renderStep({ existing: null, disabled: false });
 
-    fireEvent.change(screen.getByLabelText("Workspace name"), {
+    fireEvent.change(screen.getByLabelText("Space name"), {
       target: { value: "Acme Inc" },
     });
 
@@ -211,7 +211,7 @@ describe("StepWorkspace — issue prefix", () => {
   it("fills the URL and prefix from a Chinese name", () => {
     renderStep({ existing: null, disabled: false });
 
-    fireEvent.change(screen.getByLabelText("Workspace name"), {
+    fireEvent.change(screen.getByLabelText("Space name"), {
       target: { value: "蜘蛛侠" },
     });
 
@@ -227,7 +227,7 @@ describe("StepWorkspace — issue prefix", () => {
   it("shows no prefix at all when the name romanizes to nothing", () => {
     renderStep({ existing: null, disabled: false });
 
-    fireEvent.change(screen.getByLabelText("Workspace name"), {
+    fireEvent.change(screen.getByLabelText("Space name"), {
       target: { value: "スパイダーマン" },
     });
 
@@ -254,7 +254,7 @@ describe("StepWorkspace — issue prefix", () => {
   it("follows a hand-typed URL over the romanized one", () => {
     renderStep({ existing: null, disabled: false });
 
-    fireEvent.change(screen.getByLabelText("Workspace name"), {
+    fireEvent.change(screen.getByLabelText("Space name"), {
       target: { value: "前端团队" },
     });
     expect(prefixInput().value).toBe("QIAN");
@@ -271,7 +271,7 @@ describe("StepWorkspace — issue prefix", () => {
   it("stops following the slug once the user edits it, and normalizes input", () => {
     renderStep({ existing: null, disabled: false });
 
-    fireEvent.change(screen.getByLabelText("Workspace name"), {
+    fireEvent.change(screen.getByLabelText("Space name"), {
       target: { value: "Acme Inc" },
     });
     fireEvent.change(prefixInput(), { target: { value: "fe-team!" } });
@@ -292,7 +292,7 @@ describe("StepWorkspace — issue prefix", () => {
     mockCreateMutate.mockClear();
     renderStep({ existing: null, disabled: false });
 
-    fireEvent.change(screen.getByLabelText("Workspace name"), {
+    fireEvent.change(screen.getByLabelText("Space name"), {
       target: { value: "前端团队" },
     });
     fireEvent.change(screen.getByLabelText("URL"), {
@@ -313,7 +313,7 @@ describe("StepWorkspace — issue prefix", () => {
     mockCreateMutate.mockClear();
     renderStep({ existing: null, disabled: false });
 
-    fireEvent.change(screen.getByLabelText("Workspace name"), {
+    fireEvent.change(screen.getByLabelText("Space name"), {
       target: { value: "Acme Inc" },
     });
     fireEvent.change(prefixInput(), { target: { value: "" } });

@@ -14,22 +14,25 @@ import type { OnboardingStep } from "./types";
  * for the same reason — users shouldn't think of reading the intro
  * as progress toward completing setup.
  *
- * Two questions are intentionally NOT steps anymore:
+ * The questions are intentionally NOT steps:
  *
  *   - "source" (How did you hear about QuickWork?) is pure attribution
- *     data with zero user-facing payoff, so it no longer taxes the
- *     critical path. It is collected post-onboarding by the workspace
+ *     data with zero user-facing payoff, so it never taxes the critical
+ *     path. It is collected post-onboarding by the workspace
  *     source-backfill prompt, and only after agents have completed
  *     work for the user — see `needs-backfill.ts`.
- *   - "role" / "use_case" merged into the single "about_you" step so
- *     related personalization inputs stay together.
+ *   - "role" / "use_case" had a step of their own ("about_you") that asked
+ *     what the member does and what they want QuickWork for. It sat between
+ *     the intro and the setup, which is the one place a new member has no
+ *     basis to answer yet — they had not used the product, and the answers
+ *     only ever fed Mika's kickoff copy. The step is gone; the answers are
+ *     still collected by the same server-persisted field, so anyone who
+ *     answered before this change keeps their context.
  *
  * Runtime is the final form step. A connected path provisions Mika and opens
  * the interactive onboarding chat as part of the runtime step's submit action;
  * that chat is the product experience itself, not another progress-screen step.
  */
 export const ONBOARDING_STEP_ORDER: readonly OnboardingStep[] = [
-  "about_you",
   "workspace",
-  "runtime",
 ] as const;

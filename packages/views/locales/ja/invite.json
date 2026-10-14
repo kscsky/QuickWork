@@ -10,16 +10,16 @@
   },
   "accepted": {
     "title": "{{workspace_name}}に参加しました！",
-    "redirecting": "ワークスペースへ移動中..."
+    "redirecting": "スペースへ移動中..."
   },
   "declined": {
     "title": "招待を辞退しました",
-    "description": "このワークスペースには追加されません。",
+    "description": "このスペースには追加されません。",
     "go_to_dashboard": "ダッシュボードへ移動"
   },
   "main": {
     "join_title": "{{workspace_name}}に参加",
-    "fallback_workspace_name": "ワークスペース",
+    "fallback_workspace_name": "スペース",
     "invited_role_admin": "さんがあなたをadminとして招待しました。",
     "invited_role_member": "さんがあなたをmemberとして招待しました。",
     "already_handled_accepted": "この招待はすでに承認されています。",
@@ -37,15 +37,15 @@
   "batch": {
     "log_out": "ログアウト",
     "empty_title": "保留中の招待はありません",
-    "empty_hint": "続けて自分のワークスペースを設定しましょう。",
+    "empty_hint": "続けて自分のスペースを設定しましょう。",
     "empty_continue": "セットアップを続ける",
     "title": "招待を受け取りました",
-    "subtitle": "参加するワークスペースを選択してください。残りはいつでもサイドバーから処理できます。",
-    "submit_skip": "スキップして自分のワークスペースを設定",
-    "submit_join_other": "{{count}} 件のワークスペースに参加",
+    "subtitle": "参加するスペースを選択してください。残りはいつでもサイドバーから処理できます。",
+    "submit_skip": "スキップして自分のスペースを設定",
+    "submit_join_other": "{{count}} 件のスペースに参加",
     "joining": "参加中...",
     "error_generic": "招待を処理できませんでした。もう一度お試しください。",
-    "row_workspace_fallback": "ワークスペース",
+    "row_workspace_fallback": "スペース",
     "row_inviter_fallback": "誰か",
     "row_invited_admin": "{{inviter}}さんがあなたをadminとして招待しました",
     "row_invited_member": "{{inviter}}さんがあなたをmemberとして招待しました"
