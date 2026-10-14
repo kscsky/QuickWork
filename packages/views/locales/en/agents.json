@@ -87,8 +87,8 @@
     "fallback_runtime_cloud": "Cloud",
     "fallback_runtime_local": "Local",
     "actions_aria": "Row actions",
-    "task_count_one": "{{count}} task",
-    "task_count_other": "{{count}} tasks"
+    "task_count_one": "{{count}} task queued",
+    "task_count_other": "{{count}} tasks queued"
   },
   "activity_tooltip": {
     "created_today": "Created today",
@@ -144,7 +144,7 @@
     "load_failed_title": "Couldn't load this agent",
     "load_failed_default": "Something went wrong fetching this agent.",
     "no_access_title": "You don't have access to this agent",
-    "no_access_hint": "Only the agent owner or a workspace admin can view this private agent.",
+    "no_access_hint": "Only the agent owner or a space admin can view this private agent.",
     "try_again": "Try again",
     "archived_banner": "This agent is archived. It cannot be assigned or mentioned.",
     "runtime_required_banner": "This agent kept its configuration and history, but needs a runtime before it can run.",
@@ -170,7 +170,7 @@
   },
   "inspector": {
     "section_profile": "Profile",
-    "section_profile_hint": "Manage how this agent appears across the workspace.",
+    "section_profile_hint": "Manage how this agent appears across the space.",
     "section_execution": "Execution",
     "section_execution_hint": "Choose the runtime, model, reasoning level, speed, and parallel task limit.",
     "section_access": "Access",
@@ -213,7 +213,7 @@
     "attention_queued_other": "{{count}} tasks are queued while the runtime is unavailable."
   },
   "skill_attach": {
-    "trigger_aria": "Attach a workspace skill",
+    "trigger_aria": "Attach a space skill",
     "trigger_label": "Attach"
   },
   "pickers": {
@@ -306,7 +306,7 @@
       },
       "template": {
         "title": "Use a template",
-        "description": "Start from curated instructions and skills, then adapt every detail to your workspace."
+        "description": "Start from curated instructions and skills, then adapt every detail to your space."
       },
       "ai": {
         "title": "Build with AI",
@@ -317,7 +317,7 @@
       "identity": "Identity",
       "identity_hint": "Give the agent a recognizable name and a concise purpose.",
       "behavior": "Behavior & capabilities",
-      "behavior_hint": "Define how it should work and attach workspace skills it can rely on.",
+      "behavior_hint": "Define how it should work and attach space skills it can rely on.",
       "execution": "Execution",
       "execution_hint": "Choose where the agent runs, and optionally override the runtime's default model, thinking level and speed.",
       "access": "Access",
@@ -331,8 +331,8 @@
         "description": "Only you can run this agent."
       },
       "workspace": {
-        "title": "Entire workspace",
-        "description": "Every workspace member can run it."
+        "title": "Entire space",
+        "description": "Every space member can run it."
       },
       "members": {
         "title": "Specific people",
@@ -388,7 +388,7 @@
   "create_dialog": {
     "title_create": "Create Agent",
     "title_duplicate": "Duplicate Agent",
-    "description_create": "Create a new AI agent for your workspace.",
+    "description_create": "Create a new AI agent for your space.",
     "description_duplicate": "Create a new agent based on \"{{name}}\". Instructions, env, and skills are copied for you.",
     "name_label": "Name",
     "name_placeholder": "e.g. Deep Research Agent",
@@ -401,9 +401,9 @@
       "private_desc": "Only you can run this agent",
       "public_title": "Public",
       "public_desc": "Choose who can run this agent",
-      "public_workspace_option": "Everyone in this workspace",
+      "public_workspace_option": "Everyone in this space",
       "public_members_group": "Specific people",
-      "public_members_empty": "No workspace members to choose from",
+      "public_members_empty": "No space members to choose from",
       "public_targets_empty_hint": "Pick at least one option below — otherwise the agent stays private."
     },
     "runtime_label": "Runtime",
@@ -433,11 +433,11 @@
     },
     "skills_section": {
       "label": "Skills",
-      "placeholder": "Add skills from workspace",
+      "placeholder": "Add skills from space",
       "selected_one": "{{count}} selected — click to edit",
       "selected_other": "{{count}} selected — click to edit",
       "collapse": "Collapse",
-      "list_empty_multi": "No skills in this workspace yet. Create or import one first.",
+      "list_empty_multi": "No skills in this space yet. Create or import one first.",
       "list_loading": "Loading…",
       "list_empty_default": "No skills available.",
       "list_no_match": "No skills match.",
@@ -478,12 +478,12 @@
       "system_layer_hint": "Updates with each QuickWork release. You can't edit it, and your notes below are never overwritten.",
       "system_layer_show": "Show",
       "system_layer_hide": "Hide",
-      "workspace_notes_label": "Workspace notes",
+      "workspace_notes_label": "Space notes",
       "workspace_notes_intro": "Add your team's context and preferences below. They apply on top of the instructions QuickWork maintains for this agent. Markdown is supported.",
       "workspace_notes_placeholder": "Add context this agent should always have.\n\n# Example\nOur main repository is github.com/acme/platform.\nWrite issues in English even when we chat in Chinese.\nWe do not deploy on Fridays."
     },
     "env": {
-      "intro_readonly": "Injected into the agent process at launch. Only workspace owners and admins can read or edit values; every reveal and edit is recorded in the workspace audit log.",
+      "intro_readonly": "Injected into the agent process at launch. Only space owners and admins can read or edit values; every reveal and edit is recorded in the space audit log.",
       "empty_readonly": "No environment variables configured.",
       "intro_prefix": "Injected into the agent process at launch (e.g. ",
       "intro_separator": ", ",
@@ -507,7 +507,7 @@
       "not_revealed_title_one": "{{count}} variable configured",
       "not_revealed_title_other": "{{count}} variables configured",
       "not_revealed_empty": "No environment variables configured.",
-      "not_revealed_hint": "Values stay masked until you reveal them. Every reveal and edit is recorded in the workspace audit log.",
+      "not_revealed_hint": "Values stay masked until you reveal them. Every reveal and edit is recorded in the space audit log.",
       "reveal_action": "Reveal & edit",
       "revealing": "Revealing…",
       "reveal_failed_toast": "Failed to load env values",
@@ -539,15 +539,15 @@
       "agent_disabled_badge": "Off for agent",
       "runtime_disabled_badge": "Off in runtime",
       "runtime_overridden_badge": "Overridden by QuickWork",
-      "workspace_title": "From the workspace library",
+      "workspace_title": "From the space library",
       "workspace_action_failed": "Could not update this agent's MCP servers",
       "workspace_removed_toast": "MCP server removed from this agent",
       "workspace_added_toast": "MCP server added to this agent",
       "workspace_remove_aria": "Remove {{name}} from this agent",
       "workspace_toggle_aria": "Enable {{name}} for this agent",
-      "workspace_library_empty": "This workspace has no MCP servers to assign yet. Add them in workspace Settings → MCP.",
-      "workspace_none_assigned": "No workspace MCP servers assigned to this agent yet.",
-      "workspace_add_action": "Add from workspace",
+      "workspace_library_empty": "This space has no MCP servers to assign yet. Add them in space Settings → MCP.",
+      "workspace_none_assigned": "No space MCP servers assigned to this agent yet.",
+      "workspace_add_action": "Add from space",
       "workspace_loading": "Loading assigned servers…",
       "dialog_name_locked": "The name cannot be changed here — renaming would add a second server and leave this one behind. Remove and re-add it instead.",
       "workspace_overridden_badge": "Overridden",
@@ -612,7 +612,7 @@
       "invalid_json": "Invalid JSON: {{error}}",
       "save_failed_toast": "Failed to save MCP config",
       "redacted_title": "Configured — hidden from your view",
-      "redacted_hint": "Only the agent owner or a workspace admin can read this config."
+      "redacted_hint": "Only the agent owner or a space admin can read this config."
     },
     "composio_mcp": {
       "subtitle": "Check a toolkit to let this agent mount it as an MCP server — but only when you (its creator) are the one who triggered the run, directly or down a sub-agent chain.",
@@ -628,7 +628,7 @@
       "redacted_title": "Configured — hidden from your view",
       "redacted_hint": "Only the agent's creator can view or change which apps it may use.",
       "shared_warning": "This agent is shared. People who can run this agent may use the Composio apps you enable here. Use Private or narrow the access list if these apps expose sensitive data.",
-      "workspace_warning": "Public to workspace: any workspace member may use these Composio apps through this agent."
+      "workspace_warning": "Public to space: any space member may use these Composio apps through this agent."
     },
     "runtime_config": {
       "intro": "Choose how the OpenClaw runtime executes this agent's turns. Local mode runs the agent inside the daemon process. Gateway mode forwards each turn to an OpenClaw Gateway — useful when the daemon host is a lightweight coordinator and the agent should run on a more powerful machine.",
@@ -651,12 +651,12 @@
       "save_failed_toast": "Failed to save routing config"
     },
     "skills": {
-      "intro": "This is the agent's effective skill set. Workspace skills are managed here; inherited Codex and Claude Code skills can also be turned off per agent.",
+      "intro": "This is the agent's effective skill set. Space skills are managed here; inherited Codex and Claude Code skills can also be turned off per agent.",
       "assigned_title": "Assigned to agent",
-      "assigned_hint": "Workspace skills travel with the agent. Turn one off temporarily without removing it.",
+      "assigned_hint": "Space skills travel with the agent. Turn one off temporarily without removing it.",
       "runtime_title": "Inherited from runtime",
       "runtime_hint": "Discovered automatically from {{runtime}} and available whenever this agent runs there.",
-      "workspace_badge": "Workspace",
+      "workspace_badge": "Space",
       "inherited_badge": "Inherited",
       "refresh_action": "Refresh",
       "no_description": "No description",
@@ -681,12 +681,12 @@
       "detail_supporting_files": "Supporting files",
       "add_action": "Add skill",
       "empty_title": "No skills assigned",
-      "empty_hint": "Add workspace skills to share team knowledge with this agent.",
+      "empty_hint": "Add space skills to share team knowledge with this agent.",
       "remove_failed_toast": "Failed to remove skill",
       "add_dialog_title": "Add skill",
-      "add_dialog_description": "Select a workspace skill to assign to this agent.",
+      "add_dialog_description": "Select a space skill to assign to this agent.",
       "add_dialog_search_placeholder": "Search skills",
-      "add_dialog_empty": "All workspace skills are already assigned.",
+      "add_dialog_empty": "All space skills are already assigned.",
       "add_dialog_no_match": "No skills match your search.",
       "add_dialog_empty_partial": "No more skills to add — this agent already has all of them.",
       "add_dialog_saving": "Adding…",
@@ -698,7 +698,7 @@
     },
     "integrations": {
       "intro": "Connect this agent to external chat platforms so people can work with it where they already are.",
-      "members_note": "Only workspace owners and admins can manage this connection. You can view connected bots in Settings → Integrations."
+      "members_note": "Only space owners and admins can manage this connection. You can view connected bots in Settings → Integrations."
     },
     "activity": {
       "status": {
@@ -794,17 +794,17 @@
       "tooltip": "Personal · only the owner and people they allow can run this agent"
     },
     "workspace": {
-      "label": "Workspace",
-      "tooltip": "Workspace · everyone in this workspace can use this agent"
+      "label": "Space",
+      "tooltip": "Space · everyone in this space can use this agent"
     }
   },
   "access": {
     "section_title": "Who can run this agent",
     "tooltip": "Access · who may run this agent",
     "trigger_private": "Only me",
-    "trigger_workspace": "Workspace",
+    "trigger_workspace": "Space",
     "scope_labels": {
-      "workspace": "Workspace",
+      "workspace": "Space",
       "specific_people": "Specific people",
       "owner_only": "Owner only"
     },
@@ -814,10 +814,10 @@
     "private_title": "Only me",
     "private_desc": "Only you can run this agent",
     "shared_title": "Shared",
-    "shared_desc": "Choose the workspace or specific people who can run this agent",
+    "shared_desc": "Choose the space or specific people who can run this agent",
     "shared_target_required": "Select at least one person before saving.",
-    "workspace_title": "Entire workspace",
-    "workspace_desc": "All workspace members can run this agent",
+    "workspace_title": "Entire space",
+    "workspace_desc": "All space members can run this agent",
     "members_title": "Specific people",
     "members_desc": "Only the people you pick can run this agent",
     "team_title": "Public to team",
@@ -826,7 +826,7 @@
     "members_group": "People",
     "public_group": "Public access",
     "owner_only_readonly": "Only the agent owner can change who can run this agent.",
-    "members_empty": "No workspace members to choose from",
+    "members_empty": "No space members to choose from",
     "composio_switch_hint": "Heads up — this agent has Composio apps enabled. Sharing it lets everyone with access use those apps through this agent."
   },
   "profile_card": {
@@ -998,5 +998,45 @@
     "selected_one": "{{count}} selected",
     "selected_other": "{{count}} selected",
     "clear_selection": "Clear selection"
+  },
+  "rail": {
+    "all": "All machines",
+    "unbound": "Unbound",
+    "unbound_hint": "Agents with no machine",
+    "unknown_machine": "Unknown machine",
+    "agents_count": "{{value}} agents",
+    "offline_band": "This machine is offline — its agents cannot start work and tasks queue up until the QuickWork daemon runs on that machine again.",
+    "none_here": "No agents on this machine yet"
+  },
+  "card": {
+    "running": "running",
+    "queued": "queued",
+    "capacity": "capacity",
+    "machine_offline": "Machine offline",
+    "offline_note": "The daemon on that machine isn't running, so work assigned to it queues up first and picks back up automatically once it starts.",
+    "unbound_note": "Work addressed to it stops here — bind it to a machine first, then its tasks can start.",
+    "pending_recovery": "Waiting to resume"
+  },
+  "console": {
+    "identity": "Identity",
+    "execution": "Execution",
+    "capability": "Capability",
+    "access": "Access",
+    "runtime_offline": "Runtime offline",
+    "needs_setup": "{{count}} to set up",
+    "set": "Configured",
+    "unset": "Not set",
+    "go_configure": "Configure",
+    "machine": "Machine",
+    "hue": "hue {{value}}",
+    "recent_runs": "Recent runs",
+    "run_fallback": "{{status}} task",
+    "relay": "Relay",
+    "relay_empty": "No squad is carrying it yet",
+    "relay_leader": "Leader",
+    "relay_member": "Member",
+    "count_items": "{{count}} items",
+    "count_entries": "{{count}} entries",
+    "danger": "Danger zone"
   }
 }

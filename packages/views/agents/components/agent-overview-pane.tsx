@@ -28,7 +28,6 @@ import {
   AlertDialogTitle,
 } from "@quickwork/ui/components/ui/alert-dialog";
 import { cn } from "@quickwork/ui/lib/utils";
-import { ActivityTab } from "./tabs/activity-tab";
 import { InstructionsTab } from "./tabs/instructions-tab";
 import { SkillsTab } from "./tabs/skills-tab";
 import { EnvTab } from "./tabs/env-tab";
@@ -40,7 +39,7 @@ import { RuntimeConfigTab } from "./tabs/runtime-config-tab";
 import { SandboxTab } from "./tabs/sandbox-tab";
 import { AgentDetailInspector } from "./agent-detail-inspector";
 import { AgentAccessSettings } from "./agent-access-settings";
-import { AgentOverviewSummary } from "./agent-overview-summary";
+import { AgentConsole } from "./agent-console";
 import { ActorIssuesPanel } from "../../common/actor-issues-panel";
 import { useT } from "../../i18n";
 import { useNavigation } from "../../navigation";
@@ -62,7 +61,7 @@ export type DetailTab =
   | "runtime_config"
   | "sandbox";
 
-type SecondaryTab = {
+export type SecondaryTab = {
   id: DetailTab;
   labelKey:
     | "instructions"
@@ -135,6 +134,9 @@ interface AgentOverviewPaneProps {
   canEdit: boolean;
   navIntent?: DetailTab | null;
   onNavIntentHandled?: () => void;
+  /** Opens the archive confirmation — the console's 授权 module owns the
+   *  danger row, and the dialog itself stays in the page. */
+  onArchive?: () => void;
 }
 
 /**
@@ -155,6 +157,7 @@ export function AgentOverviewPane({
   canEdit,
   navIntent,
   onNavIntentHandled,
+  onArchive,
 }: AgentOverviewPaneProps) {
   const { t } = useT("agents");
   const wsId = useWorkspaceId();
@@ -376,16 +379,23 @@ export function AgentOverviewPane({
         )}
       >
         {effectiveView === "overview" && (
-          <div className="mx-auto max-w-[1440px] p-4 sm:p-6">
-            <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
-              <ActivityTab agent={agent} showPerformance={false} />
-              <AgentOverviewSummary
-                agent={agent}
-                runtime={runtime}
-                owner={owner}
-              />
-            </div>
-          </div>
+          <AgentConsole
+            agent={agent}
+            runtime={runtime}
+            runtimes={runtimes}
+            members={members}
+            owner={owner}
+            currentUserId={currentUserId ?? null}
+            canEdit={canEdit}
+            onUpdate={onUpdate}
+            onOpenView={commitView}
+            onArchive={onArchive}
+            capabilityTabs={visibleCapabilityTabs}
+            // 通用's fields already live inline in the 身份 / 执行 modules.
+            settingsTabs={visibleSettingsTabs.filter(
+              (tab) => tab.id !== "general",
+            )}
+          />
         )}
 
         {effectiveView === "work" && (

@@ -40,19 +40,21 @@ function ActorAvatar({
     setImgError(false);
   }, [avatarUrl]);
 
-  // Every actor — member, agent, squad, or system — renders as a circle. This
-  // is the single source of truth for avatar shape; the upload editors mirror
-  // it (packages/views/common/avatar-upload-control.tsx).
+  // Every actor — member, agent, squad, or system — renders as a 4px-radius
+  // square (the blueprint skin's "specimen tile"): the shape and the inset
+  // hairline are a hard invariant, not a per-site choice. This is the single
+  // source of truth; the upload editors mirror it
+  // (packages/views/common/avatar-upload-control.tsx) and the shadcn Avatar
+  // primitive carries the same radius (packages/ui/components/ui/avatar.tsx).
   return (
     <div
       data-slot="avatar"
       className={cn(
-        "inline-flex shrink-0 items-center justify-center font-medium overflow-hidden",
+        "inline-flex shrink-0 items-center justify-center font-mono font-medium overflow-hidden",
         (!avatarUrl || emoji || imgError) && "bg-muted text-muted-foreground",
         className,
-        // rounded-full stays last so a call-site `className` can never override
-        // the circle — avatar shape is a hard invariant, not a per-site choice.
-        "rounded-full"
+        // Kept last so a call-site `className` can never override the shape.
+        "rounded-[4px] shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--foreground)_20%,transparent)]"
       )}
       style={{ width: px, height: px, fontSize: px * 0.45 }}
     >

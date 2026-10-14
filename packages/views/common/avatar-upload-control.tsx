@@ -239,7 +239,7 @@ export function AvatarUploadControl({
         "flex items-center justify-center",
         "focus-visible:ring-2 focus-visible:ring-ring",
         "disabled:cursor-not-allowed disabled:opacity-60",
-        "rounded-full",
+        "rounded-[4px]",
         className,
       )}
       style={{ width: size, height: size }}

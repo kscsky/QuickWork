@@ -85,7 +85,7 @@
     "fallback_runtime_cloud": "云端",
     "fallback_runtime_local": "本地",
     "actions_aria": "行操作",
-    "task_count_other": "{{count}} 个 task"
+    "task_count_other": "{{count}} 个 task 排队中"
   },
   "activity_tooltip": {
     "created_today": "今天创建",
@@ -135,7 +135,7 @@
     "load_failed_title": "无法加载该智能体",
     "load_failed_default": "获取该智能体时出错。",
     "no_access_title": "你没有访问该智能体的权限",
-    "no_access_hint": "只有该私密智能体的拥有者或工作区管理员可以查看。",
+    "no_access_hint": "只有该私密智能体的拥有者或空间管理员可以查看。",
     "try_again": "重试",
     "archived_banner": "该智能体已归档，无法被分配或提及。",
     "runtime_required_banner": "该智能体的配置和历史记录已保留，但需要绑定运行时后才能运行。",
@@ -161,7 +161,7 @@
   },
   "inspector": {
     "section_profile": "资料",
-    "section_profile_hint": "管理该智能体在工作区内的展示方式。",
+    "section_profile_hint": "管理该智能体在空间内的展示方式。",
     "section_execution": "执行配置",
     "section_execution_hint": "选择运行时、模型、思考强度、速度和并行 task 上限。",
     "section_access": "访问权限",
@@ -203,7 +203,7 @@
     "attention_queued_other": "运行时不可用，当前有 {{count}} 个 task 正在排队。"
   },
   "skill_attach": {
-    "trigger_aria": "附加工作区 skill",
+    "trigger_aria": "附加空间 skill",
     "trigger_label": "附加"
   },
   "pickers": {
@@ -296,7 +296,7 @@
       },
       "template": {
         "title": "使用模板",
-        "description": "从整理好的指令和 skill 开始，再根据工作区需要修改每个细节。"
+        "description": "从整理好的指令和 skill 开始，再根据空间需要修改每个细节。"
       },
       "ai": {
         "title": "通过 AI 创建",
@@ -307,7 +307,7 @@
       "identity": "身份",
       "identity_hint": "为智能体设置容易识别的名称和简洁的用途。",
       "behavior": "行为与能力",
-      "behavior_hint": "定义它的工作方式，并添加可使用的工作区 skill。",
+      "behavior_hint": "定义它的工作方式，并添加可使用的空间 skill。",
       "execution": "执行配置",
       "execution_hint": "选择智能体使用的运行时，也可以覆盖运行时的默认模型、思考等级和速度。",
       "access": "访问权限",
@@ -321,8 +321,8 @@
         "description": "只有你可以运行此智能体。"
       },
       "workspace": {
-        "title": "整个工作区",
-        "description": "工作区中的所有成员都可以运行。"
+        "title": "整个空间",
+        "description": "空间中的所有成员都可以运行。"
       },
       "members": {
         "title": "指定成员",
@@ -362,7 +362,7 @@
     "create_and_add": "创建并加入小队",
     "creating": "正在创建…",
     "create_failed": "无法创建智能体。",
-    "name_conflict": "工作区中已存在同名智能体。",
+    "name_conflict": "空间中已存在同名智能体。",
     "created": "已创建 {{name}}",
     "drafts": {
       "title": "创建草稿",
@@ -378,7 +378,7 @@
   "create_dialog": {
     "title_create": "创建智能体",
     "title_duplicate": "复制智能体",
-    "description_create": "为工作区创建一个新的 AI 智能体。",
+    "description_create": "为空间创建一个新的 AI 智能体。",
     "description_duplicate": "基于\"{{name}}\"创建一个新智能体。指令、环境变量和 skill 会一并复制。",
     "name_label": "名称",
     "name_placeholder": "例如：深度研究智能体",
@@ -391,9 +391,9 @@
       "private_desc": "只有你可以运行该智能体",
       "public_title": "公开",
       "public_desc": "选择谁可以运行该智能体",
-      "public_workspace_option": "工作区内所有人",
+      "public_workspace_option": "空间内所有人",
       "public_members_group": "指定成员",
-      "public_members_empty": "没有可选择的工作区成员",
+      "public_members_empty": "没有可选择的空间成员",
       "public_targets_empty_hint": "至少勾选下方一项——否则该智能体仍为私有。"
     },
     "runtime_label": "运行时",
@@ -423,10 +423,10 @@
     },
     "skills_section": {
       "label": "Skills",
-      "placeholder": "从工作区添加 skill",
+      "placeholder": "从空间添加 skill",
       "selected_other": "已选 {{count}} 个——点击修改",
       "collapse": "收起",
-      "list_empty_multi": "工作区还没有 skill。请先创建或导入一个。",
+      "list_empty_multi": "空间还没有 skill。请先创建或导入一个。",
       "list_loading": "加载中…",
       "list_empty_default": "暂无 skill。",
       "list_no_match": "没有匹配的 skill。",
@@ -467,12 +467,12 @@
       "system_layer_hint": "随 QuickWork 版本更新。你无法编辑这部分，你在下面写的内容也永远不会被覆盖。",
       "system_layer_show": "查看",
       "system_layer_hide": "收起",
-      "workspace_notes_label": "工作区补充",
+      "workspace_notes_label": "空间补充",
       "workspace_notes_intro": "在下面补充你们团队的上下文和偏好，它们会叠加在 QuickWork 为这个智能体维护的指令之上。支持 Markdown。",
       "workspace_notes_placeholder": "写下这个智能体应该始终知道的上下文。\n\n# 示例\n我们的主仓库是 github.com/acme/platform。\n即使聊天用中文，任务也一律用英文写。\n周五不部署。"
     },
     "env": {
-      "intro_readonly": "在智能体进程启动时注入。只有工作区所有者 / 管理员可以查看或编辑值；每次解锁和编辑都会写入工作区审计日志。",
+      "intro_readonly": "在智能体进程启动时注入。只有空间所有者 / 管理员可以查看或编辑值；每次解锁和编辑都会写入空间审计日志。",
       "empty_readonly": "尚未配置环境变量。",
       "intro_prefix": "在智能体进程启动时注入（例如 ",
       "intro_separator": "、",
@@ -495,7 +495,7 @@
       "save_failed_toast": "保存环境变量失败",
       "not_revealed_title_other": "已配置 {{count}} 个变量",
       "not_revealed_empty": "尚未配置环境变量。",
-      "not_revealed_hint": "在解锁前所有值保持隐藏。每次解锁与编辑都会写入工作区审计日志。",
+      "not_revealed_hint": "在解锁前所有值保持隐藏。每次解锁与编辑都会写入空间审计日志。",
       "reveal_action": "解锁并编辑",
       "revealing": "正在解锁…",
       "reveal_failed_toast": "加载环境变量值失败",
@@ -527,15 +527,15 @@
       "agent_disabled_badge": "已为智能体关闭",
       "runtime_disabled_badge": "运行时中已关闭",
       "runtime_overridden_badge": "已由 QuickWork 覆盖",
-      "workspace_title": "来自工作区库",
+      "workspace_title": "来自空间库",
       "workspace_action_failed": "更新该智能体的 MCP 服务失败",
       "workspace_removed_toast": "已从该智能体移除 MCP 服务",
       "workspace_added_toast": "已为该智能体添加 MCP 服务",
       "workspace_remove_aria": "从该智能体移除 {{name}}",
       "workspace_toggle_aria": "为该智能体启用 {{name}}",
-      "workspace_library_empty": "本工作区还没有可分配的 MCP 服务。请在工作区设置 → MCP 中添加。",
-      "workspace_none_assigned": "还没有给该智能体分配工作区 MCP 服务。",
-      "workspace_add_action": "从工作区添加",
+      "workspace_library_empty": "本空间还没有可分配的 MCP 服务。请在空间设置 → MCP 中添加。",
+      "workspace_none_assigned": "还没有给该智能体分配空间 MCP 服务。",
+      "workspace_add_action": "从空间添加",
       "workspace_loading": "正在加载已分配的服务…",
       "dialog_name_locked": "这里不能改名——改名会新增一个服务并把原来的留在那里。请改用移除后重新添加。",
       "workspace_overridden_badge": "已覆盖",
@@ -600,7 +600,7 @@
       "invalid_json": "JSON 无效：{{error}}",
       "save_failed_toast": "保存 MCP 配置失败",
       "redacted_title": "已配置——对你隐藏",
-      "redacted_hint": "只有智能体所有者或工作区管理员可以读取该配置。"
+      "redacted_hint": "只有智能体所有者或空间管理员可以读取该配置。"
     },
     "composio_mcp": {
       "subtitle": "勾选 toolkit，只在你自己（这个智能体的创建者）直接或通过下级智能体链路触发这个智能体时，才把它挂载为 MCP server。",
@@ -616,7 +616,7 @@
       "redacted_title": "已配置——对你隐藏",
       "redacted_hint": "只有该智能体的创建者才能查看或修改它可使用的应用。",
       "shared_warning": "该智能体已共享。能够运行该智能体的人可以通过它使用你在此启用的 Composio 应用。如果这些应用涉及敏感数据，请改用\"私有\"或缩小访问范围。",
-      "workspace_warning": "公开给工作区：工作区内任何成员都可以通过该智能体使用这些 Composio 应用。"
+      "workspace_warning": "公开给空间：空间内任何成员都可以通过该智能体使用这些 Composio 应用。"
     },
     "runtime_config": {
       "intro": "选择 OpenClaw 运行时执行该智能体每一回合的方式。Local 模式让智能体直接在守护进程内运行；Gateway 模式则把每一回合转发到一个 OpenClaw Gateway——适合守护进程宿主只是轻量协调机、希望真正算力落在更强的远端机器上的场景。",
@@ -639,12 +639,12 @@
       "save_failed_toast": "保存路由配置失败"
     },
     "skills": {
-      "intro": "这里展示该智能体实际拥有的全部 skill。工作区 skill 可在此管理；从 Codex 和 Claude Code 继承的 skill 也可以按智能体单独关闭。",
+      "intro": "这里展示该智能体实际拥有的全部 skill。空间 skill 可在此管理；从 Codex 和 Claude Code 继承的 skill 也可以按智能体单独关闭。",
       "assigned_title": "分配给智能体",
-      "assigned_hint": "工作区 skill 会跟随智能体。你可以临时关闭，而不必将其移除。",
+      "assigned_hint": "空间 skill 会跟随智能体。你可以临时关闭，而不必将其移除。",
       "runtime_title": "从运行时继承",
       "runtime_hint": "自动从 {{runtime}} 发现；只要该智能体在这个运行时执行，就可以直接使用。",
-      "workspace_badge": "工作区",
+      "workspace_badge": "空间",
       "inherited_badge": "继承",
       "refresh_action": "刷新",
       "no_description": "暂无描述",
@@ -669,12 +669,12 @@
       "detail_supporting_files": "附属文件",
       "add_action": "添加 skill",
       "empty_title": "尚未分配 skill",
-      "empty_hint": "添加工作区 skill，把团队知识共享给这个智能体。",
+      "empty_hint": "添加空间 skill，把团队知识共享给这个智能体。",
       "remove_failed_toast": "移除 skill 失败",
       "add_dialog_title": "添加 skill",
-      "add_dialog_description": "选择一个工作区 skill 分配给该智能体。",
+      "add_dialog_description": "选择一个空间 skill 分配给该智能体。",
       "add_dialog_search_placeholder": "搜索 skill",
-      "add_dialog_empty": "全部工作区 skill 都已分配。",
+      "add_dialog_empty": "全部空间 skill 都已分配。",
       "add_dialog_no_match": "没有匹配的 skill。",
       "add_dialog_empty_partial": "已无可添加的 skill——全部都已分配给该智能体。",
       "add_dialog_saving": "添加中…",
@@ -685,7 +685,7 @@
     },
     "integrations": {
       "intro": "把这个智能体连接到外部聊天平台，让大家在自己熟悉的工具里直接与它协作。",
-      "members_note": "只有工作区的所有者和管理员可以管理此连接。你可以在\"设置 → 集成\"中查看已连接的 Bot。"
+      "members_note": "只有空间的所有者和管理员可以管理此连接。你可以在\"设置 → 集成\"中查看已连接的 Bot。"
     },
     "activity": {
       "status": {
@@ -779,17 +779,17 @@
       "tooltip": "个人 · 仅 owner 和其授权的人可以运行该智能体"
     },
     "workspace": {
-      "label": "工作区",
-      "tooltip": "工作区 · 工作区内所有人都可以使用该智能体"
+      "label": "空间",
+      "tooltip": "空间 · 空间内所有人都可以使用该智能体"
     }
   },
   "access": {
     "section_title": "谁可以运行该智能体",
     "tooltip": "访问权限 · 谁可以运行该智能体",
     "trigger_private": "仅自己",
-    "trigger_workspace": "工作区",
+    "trigger_workspace": "空间",
     "scope_labels": {
-      "workspace": "工作区",
+      "workspace": "空间",
       "specific_people": "指定成员",
       "owner_only": "仅所有者"
     },
@@ -799,10 +799,10 @@
     "private_title": "仅自己",
     "private_desc": "只有你可以运行该智能体",
     "shared_title": "共享",
-    "shared_desc": "向整个工作区或指定成员开放该智能体",
+    "shared_desc": "向整个空间或指定成员开放该智能体",
     "shared_target_required": "保存前，请至少选择一名成员。",
-    "workspace_title": "整个工作区",
-    "workspace_desc": "默认允许工作区内所有成员运行该智能体",
+    "workspace_title": "整个空间",
+    "workspace_desc": "默认允许空间内所有成员运行该智能体",
     "members_title": "指定成员",
     "members_desc": "只有你选择的人可以运行该智能体",
     "team_title": "公开给团队",
@@ -811,7 +811,7 @@
     "members_group": "成员",
     "public_group": "公开访问",
     "owner_only_readonly": "只有该智能体的所有者可以更改谁能调用它。",
-    "members_empty": "没有可选择的工作区成员",
+    "members_empty": "没有可选择的空间成员",
     "composio_switch_hint": "提示——该智能体已启用 Composio 应用。共享后，所有获得访问权限的人都可以通过该智能体使用这些应用。"
   },
   "profile_card": {
@@ -976,5 +976,45 @@
   "actions": {
     "selected_other": "已选 {{count}} 项",
     "clear_selection": "清除选择"
+  },
+  "rail": {
+    "all": "全部机器",
+    "unbound": "未绑定",
+    "unbound_hint": "没有机器的智能体",
+    "unknown_machine": "未知机器",
+    "agents_count": "{{value}} 个智能体",
+    "offline_band": "这台机器离线——它上面的智能体现在开不了工，派给它的任务会先排队；在那台机器上启动 QuickWork 助手后自动恢复。",
+    "none_here": "这台机器上还没有智能体"
+  },
+  "card": {
+    "running": "在跑",
+    "queued": "队列",
+    "capacity": "容量",
+    "machine_offline": "机器离线",
+    "offline_note": "那台机器的守护进程没在跑，派给它的活会先排队；启动后自动接着干。",
+    "unbound_note": "轮到它的活会停在这里——先把它绑到一台机器上，任务才会开始跑。",
+    "pending_recovery": "待恢复"
+  },
+  "console": {
+    "identity": "身份",
+    "execution": "执行",
+    "capability": "能力",
+    "access": "授权",
+    "runtime_offline": "运行时离线",
+    "needs_setup": "{{count}} 处未配置",
+    "set": "已配置",
+    "unset": "未配置",
+    "go_configure": "去配置",
+    "machine": "机位",
+    "hue": "色相 {{value}}",
+    "recent_runs": "最近运行",
+    "run_fallback": "{{status}}的 task",
+    "relay": "接力",
+    "relay_empty": "还没有小队带着它干活",
+    "relay_leader": "队长",
+    "relay_member": "成员",
+    "count_items": "{{count}} 个",
+    "count_entries": "{{count}} 条",
+    "danger": "危险操作"
   }
 }

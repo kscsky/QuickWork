@@ -23,6 +23,13 @@ interface CollectionPageHeaderProps {
     href: string;
     label: ReactNode;
   };
+  /**
+   * Rendered immediately after the title/count, inside the left cluster. For
+   * the page's PRIMARY action — on a wide window the right-aligned `actions`
+   * slot sits a full screen away from the title, and the eye never travels
+   * there on its own; the create button belongs where the reading starts.
+   */
+  leadingAction?: ReactNode;
   actions?: ReactNode;
   className?: string;
 }
@@ -37,6 +44,7 @@ export function CollectionPageHeader({
   count,
   description,
   learnMore,
+  leadingAction,
   actions,
   className,
 }: CollectionPageHeaderProps) {
@@ -52,6 +60,9 @@ export function CollectionPageHeader({
           <span className="shrink-0 font-mono text-caption tabular-nums text-muted-foreground">
             {count}
           </span>
+        ) : null}
+        {leadingAction ? (
+          <span className="flex shrink-0 items-center">{leadingAction}</span>
         ) : null}
         {description ? (
           <p className="ml-2 hidden min-w-0 truncate text-caption text-muted-foreground md:block">

@@ -1,6 +1,6 @@
 import React from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { screen } from "@testing-library/react";
+import { cleanup, screen } from "@testing-library/react";
 import type { Agent } from "@quickwork/core/types";
 import type { AgentActivity } from "@quickwork/core/agents";
 import { renderWithI18n } from "../../test/i18n";
@@ -292,14 +292,25 @@ describe("AgentsPage listReady gate", () => {
     expect(betaPrecedesAlpha()).toBe(true);
   });
 
-  it("renders rows immediately for name sort without waiting on activity/run-counts", () => {
+  it("renders cards for name sort without waiting on activity/run-counts, but does wait for presence", () => {
     mocks.viewState.sortField = "name";
     mocks.viewState.sortDirection = "asc";
-    // Auxiliary queries are still in flight — name sort must not wait on them.
+    // Name sort needs neither activity nor run-counts — those stay in flight.
     mocks.activity = { byAgent: new Map(), loading: true };
     mocks.runCountsPending = true;
+    // Presence is different: every card paints its live lamp and counts, so
+    // the gate holds the first paint until it lands rather than flashing "—".
     mocks.presence = { byAgent: new Map(), loading: true };
 
+    renderPage();
+
+    expect(screen.queryByText("Alpha Agent")).not.toBeInTheDocument();
+    expect(screen.getAllByTestId("skeleton").length).toBeGreaterThan(0);
+
+    // Once presence lands (activity/run-counts still pending), cards paint in
+    // name order.
+    mocks.presence = { byAgent: new Map(), loading: false };
+    cleanup();
     renderPage();
 
     expect(screen.getByText("Alpha Agent")).toBeInTheDocument();

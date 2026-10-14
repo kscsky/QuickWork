@@ -4,11 +4,10 @@ import { useCallback, useMemo, useRef, useState } from "react";
 import {
   AlertCircle,
   Bot,
-  Lock,
   Plus,
+  TriangleAlert,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import { useVirtualizer } from "@tanstack/react-virtual";
 import type {
   Agent,
   AgentRuntime,
@@ -18,20 +17,15 @@ import {
   type AgentActivity,
   agentRunCounts30dOptions,
   effectiveAccessScope,
-  isAgentRuntimeBound,
   useWorkspaceActivityMap,
   useWorkspacePresenceMap,
-  VISIBILITY_TOOLTIP,
   type AgentPresenceDetail,
 } from "@quickwork/core/agents";
 import {
   type AgentListFilters,
   useAgentsViewStore,
-  AGENT_DEFAULT_HIDDEN_COLUMNS,
   AGENT_SCOPES,
-  type AgentColumnKey,
   type AgentsScope,
-  type AgentSortField,
 } from "@quickwork/core/agents/stores";
 import { useAuthStore } from "@quickwork/core/auth";
 import { useWorkspaceId } from "@quickwork/core/hooks";
@@ -40,40 +34,23 @@ import {
   agentListOptions,
   memberListOptions,
 } from "@quickwork/core/workspace/queries";
-import { runtimeDisplayLabel, runtimeListOptions } from "@quickwork/core/runtimes";
+import { runtimeListOptions } from "@quickwork/core/runtimes";
 import { Button } from "@quickwork/ui/components/ui/button";
-import { Checkbox } from "@quickwork/ui/components/ui/checkbox";
-import {
-  LIST_GRID_BOTTOM_CLEARANCE,
-  ListGrid,
-  ListGridBody,
-  ListGridCell,
-  ListGridHeader,
-  ListGridHeaderCell,
-  ListGridRow,
-  type ListGridSortDirection,
-} from "@quickwork/ui/components/ui/list-grid";
+import { ListGridCell } from "@quickwork/ui/components/ui/list-grid";
 import { Skeleton } from "@quickwork/ui/components/ui/skeleton";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@quickwork/ui/components/ui/tooltip";
-import { useNavigation, useRowLink } from "../../navigation";
-import { ActorAvatar } from "../../common/actor-avatar";
-import { ProviderLogo } from "../../runtimes/components/provider-logo";
+import { useNavigation } from "../../navigation";
 import {
   CollectionPageHeader,
   CollectionPageHeaderAction,
   CollectionPageState,
 } from "../../layout/collection-page";
-import { availabilityConfig } from "../presence";
-import { AgentRowActions } from "./agent-row-actions";
+import { AgentCard } from "./agent-card";
+import { ALL_MACHINES, MachineRail, UNBOUND_MACHINE, machineKeyOf } from "./machine-rail";
 import {
   AgentListToolbar,
   countActiveFilterDimensions,
 } from "./agent-list-toolbar";
-import { useLocale, useT } from "../../i18n";
+import { useT } from "../../i18n";
 import { matchesPinyin } from "../../editor/extensions/pinyin-match";
 
 // Column template — single source of truth for header, rows, and skeletons.
@@ -83,60 +60,16 @@ import { matchesPinyin } from "../../editor/extensions/pinyin-match";
 // name + status, toggles don't apply).
 //
 // Agents are identity-type entities (few, avatar + persona), so rows are
-// the TWO-LINE form: avatar left, name + description right, 64px tall —
-// the documented exception to the single-line management-list rule.
-const GRID_COLS =
-  "grid-cols-[0.75rem_minmax(120px,1fr)_var(--agc-status-mobile)_1.75rem_0.75rem] " +
-  "@2xl:grid-cols-[0.75rem_1rem_minmax(200px,1fr)_var(--agc-status-desktop)_var(--agc-owner)_var(--agc-access)_var(--agc-runtime)_var(--agc-lastactive)_var(--agc-runs)_var(--agc-model)_var(--agc-created)_1.75rem_0.75rem]";
 
 // Two-line rows; the virtualizer's fixed-size contract.
-const ROW_HEIGHT = 64;
 
 // Single source for hideable column widths: track vars and the grid's
 // min-width derive from the same numbers.
-const COLUMN_WIDTHS: Record<AgentColumnKey, number> = {
-  // Sized for the worst case "Online · 2 tasks" (~140px incl. padding);
-  // idle rows show only the dot + label and leave some in-track slack.
-  status: 144,
-  owner: 144,
-  // Fits the longest label "Specific people" (~120px incl. padding).
-  access: 132,
-  runtime: 144,
-  lastActive: 120,
-  runs: 88,
-  model: 120,
-  created: 104,
-};
 
 // Fixed tracks (edges 12+12, checkbox 16, name min 200, kebab 28) plus the
 // 11 gap-x-3 gaps between the wide template's 12 tracks (zero-width tracks
 // still carry gaps).
-const FIXED_TRACKS_WIDTH = 268 + 11 * 12;
 
-function columnTrackVars(
-  isVisible: (key: AgentColumnKey) => boolean,
-): React.CSSProperties {
-  const width = (key: AgentColumnKey) =>
-    isVisible(key) ? `${COLUMN_WIDTHS[key]}px` : "0px";
-  const minWidth =
-    FIXED_TRACKS_WIDTH +
-    (Object.keys(COLUMN_WIDTHS) as AgentColumnKey[]).reduce(
-      (sum, key) => sum + (isVisible(key) ? COLUMN_WIDTHS[key] : 0),
-      0,
-    );
-  return {
-    "--agc-status-mobile": isVisible("status") ? "96px" : "0px",
-    "--agc-status-desktop": width("status"),
-    "--agc-owner": width("owner"),
-    "--agc-access": width("access"),
-    "--agc-runtime": width("runtime"),
-    "--agc-lastactive": width("lastActive"),
-    "--agc-runs": width("runs"),
-    "--agc-model": width("model"),
-    "--agc-created": width("created"),
-    "--agc-minw": `${minWidth}px`,
-  } as React.CSSProperties;
-}
 
 export interface AgentListRow {
   agent: Agent;
@@ -232,7 +165,6 @@ export function rowMatchesFilters(
  * predicate (its own Save button is hidden via `hideFooter` in the bulk flow).
  */
 import { isAccessChangeReady } from "@quickwork/core/agents";
-import { AgentBatchToolbar } from "./agent-batch-toolbar";
 export { isAccessChangeReady };
 
 export interface AgentsPageProps {
@@ -331,160 +263,15 @@ function EmptyState({ onCreate }: { onCreate: () => void }) {
 // Cells
 // ---------------------------------------------------------------------------
 
-function CheckboxCell({
-  checked,
-  onToggle,
-}: {
-  checked: boolean;
-  onToggle: () => void;
-}) {
-  return (
-    <ListGridCell className="hidden justify-center px-0 @2xl:flex">
-      <button
-        type="button"
-        aria-pressed={checked}
-        onClick={(e) => {
-          e.stopPropagation();
-          onToggle();
-        }}
-        className={`-m-1.5 flex items-center p-1.5 ${
-          checked ? "" : "opacity-0 transition-opacity group-hover/row:opacity-100"
-        }`}
-      >
-        <Checkbox
-          checked={checked}
-          tabIndex={-1}
-          className="pointer-events-none"
-        />
-      </button>
-    </ListGridCell>
-  );
-}
-
 // Two-line identity cell: avatar left, name + description right. The
 // documented exception to the single-line rule — agents are few and
 // identity-rich, so this is the "team roster" form (GitHub org members,
 // Slack member list).
-function NameCell({ row }: { row: AgentListRow }) {
-  const { t } = useT("agents");
-  const { agent, isOwnedByMe } = row;
-  const isArchived = !!agent.archived_at;
-  const isPrivate = agent.visibility === "private";
-  return (
-    <ListGridCell className="gap-3">
-      <ActorAvatar
-        actorType="agent"
-        actorId={agent.id}
-        size="lg"
-        className={`shrink-0 ${isArchived ? "opacity-50 grayscale" : ""}`}
-        showStatusDot
-      />
-      <div className="min-w-0 flex-1">
-        <div className="flex min-w-0 items-center gap-2">
-          <span
-            className={`min-w-0 truncate text-body font-medium ${
-              isArchived ? "text-muted-foreground" : ""
-            }`}
-          >
-            {agent.name}
-          </span>
-          {isPrivate && !isArchived && (
-            <Tooltip>
-              <TooltipTrigger
-                render={
-                  <Lock className="h-3 w-3 shrink-0 text-faint-foreground" />
-                }
-              />
-              <TooltipContent>{VISIBILITY_TOOLTIP.private}</TooltipContent>
-            </Tooltip>
-          )}
-          {isOwnedByMe && (
-            <span className="shrink-0 rounded bg-muted px-1 text-micro font-medium text-muted-foreground">
-              {t(($) => $.row.you)}
-            </span>
-          )}
-        </div>
-        {agent.description ? (
-          <div className="mt-0.5 truncate text-caption text-muted-foreground">
-            {agent.description}
-          </div>
-        ) : null}
-      </div>
-    </ListGridCell>
-  );
-}
-
 // Availability dot + label, with the workload folded in as a suffix
 // ("Online · 2 tasks") — a 0-2 integer doesn't earn its own column.
-function StatusCell({ row }: { row: AgentListRow }) {
-  const { t } = useT("agents");
-  const { agent, presence } = row;
-  if (agent.archived_at) {
-    return (
-      <ListGridCell>
-        <span className="text-caption text-muted-foreground">
-          {t(($) => $.row.archived)}
-        </span>
-      </ListGridCell>
-    );
-  }
-  if (!isAgentRuntimeBound(agent)) {
-    return (
-      <ListGridCell className="gap-1.5">
-        <AlertCircle className="size-3.5 shrink-0 text-amber-500" />
-        <span className="truncate text-caption text-amber-600 dark:text-amber-400">
-          {t(($) => $.row.needs_runtime)}
-        </span>
-      </ListGridCell>
-    );
-  }
-  if (!presence) {
-    return (
-      <ListGridCell>
-        <span className="text-caption text-faint-foreground">—</span>
-      </ListGridCell>
-    );
-  }
-  const visual = availabilityConfig[presence.availability];
-  const active = presence.runningCount + presence.queuedCount;
-  return (
-    <ListGridCell className="gap-1.5">
-      <span className={`size-1.5 shrink-0 rounded-full ${visual.dotClass}`} />
-      <span className={`truncate text-caption ${visual.textClass}`}>
-        {t(($) => $.availability[presence.availability])}
-        {active > 0 && (
-          <span className="text-muted-foreground">
-            {" · "}
-            {t(($) => $.row.task_count, { count: active })}
-          </span>
-        )}
-      </span>
-    </ListGridCell>
-  );
-}
-
 // Owner = the agent's owner_id, which is set to the creator at creation and
 // never transferred (so owner ≡ creator). It carries management rights, so
 // the column is "Owner", not "Created by".
-function OwnerCell({ row }: { row: AgentListRow }) {
-  const { agent, owner } = row;
-  if (!agent.owner_id) {
-    return (
-      <ListGridCell className="hidden @2xl:flex">
-        <span className="text-caption text-faint-foreground">—</span>
-      </ListGridCell>
-    );
-  }
-  return (
-    <ListGridCell className="hidden gap-1.5 @2xl:flex">
-      <ActorAvatar actorType="member" actorId={agent.owner_id} size="sm" />
-      <span className="min-w-0 truncate text-caption text-muted-foreground">
-        {owner?.name ?? agent.owner_id.slice(0, 8)}
-      </span>
-    </ListGridCell>
-  );
-}
-
 // Effective access scope derived from permission_mode + invocation_targets
 // (not the lossy derived `visibility`). Text label, not icon-only, so screen
 // readers announce the scope.
@@ -514,250 +301,31 @@ export function AccessCell({ row }: { row: AgentListRow }) {
   );
 }
 
-function RuntimeCell({ row }: { row: AgentListRow }) {
-  const { t } = useT("agents");
-  if (!isAgentRuntimeBound(row.agent)) {
-    return (
-      <ListGridCell className="hidden @2xl:flex">
-        <span className="truncate text-caption text-amber-600 dark:text-amber-400">
-          {t(($) => $.row.needs_runtime)}
-        </span>
-      </ListGridCell>
-    );
-  }
-  const runtime = row.runtime;
-  return (
-    <ListGridCell className="hidden @2xl:flex">
-      {runtime ? (
-        // Provider mark before the label: scanning this column for "which of
-        // these run on Codex" is a shape match, not a read.
-        <span className="inline-flex min-w-0 items-center gap-1.5">
-          <ProviderLogo
-            provider={runtime.provider}
-            className="h-3.5 w-3.5 shrink-0"
-          />
-          <span className="min-w-0 truncate text-caption text-muted-foreground">
-            {runtimeDisplayLabel(runtime)}
-          </span>
-        </span>
-      ) : (
-        <span className="text-caption text-faint-foreground">—</span>
-      )}
-    </ListGridCell>
-  );
-}
-
-function LastActiveCell({ row }: { row: AgentListRow }) {
-  const { t } = useT("agents");
-  const days = row.lastActiveDays;
-  return (
-    <ListGridCell className="hidden @2xl:flex">
-      {days === null ? (
-        <span className="truncate text-caption text-muted-foreground">
-          {row.agent.archived_at ? "—" : t(($) => $.last_active.none)}
-        </span>
-      ) : (
-        <span className="whitespace-nowrap text-caption tabular-nums text-muted-foreground">
-          {days === 0
-            ? t(($) => $.last_active.today)
-            : t(($) => $.last_active.days_ago, { count: days })}
-        </span>
-      )}
-    </ListGridCell>
-  );
-}
-
 // ---------------------------------------------------------------------------
 // Header row + skeleton
 // ---------------------------------------------------------------------------
 
-function AgentListHeader({
-  sortField,
-  sortDirection,
-  onSort,
-  allSelected,
-  someSelected,
-  onToggleAll,
-  isColVisible,
-}: {
-  sortField: AgentSortField;
-  sortDirection: ListGridSortDirection;
-  onSort: (field: AgentSortField) => void;
-  allSelected: boolean;
-  someSelected: boolean;
-  onToggleAll: () => void;
-  isColVisible: (key: AgentColumnKey) => boolean;
-}) {
-  const { t } = useT("agents");
-  const sorted = (field: AgentSortField) =>
-    sortField === field ? sortDirection : false;
-  const anySelected = allSelected || someSelected;
-  return (
-    <ListGridHeader>
-      <div className="hidden items-center justify-center @2xl:flex">
-        <button
-          type="button"
-          aria-pressed={allSelected}
-          onClick={onToggleAll}
-          className={`-m-1.5 flex items-center p-1.5 ${
-            anySelected
-              ? ""
-              : "opacity-0 transition-opacity group-hover/header:opacity-100"
-          }`}
-        >
-          <Checkbox
-            checked={allSelected}
-            indeterminate={someSelected && !allSelected}
-            tabIndex={-1}
-            className="pointer-events-none"
-          />
-        </button>
-      </div>
-      <ListGridHeaderCell sorted={sorted("name")} onSort={() => onSort("name")}>
-        {t(($) => $.columns.agent)}
-      </ListGridHeaderCell>
-      {isColVisible("status") ? (
-        <ListGridHeaderCell>{t(($) => $.columns.status)}</ListGridHeaderCell>
-      ) : (
-        <ListGridHeaderCell className="px-0" />
-      )}
-      {isColVisible("owner") ? (
-        <ListGridHeaderCell className="hidden @2xl:flex">
-          {t(($) => $.columns.owner)}
-        </ListGridHeaderCell>
-      ) : (
-        <ListGridHeaderCell className="hidden px-0 @2xl:flex" />
-      )}
-      {isColVisible("access") ? (
-        <ListGridHeaderCell className="hidden @2xl:flex">
-          {t(($) => $.columns.access)}
-        </ListGridHeaderCell>
-      ) : (
-        <ListGridHeaderCell className="hidden px-0 @2xl:flex" />
-      )}
-      {isColVisible("runtime") ? (
-        <ListGridHeaderCell className="hidden @2xl:flex">
-          {t(($) => $.columns.runtime)}
-        </ListGridHeaderCell>
-      ) : (
-        <ListGridHeaderCell className="hidden px-0 @2xl:flex" />
-      )}
-      {isColVisible("lastActive") ? (
-        <ListGridHeaderCell
-          className="hidden @2xl:flex"
-          sorted={sorted("lastActive")}
-          onSort={() => onSort("lastActive")}
-        >
-          {t(($) => $.columns.last_active)}
-        </ListGridHeaderCell>
-      ) : (
-        <ListGridHeaderCell className="hidden px-0 @2xl:flex" />
-      )}
-      {isColVisible("runs") ? (
-        <ListGridHeaderCell
-          className="hidden @2xl:flex"
-          align="right"
-          sorted={sorted("runs")}
-          onSort={() => onSort("runs")}
-        >
-          {t(($) => $.columns.runs)}
-        </ListGridHeaderCell>
-      ) : (
-        <ListGridHeaderCell className="hidden px-0 @2xl:flex" />
-      )}
-      {isColVisible("model") ? (
-        <ListGridHeaderCell className="hidden @2xl:flex">
-          {t(($) => $.columns.model)}
-        </ListGridHeaderCell>
-      ) : (
-        <ListGridHeaderCell className="hidden px-0 @2xl:flex" />
-      )}
-      {isColVisible("created") ? (
-        <ListGridHeaderCell
-          className="hidden @2xl:flex"
-          sorted={sorted("created")}
-          onSort={() => onSort("created")}
-        >
-          {t(($) => $.columns.created)}
-        </ListGridHeaderCell>
-      ) : (
-        <ListGridHeaderCell className="hidden px-0 @2xl:flex" />
-      )}
-      <span aria-hidden="true" />
-    </ListGridHeader>
-  );
-}
-
 function LoadingSkeleton() {
   return (
-    <ListGrid
-      className={GRID_COLS}
-      style={columnTrackVars(
-        (key) => !AGENT_DEFAULT_HIDDEN_COLUMNS.includes(key),
-      )}
-    >
-      <ListGridHeader>
-        <span aria-hidden="true" className="hidden @2xl:inline" />
-        <ListGridHeaderCell>
-          <Skeleton className="h-3 w-12" />
-        </ListGridHeaderCell>
-        <ListGridHeaderCell>
-          <Skeleton className="h-3 w-12" />
-        </ListGridHeaderCell>
-        <ListGridHeaderCell className="hidden @2xl:flex">
-          <Skeleton className="h-3 w-14" />
-        </ListGridHeaderCell>
-        <ListGridHeaderCell className="hidden @2xl:flex">
-          <Skeleton className="h-3 w-14" />
-        </ListGridHeaderCell>
-        <ListGridHeaderCell className="hidden @2xl:flex">
-          <Skeleton className="h-3 w-14" />
-        </ListGridHeaderCell>
-        <ListGridHeaderCell className="hidden @2xl:flex">
-          <Skeleton className="h-3 w-14" />
-        </ListGridHeaderCell>
-        <ListGridHeaderCell className="hidden @2xl:flex">
-          <Skeleton className="h-3 w-10" />
-        </ListGridHeaderCell>
-        <ListGridHeaderCell className="hidden px-0 @2xl:flex" />
-        <ListGridHeaderCell className="hidden px-0 @2xl:flex" />
-        <span aria-hidden="true" />
-      </ListGridHeader>
-      {Array.from({ length: 5 }).map((_, i) => (
-        <ListGridRow key={i} className="h-16 hover:bg-transparent">
-          <span aria-hidden="true" className="hidden @2xl:inline" />
-          <ListGridCell className="gap-3">
-            <Skeleton className="size-8 rounded-full" />
+    <div className="grid grid-cols-1 gap-3 px-[22px] pb-6 @container @3xl:grid-cols-2 @6xl:grid-cols-3">
+      {Array.from({ length: 6 }, (_, i) => (
+        <div
+          key={i}
+          data-testid="skeleton"
+          className="h-[124px] rounded-[var(--radius)] border bg-surface p-3.5 shadow-[var(--shadow-surface)]"
+        >
+          <div className="flex items-center gap-2.5">
+            <Skeleton className="size-8 shrink-0 rounded-[4px]" />
             <div className="min-w-0 flex-1 space-y-1.5">
-              <Skeleton className="h-3.5 w-32 max-w-full" />
-              <Skeleton className="h-3 w-48 max-w-full" />
+              <Skeleton className="h-3.5 w-28" />
+              <Skeleton className="h-2.5 w-40" />
             </div>
-          </ListGridCell>
-          <ListGridCell>
-            <Skeleton className="h-3 w-16" />
-          </ListGridCell>
-          <ListGridCell className="hidden gap-1.5 @2xl:flex">
-            <Skeleton className="size-5 rounded-full" />
-            <Skeleton className="h-3 w-12" />
-          </ListGridCell>
-          <ListGridCell className="hidden @2xl:flex">
-            <Skeleton className="h-3 w-14" />
-          </ListGridCell>
-          <ListGridCell className="hidden @2xl:flex">
-            <Skeleton className="h-3 w-16" />
-          </ListGridCell>
-          <ListGridCell className="hidden @2xl:flex">
-            <Skeleton className="h-3 w-12" />
-          </ListGridCell>
-          <ListGridCell className="hidden justify-end @2xl:flex">
-            <Skeleton className="h-3 w-8" />
-          </ListGridCell>
-          <ListGridCell className="hidden px-0 @2xl:flex" />
-          <ListGridCell className="hidden px-0 @2xl:flex" />
-          <span aria-hidden="true" />
-        </ListGridRow>
+          </div>
+          <Skeleton className="mt-4 h-4 w-44" />
+          <Skeleton className="mt-3 h-3 w-32" />
+        </div>
       ))}
-    </ListGrid>
+    </div>
   );
 }
 
@@ -768,11 +336,9 @@ function LoadingSkeleton() {
 
 export function AgentsPage(_props: AgentsPageProps = {}) {
   const { t } = useT("agents");
-  const locale = useLocale();
   const wsId = useWorkspaceId();
   const paths = useWorkspacePaths();
   const navigation = useNavigation();
-  const rowLink = useRowLink();
   const currentUser = useAuthStore((s) => s.user);
 
   const {
@@ -793,10 +359,10 @@ export function AgentsPage(_props: AgentsPageProps = {}) {
   const { byAgent: activityMap, loading: activityLoading } =
     useWorkspaceActivityMap(wsId);
 
-  const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(
-    new Set(),
-  );
+  const listScrollRef = useRef<HTMLDivElement | null>(null);
   const [search, setSearch] = useState("");
+  /** Machine rail selection: ALL_MACHINES, a runtime id, or UNBOUND_MACHINE. */
+  const [machine, setMachine] = useState<string>(ALL_MACHINES);
 
   const rawScope = useAgentsViewStore((s) => s.scope);
   const scope = AGENT_SCOPES.includes(rawScope) ? rawScope : "mine";
@@ -805,23 +371,12 @@ export function AgentsPage(_props: AgentsPageProps = {}) {
   const sortDirection = useAgentsViewStore((s) => s.sortDirection);
   const hiddenColumns = useAgentsViewStore((s) => s.hiddenColumns);
   const filters = useAgentsViewStore((s) => s.filters);
-  const handleSort = useAgentsViewStore((s) => s.toggleSort);
   const handleSortFieldSelect = useAgentsViewStore((s) => s.setSortField);
   const setSortDirection = useAgentsViewStore((s) => s.setSortDirection);
   const toggleColumn = useAgentsViewStore((s) => s.toggleColumn);
   const toggleFilter = useAgentsViewStore((s) => s.toggleFilter);
   const clearFilters = useAgentsViewStore((s) => s.clearFilters);
 
-  const isColVisible = (key: AgentColumnKey) => !hiddenColumns.includes(key);
-
-  const toggleSelected = (id: string) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
 
   const runtimesById = useMemo(() => {
     const m = new Map<string, AgentRuntime>();
@@ -936,6 +491,28 @@ export function AgentsPage(_props: AgentsPageProps = {}) {
     return filtered;
   }, [scopeRows, search, filters, sortField, sortDirection]);
 
+  // The machine rail is the page's first question ("which machine holds
+  // what"), so the list below it is scoped by the selected tile. Counts on the
+  // tiles come from `rows` — the filtered set — so the rail always adds up to
+  // what the list would show if every tile were selected.
+  const visibleRows = useMemo<AgentListRow[]>(
+    () =>
+      machine === ALL_MACHINES
+        ? rows
+        : rows.filter(
+            (row) => machineKeyOf(row.agent.runtime_id) === machine,
+          ),
+    [rows, machine],
+  );
+
+  // A selected machine with no runtime row left (removed, or never seen) is
+  // treated as offline: its agents cannot run either way.
+  const selectedMachineOffline = useMemo(() => {
+    if (machine === ALL_MACHINES || machine === UNBOUND_MACHINE) return false;
+    const runtime = runtimesById.get(machine);
+    return !runtime || runtime.status !== "online";
+  }, [machine, runtimesById]);
+
   const noMatchText = useMemo(() => {
     const query = search.trim();
     if (query) {
@@ -962,14 +539,6 @@ export function AgentsPage(_props: AgentsPageProps = {}) {
   // double scrollbars) and clipped the last row under the horizontal
   // scrollbar. The sticky header pins inside this scroller; the vertical
   // scrollbar spans the full pane height (Linear's structure).
-  const listScrollRef = useRef<HTMLDivElement | null>(null);
-  const rowVirtualizer = useVirtualizer({
-    count: rows.length,
-    getScrollElement: () => listScrollRef.current,
-    estimateSize: () => ROW_HEIGHT,
-    overscan: 10,
-  });
-
   // Straight to the manual form: a duplicate already has every field decided,
   // so the method chooser would be a step with nothing to choose.
   const duplicateHref = useCallback(
@@ -978,32 +547,15 @@ export function AgentsPage(_props: AgentsPageProps = {}) {
     [paths],
   );
 
-  const selectedRows = rows.filter((row) => selectedIds.has(row.agent.id));
-  const allSelected = rows.length > 0 && selectedRows.length === rows.length;
-  const someSelected = selectedRows.length > 0 && !allSelected;
-  const handleToggleAll = () => {
-    setSelectedIds(
-      allSelected ? new Set() : new Set(rows.map((r) => r.agent.id)),
-    );
-  };
-
-  const virtualItems = rowVirtualizer.getVirtualItems();
-  const firstVirtual = virtualItems[0];
-  const lastVirtual = virtualItems[virtualItems.length - 1];
-  const virtualPadding = {
-    top: firstVirtual ? firstVirtual.start : 0,
-    bottom: lastVirtual
-      ? rowVirtualizer.getTotalSize() - lastVirtual.end
-      : 0,
-  };
-
   if (listError) {
     return (
-      <ListError
-        onCreate={() => navigation.push(paths.newAgent())}
-        listError={listError}
-        onRetry={() => refetchList()}
-      />
+      <div className="flex flex-1 items-center justify-center">
+        <ListError
+          onCreate={() => navigation.push(paths.newAgent())}
+          listError={listError}
+          onRetry={() => refetchList()}
+        />
+      </div>
     );
   }
 
@@ -1025,7 +577,9 @@ export function AgentsPage(_props: AgentsPageProps = {}) {
   // blocked on the auxiliary queries.
   const needsRunCounts = sortField === "lastActive" || sortField === "runs";
   const needsActivity = sortField === "lastActive";
-  const needsPresence = filters.availability.length > 0;
+  // Cards always paint live presence (lamp, counts) and the sparkline,
+  // so presence is part of the gate regardless of the active filter.
+  const needsPresence = true;
   const listReady =
     (!needsActivity || !activityLoading) &&
     (!needsRunCounts || !runCountsPending) &&
@@ -1067,131 +621,49 @@ export function AgentsPage(_props: AgentsPageProps = {}) {
             onToggleColumn={toggleColumn}
             allRows={scopeRows}
             members={members}
-            visibleCount={rows.length}
+            visibleCount={visibleRows.length}
           />
+          <MachineRail
+            rows={rows}
+            runtimes={runtimes}
+            selected={machine}
+            onSelect={setMachine}
+          />
+          {selectedMachineOffline && (
+            <div className="mx-[22px] mb-2 flex shrink-0 items-center gap-2 rounded-[var(--radius)] border border-warning/40 bg-warning/10 px-3 py-2 text-caption">
+              <TriangleAlert
+                aria-hidden="true"
+                className="size-3.5 shrink-0 text-warning"
+              />
+              <span className="min-w-0 text-foreground">{t(($) => $.rail.offline_band)}</span>
+            </div>
+          )}
           <div
             ref={listScrollRef}
-            className="min-h-0 flex-1 overflow-auto @container"
+            className="@container min-h-0 flex-1 overflow-auto"
           >
-            <ListGrid
-              className={`${GRID_COLS} @2xl:min-w-[var(--agc-minw)]`}
-              style={columnTrackVars(isColVisible)}
-            >
-              <AgentListHeader
-                sortField={sortField}
-                sortDirection={sortDirection}
-                onSort={handleSort}
-                allSelected={allSelected}
-                someSelected={someSelected}
-                onToggleAll={handleToggleAll}
-                isColVisible={isColVisible}
-              />
-              <ListGridBody
-                style={{
-                  paddingTop: virtualPadding.top,
-                  paddingBottom:
-                    virtualPadding.bottom + LIST_GRID_BOTTOM_CLEARANCE,
-                }}
-              >
-                {rows.length === 0 && (
-                  <div className="col-span-full py-16 text-center text-body text-muted-foreground">
-                    {noMatchText}
-                  </div>
-                )}
-                {virtualItems.map((vi) => {
-                  const row = rows[vi.index];
-                  if (!row) return null;
-                  return (
-                    <ListGridRow
-                      key={row.agent.id}
-                      className={`h-16 cursor-pointer ${
-                        selectedIds.has(row.agent.id) ? "bg-accent/30" : ""
-                      }`}
-                      {...rowLink(paths.agentDetail(row.agent.id), row.agent.name)}
-                    >
-                      <CheckboxCell
-                        checked={selectedIds.has(row.agent.id)}
-                        onToggle={() => toggleSelected(row.agent.id)}
-                      />
-                      <NameCell row={row} />
-                      {isColVisible("status") ? (
-                        <StatusCell row={row} />
-                      ) : (
-                        <ListGridCell className="px-0" />
-                      )}
-                      {isColVisible("owner") ? (
-                        <OwnerCell row={row} />
-                      ) : (
-                        <ListGridCell className="hidden px-0 @2xl:flex" />
-                      )}
-                      {isColVisible("access") ? (
-                        <AccessCell row={row} />
-                      ) : (
-                        <ListGridCell className="hidden px-0 @2xl:flex" />
-                      )}
-                      {isColVisible("runtime") ? (
-                        <RuntimeCell row={row} />
-                      ) : (
-                        <ListGridCell className="hidden px-0 @2xl:flex" />
-                      )}
-                      {isColVisible("lastActive") ? (
-                        <LastActiveCell row={row} />
-                      ) : (
-                        <ListGridCell className="hidden px-0 @2xl:flex" />
-                      )}
-                      {isColVisible("runs") ? (
-                        <ListGridCell className="hidden justify-end font-mono text-caption tabular-nums text-muted-foreground @2xl:flex">
-                          {row.runCount.toLocaleString(locale)}
-                        </ListGridCell>
-                      ) : (
-                        <ListGridCell className="hidden px-0 @2xl:flex" />
-                      )}
-                      {isColVisible("model") ? (
-                        <ListGridCell className="hidden @2xl:flex">
-                          <span className="min-w-0 truncate text-caption text-muted-foreground">
-                            {row.agent.model || "—"}
-                          </span>
-                        </ListGridCell>
-                      ) : (
-                        <ListGridCell className="hidden px-0 @2xl:flex" />
-                      )}
-                      {isColVisible("created") ? (
-                        <ListGridCell className="hidden whitespace-nowrap text-caption tabular-nums text-muted-foreground @2xl:flex">
-                          {new Date(
-                            row.agent.created_at,
-                          ).toLocaleDateString(locale)}
-                        </ListGridCell>
-                      ) : (
-                        <ListGridCell className="hidden px-0 @2xl:flex" />
-                      )}
-                      <ListGridCell className="justify-end px-0">
-                        <span
-                          onClick={(e) => e.stopPropagation()}
-                          className="flex items-center"
-                        >
-                          <AgentRowActions
-                            agent={row.agent}
-                            presence={row.presence}
-                            canManage={row.canManage}
-                            duplicateHref={duplicateHref(row.agent)}
-                          />
-                        </span>
-                      </ListGridCell>
-                    </ListGridRow>
-                  );
-                })}
-              </ListGridBody>
-            </ListGrid>
+            {visibleRows.length === 0 ? (
+              <div className="py-16 text-center text-body text-muted-foreground">
+                {machine === ALL_MACHINES
+                  ? noMatchText
+                  : t(($) => $.rail.none_here)}
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-3 px-[22px] pb-6 @3xl:grid-cols-2 @6xl:grid-cols-3">
+                {visibleRows.map((row) => (
+                  <AgentCard
+                    key={row.agent.id}
+                    row={row}
+                    onOpen={() => navigation.push(paths.agentDetail(row.agent.id))}
+                    duplicateHref={duplicateHref(row.agent)}
+                  />
+                ))}
+              </div>
+            )}
           </div>
         </>
       )}
 
-      <AgentBatchToolbar
-        rows={selectedRows}
-        members={members}
-        currentUserId={currentUser?.id ?? null}
-        onClear={() => setSelectedIds(new Set())}
-      />
 
     </div>
   );

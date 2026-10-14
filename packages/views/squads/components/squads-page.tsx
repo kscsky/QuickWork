@@ -6,13 +6,11 @@ import {
   ArrowUp,
   ChevronDown,
   ExternalLink,
-  Filter,
   Loader2,
   MoreHorizontal,
   Plus,
   Trash2,
   Users,
-  X,
 } from "lucide-react";
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -54,9 +52,6 @@ import {
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
   DropdownMenuSeparator,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@quickwork/ui/components/ui/dropdown-menu";
 import {
@@ -440,17 +435,12 @@ interface ActorOption {
   count: number;
 }
 
-function SquadListToolbar({
-  scope,
-  onScopeChange,
-  scopeCounts,
-  filters,
-  onToggleFilter,
-  onClearFilters,
-  leaderOptions,
-  creatorOptions,
-  visibleCount,
-  totalCount,
+/**
+ * Sort field + direction and column visibility — the list's display settings.
+ * Lives at the header's right end (a secondary control, quiet and borderless
+ * there) so the toolbar below holds nothing but the filters.
+ */
+function SquadDisplayControl({
   sortField,
   sortDirection,
   onSortFieldChange,
@@ -458,16 +448,6 @@ function SquadListToolbar({
   hiddenColumns,
   onToggleColumn,
 }: {
-  scope: SquadsScope;
-  onScopeChange: (scope: SquadsScope) => void;
-  scopeCounts: Record<SquadsScope, number>;
-  filters: SquadListFilters;
-  onToggleFilter: (key: keyof SquadListFilters, value: string) => void;
-  onClearFilters: () => void;
-  leaderOptions: ActorOption[];
-  creatorOptions: ActorOption[];
-  visibleCount: number;
-  totalCount: number;
   sortField: SquadSortField;
   sortDirection: ListGridSortDirection;
   onSortFieldChange: (field: SquadSortField) => void;
@@ -476,28 +456,219 @@ function SquadListToolbar({
   onToggleColumn: (key: SquadColumnKey) => void;
 }) {
   const { t } = useT("squads");
-  const activeFilterCount =
-    (filters.leaders.length > 0 ? 1 : 0) +
-    (filters.creators.length > 0 ? 1 : 0);
-  const hasActiveFilters = activeFilterCount > 0;
-  const countBadge = (n: number) => (
-    <span className="ml-auto pl-3 text-caption text-muted-foreground">{n}</span>
-  );
-  const SCOPE_LABELS: Record<SquadsScope, string> = {
-    mine: t(($) => $.scope.mine),
-    all: t(($) => $.scope.all),
-  };
-  const SORT_LABELS: Record<SquadSortField, string> = {
+  const sortLabels: Record<SquadSortField, string> = {
     name: t(($) => $.page.table.name),
     members: t(($) => $.page.table.members),
     created: t(($) => $.page.table.created),
   };
-  const COLUMN_LABELS: Record<SquadColumnKey, string> = {
+  const sortLabel = sortLabels[sortField];
+  const columnLabels: Record<SquadColumnKey, string> = {
     members: t(($) => $.page.table.members),
     creator: t(($) => $.page.table.creator),
     created: t(($) => $.page.table.created),
   };
-  const sortLabel = SORT_LABELS[sortField];
+  return (
+    <Popover>
+      <Tooltip>
+        <PopoverTrigger
+          render={
+            <TooltipTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 w-8 gap-1 px-0 text-muted-foreground md:w-auto md:px-2.5"
+                  aria-label={t(($) => $.toolbar.display)}
+                >
+                  {sortDirection === "asc" ? (
+                    <ArrowUp className="size-3.5" />
+                  ) : (
+                    <ArrowDown className="size-3.5" />
+                  )}
+                  <span className="hidden md:inline">{sortLabel}</span>
+                </Button>
+              }
+            />
+          }
+        />
+        <TooltipContent side="bottom">
+          {t(($) => $.toolbar.display)}
+        </TooltipContent>
+      </Tooltip>
+      <PopoverContent align="end" className="w-64 p-0">
+        <div className="border-b px-3 py-2.5">
+          <span className="text-caption font-medium text-muted-foreground">
+            {t(($) => $.toolbar.sort_by)}
+          </span>
+          <div className="mt-2 flex items-center gap-1.5">
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                render={
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1 justify-between text-caption"
+                  >
+                    {sortLabel}
+                    <ChevronDown className="size-3 text-muted-foreground" />
+                  </Button>
+                }
+              />
+              <DropdownMenuContent align="start" className="w-auto">
+                <DropdownMenuRadioGroup
+                  value={sortField}
+                  onValueChange={(v) => onSortFieldChange(v as SquadSortField)}
+                >
+                  {SORT_FIELDS.map((field) => (
+                    <DropdownMenuRadioItem key={field} value={field}>
+                      {sortLabels[field]}
+                    </DropdownMenuRadioItem>
+                  ))}
+                </DropdownMenuRadioGroup>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <Button
+              variant="outline"
+              size="icon-sm"
+              onClick={() =>
+                onSortDirectionChange(sortDirection === "asc" ? "desc" : "asc")
+              }
+              title={
+                sortDirection === "asc"
+                  ? t(($) => $.toolbar.direction_asc)
+                  : t(($) => $.toolbar.direction_desc)
+              }
+            >
+              {sortDirection === "asc" ? (
+                <ArrowUp className="size-3.5" />
+              ) : (
+                <ArrowDown className="size-3.5" />
+              )}
+            </Button>
+          </div>
+        </div>
+        <div className="px-3 py-2.5">
+          <span className="text-caption font-medium text-muted-foreground">
+            {t(($) => $.toolbar.section_columns)}
+          </span>
+          <div className="mt-2 space-y-2">
+            {COLUMN_KEYS.map((key) => (
+              <label
+                key={key}
+                className="flex cursor-pointer items-center justify-between"
+              >
+                <span className="text-body">{columnLabels[key]}</span>
+                <Switch
+                  size="sm"
+                  checked={!hiddenColumns.includes(key)}
+                  onCheckedChange={() => onToggleColumn(key)}
+                />
+              </label>
+            ))}
+          </div>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+/**
+ * One always-visible filter chip: opens the same multi-select menu the old
+ * 「筛选」 dropdown hid, but the trigger itself states what is filtered
+ * ("队长：王磊") and turns brand-tinted while a value is selected — nothing
+ * about the current filter is behind a click anymore.
+ */
+function SquadFilterChip({
+  label,
+  options,
+  selected,
+  onToggle,
+  actorType,
+}: {
+  label: string;
+  options: ActorOption[];
+  selected: string[];
+  onToggle: (id: string) => void;
+  actorType: "agent" | "member";
+}) {
+  const { t } = useT("squads");
+  const active = selected.length > 0;
+  const selectedName =
+    options.find((o) => o.id === selected[0])?.name ??
+    selected[0]?.slice(0, 8) ??
+    "";
+  const text =
+    selected.length === 0
+      ? label
+      : selected.length === 1
+        ? t(($) => $.toolbar.chip_named, { label, value: selectedName })
+        : t(($) => $.toolbar.chip_multi, { label, value: selected.length });
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        render={
+          <Button
+            variant={active ? "brandSubtle" : "outline"}
+            size="sm"
+            className="h-8 max-w-56 shrink-0 gap-1 px-2.5"
+          >
+            <span className="min-w-0 truncate">{text}</span>
+            <ChevronDown className="size-3 shrink-0 text-muted-foreground" />
+          </Button>
+        }
+      />
+      <DropdownMenuContent
+        align="start"
+        className="max-h-72 w-auto min-w-48 overflow-y-auto"
+      >
+        {options.map((o) => (
+          <DropdownMenuCheckboxItem
+            key={o.id}
+            checked={selected.includes(o.id)}
+            onCheckedChange={() => onToggle(o.id)}
+            className={FILTER_ITEM_CLASS}
+          >
+            <HoverCheck checked={selected.includes(o.id)} />
+            <ActorAvatar actorType={actorType} actorId={o.id} size="sm" />
+            <span className="min-w-0 truncate">{o.name}</span>
+            <span className="ml-auto pl-3 text-caption text-muted-foreground">
+              {o.count}
+            </span>
+          </DropdownMenuCheckboxItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+function SquadListToolbar({
+  scope,
+  onScopeChange,
+  scopeCounts,
+  filters,
+  onToggleFilter,
+  leaderOptions,
+  creatorOptions,
+  visibleCount,
+  totalCount,
+}: {
+  scope: SquadsScope;
+  onScopeChange: (scope: SquadsScope) => void;
+  scopeCounts: Record<SquadsScope, number>;
+  filters: SquadListFilters;
+  onToggleFilter: (key: keyof SquadListFilters, value: string) => void;
+  leaderOptions: ActorOption[];
+  creatorOptions: ActorOption[];
+  visibleCount: number;
+  totalCount: number;
+}) {
+  const { t } = useT("squads");
+  const hasActiveFilters =
+    filters.leaders.length > 0 || filters.creators.length > 0;
+  const SCOPE_LABELS: Record<SquadsScope, string> = {
+    mine: t(($) => $.scope.mine),
+    all: t(($) => $.scope.all),
+  };
 
   return (
     <div className={PAGE_TOOLBAR}>
@@ -552,6 +723,21 @@ function SquadListToolbar({
           </DropdownMenuContent>
         </DropdownMenu>
 
+        <SquadFilterChip
+          label={t(($) => $.page.table.leader)}
+          options={leaderOptions}
+          selected={filters.leaders}
+          onToggle={(id) => onToggleFilter("leaders", id)}
+          actorType="agent"
+        />
+        <SquadFilterChip
+          label={t(($) => $.page.table.creator)}
+          options={creatorOptions}
+          selected={filters.creators}
+          onToggle={(id) => onToggleFilter("creators", id)}
+          actorType="member"
+        />
+
         {hasActiveFilters && (
           <span
             title={t(($) => $.toolbar.result_count_title)}
@@ -562,206 +748,6 @@ function SquadListToolbar({
         )}
       </div>
 
-      <div className="flex shrink-0 items-center gap-1">
-      {/* Filter */}
-      <DropdownMenu>
-        <DropdownMenuTrigger
-          render={
-            <Button
-              variant={hasActiveFilters ? "default" : "outline"}
-              size="sm"
-              className={
-                hasActiveFilters
-                  ? "h-8 w-8 gap-1 bg-brand px-0 text-white hover:bg-brand/90 md:w-auto md:px-2.5"
-                  : "h-8 w-8 gap-1 px-0 text-muted-foreground md:w-auto md:px-2.5"
-              }
-            >
-              <Filter className="size-3.5" />
-              {hasActiveFilters ? (
-                <>
-                  <span className="hidden md:inline">
-                    {t(($) => $.toolbar.filter_active_count, { count: activeFilterCount })}
-                  </span>
-                  <span className="tabular-nums md:hidden">{activeFilterCount}</span>
-                </>
-              ) : (
-                <span className="hidden md:inline">{t(($) => $.toolbar.filter_label)}</span>
-              )}
-              {hasActiveFilters && (
-                <span
-                  role="button"
-                  tabIndex={-1}
-                  aria-label={t(($) => $.toolbar.clear_filters)}
-                  className="-mr-1 ml-0.5 hidden rounded-sm p-0.5 hover:bg-white/20 md:inline-flex"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    onClearFilters();
-                  }}
-                  onPointerDown={(e) => e.stopPropagation()}
-                >
-                  <X className="size-3" />
-                </span>
-              )}
-            </Button>
-          }
-        />
-        <DropdownMenuContent align="end" className="w-auto">
-          <DropdownMenuSub>
-            <DropdownMenuSubTrigger>
-              <span className="flex-1">{t(($) => $.page.table.leader)}</span>
-              {filters.leaders.length > 0 && (
-                <span className="text-caption font-medium text-primary">{filters.leaders.length}</span>
-              )}
-            </DropdownMenuSubTrigger>
-            <DropdownMenuSubContent className="max-h-72 w-auto min-w-48 overflow-y-auto">
-              {leaderOptions.map((o) => (
-                <DropdownMenuCheckboxItem
-                  key={o.id}
-                  checked={filters.leaders.includes(o.id)}
-                  onCheckedChange={() => onToggleFilter("leaders", o.id)}
-                  className={FILTER_ITEM_CLASS}
-                >
-                  <HoverCheck checked={filters.leaders.includes(o.id)} />
-                  <ActorAvatar actorType="agent" actorId={o.id} size="sm" />
-                  <span className="min-w-0 truncate">{o.name}</span>
-                  {countBadge(o.count)}
-                </DropdownMenuCheckboxItem>
-              ))}
-            </DropdownMenuSubContent>
-          </DropdownMenuSub>
-          <DropdownMenuSub>
-            <DropdownMenuSubTrigger>
-              <span className="flex-1">{t(($) => $.page.table.creator)}</span>
-              {filters.creators.length > 0 && (
-                <span className="text-caption font-medium text-primary">{filters.creators.length}</span>
-              )}
-            </DropdownMenuSubTrigger>
-            <DropdownMenuSubContent className="max-h-72 w-auto min-w-48 overflow-y-auto">
-              {creatorOptions.map((o) => (
-                <DropdownMenuCheckboxItem
-                  key={o.id}
-                  checked={filters.creators.includes(o.id)}
-                  onCheckedChange={() => onToggleFilter("creators", o.id)}
-                  className={FILTER_ITEM_CLASS}
-                >
-                  <HoverCheck checked={filters.creators.includes(o.id)} />
-                  <ActorAvatar actorType="member" actorId={o.id} size="sm" />
-                  <span className="min-w-0 truncate">{o.name}</span>
-                  {countBadge(o.count)}
-                </DropdownMenuCheckboxItem>
-              ))}
-            </DropdownMenuSubContent>
-          </DropdownMenuSub>
-        </DropdownMenuContent>
-      </DropdownMenu>
-
-      {/* Display settings */}
-      <Popover>
-        <Tooltip>
-          <PopoverTrigger
-            render={
-              <TooltipTrigger
-                render={
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-8 w-8 gap-1 px-0 text-muted-foreground md:w-auto md:px-2.5"
-                  >
-                    {sortDirection === "asc" ? (
-                      <ArrowUp className="size-3.5" />
-                    ) : (
-                      <ArrowDown className="size-3.5" />
-                    )}
-                    <span className="hidden md:inline">{sortLabel}</span>
-                  </Button>
-                }
-              />
-            }
-          />
-          <TooltipContent side="bottom">
-            {t(($) => $.toolbar.display)}
-          </TooltipContent>
-        </Tooltip>
-        <PopoverContent align="end" className="w-64 p-0">
-          <div className="border-b px-3 py-2.5">
-            <span className="text-caption font-medium text-muted-foreground">
-              {t(($) => $.toolbar.sort_by)}
-            </span>
-            <div className="mt-2 flex items-center gap-1.5">
-              <DropdownMenu>
-                <DropdownMenuTrigger
-                  render={
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="flex-1 justify-between text-caption"
-                    >
-                      {sortLabel}
-                      <ChevronDown className="size-3 text-muted-foreground" />
-                    </Button>
-                  }
-                />
-                <DropdownMenuContent align="start" className="w-auto">
-                  <DropdownMenuRadioGroup
-                    value={sortField}
-                    onValueChange={(v) =>
-                      onSortFieldChange(v as SquadSortField)
-                    }
-                  >
-                    {SORT_FIELDS.map((field) => (
-                      <DropdownMenuRadioItem key={field} value={field}>
-                        {SORT_LABELS[field]}
-                      </DropdownMenuRadioItem>
-                    ))}
-                  </DropdownMenuRadioGroup>
-                </DropdownMenuContent>
-              </DropdownMenu>
-              <Button
-                variant="outline"
-                size="icon-sm"
-                onClick={() =>
-                  onSortDirectionChange(
-                    sortDirection === "asc" ? "desc" : "asc",
-                  )
-                }
-                title={
-                  sortDirection === "asc"
-                    ? t(($) => $.toolbar.direction_asc)
-                    : t(($) => $.toolbar.direction_desc)
-                }
-              >
-                {sortDirection === "asc" ? (
-                  <ArrowUp className="size-3.5" />
-                ) : (
-                  <ArrowDown className="size-3.5" />
-                )}
-              </Button>
-            </div>
-          </div>
-          <div className="px-3 py-2.5">
-            <span className="text-caption font-medium text-muted-foreground">
-              {t(($) => $.toolbar.section_columns)}
-            </span>
-            <div className="mt-2 space-y-2">
-              {COLUMN_KEYS.map((key) => (
-                <label
-                  key={key}
-                  className="flex cursor-pointer items-center justify-between"
-                >
-                  <span className="text-body">{COLUMN_LABELS[key]}</span>
-                  <Switch
-                    size="sm"
-                    checked={!hiddenColumns.includes(key)}
-                    onCheckedChange={() => onToggleColumn(key)}
-                  />
-                </label>
-              ))}
-            </div>
-          </div>
-        </PopoverContent>
-      </Popover>
-      </div>
     </div>
   );
 }
@@ -815,7 +801,6 @@ export function SquadsPage() {
   const toggleColumn = useSquadsViewStore((s) => s.toggleColumn);
   const filters = useSquadsViewStore((s) => s.filters);
   const toggleFilter = useSquadsViewStore((s) => s.toggleFilter);
-  const clearFilters = useSquadsViewStore((s) => s.clearFilters);
 
   const isColVisible = (key: SquadColumnKey) => !hiddenColumns.includes(key);
 
@@ -915,11 +900,26 @@ export function SquadsPage() {
         icon={Users}
         title={t(($) => $.page.title)}
         count={squads.length}
-        actions={
+        description={t(($) => $.page.tagline)}
+        // The primary action sits with the title, not across the page: on a
+        // wide window the right-hand slot is a full screen away from where
+        // the eye starts reading.
+        leadingAction={
           <CollectionPageHeaderAction
+            variant="default"
             icon={Plus}
             label={t(($) => $.page.new_button)}
             onClick={() => useModalStore.getState().open("create-squad")}
+          />
+        }
+        actions={
+          <SquadDisplayControl
+            sortField={sortField}
+            sortDirection={sortDirection}
+            onSortFieldChange={handleSortFieldSelect}
+            onSortDirectionChange={setSortDirection}
+            hiddenColumns={hiddenColumns}
+            onToggleColumn={toggleColumn}
           />
         }
       />
@@ -948,17 +948,10 @@ export function SquadsPage() {
             scopeCounts={scopeCounts}
             filters={filters}
             onToggleFilter={toggleFilter}
-            onClearFilters={clearFilters}
             leaderOptions={leaderOptions}
             creatorOptions={creatorOptions}
             visibleCount={rows.length}
             totalCount={scopeRows.length}
-            sortField={sortField}
-            sortDirection={sortDirection}
-            onSortFieldChange={handleSortFieldSelect}
-            onSortDirectionChange={setSortDirection}
-            hiddenColumns={hiddenColumns}
-            onToggleColumn={toggleColumn}
           />
           <div className="min-h-0 flex-1 overflow-auto @container">
             <ListGrid
