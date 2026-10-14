@@ -55,7 +55,7 @@
     "author_renamed": "保存時 {{captured}} · 現在 {{current}}",
     "author_archived": "アーカイブ済み",
     "author_deleted_agent": "削除されたエージェント",
-    "author_left_workspace": "ワークスペースに所属していません",
+    "author_left_workspace": "スペースに所属していません",
     "error_source_changed": "参照元が変更されました。更新されたプレビューを確認して、もう一度送信してください。",
     "error_agent_unsupported": "保存済みコンテキストを使うには、このエージェントのランタイムを更新してください。Manual に切り替えることもできます。",
     "error_server_unsupported": "保存済みコンテキスト付きのサブタスクを作成するには、サーバーの更新が必要です。",
@@ -77,7 +77,7 @@
   },
   "page": {
     "breadcrumb_title": "タスク",
-    "breadcrumb_workspace_fallback": "ワークスペース",
+    "breadcrumb_workspace_fallback": "スペース",
     "empty_title": "まだタスクがありません",
     "empty_hint": "タスクを作成して始めましょう。",
     "move_failed": "タスクを移動できませんでした"
@@ -104,7 +104,7 @@
   },
   "scope": {
     "all_label": "すべて",
-    "all_description": "このワークスペースのすべてのタスク",
+    "all_description": "このスペースのすべてのタスク",
     "members_label": "メンバー",
     "members_description": "チームメンバーに割り当てられたタスク",
     "agents_label": "エージェント",
@@ -291,7 +291,8 @@
   },
   "list": {
     "empty_status": "タスクなし",
-    "add_issue_tooltip": "タスクを追加"
+    "add_issue_tooltip": "タスクを追加",
+    "stream_title": "アクティビティ"
   },
   "board": {
     "hidden_columns_label": "非表示の列",
@@ -304,7 +305,7 @@
     "ordered_by": "{{field}} 順に並べたボード"
   },
   "detail": {
-    "not_found": "このタスクはこのワークスペースに存在しないか、削除されています。",
+    "not_found": "このタスクはこのスペースに存在しないか、削除されています。",
     "breadcrumb_project_unknown": "不明なプロジェクト",
     "back": "戻る",
     "title_placeholder": "タスクのタイトル",
@@ -332,7 +333,7 @@
     "quick_action_blocked": "{{name}} を実行できませんでした",
     "quick_action_posted": "コメントを投稿しました",
     "quick_action_blocked_title": "このクイックアクションは実行できません",
-    "quick_action_blocked_body": "「{{name}}」は、あなたが実行を許可されていないエージェントで動作します。ワークスペース管理者にそのエージェントをチームへ公開してもらうか、共有エージェントへの変更を依頼してください。",
+    "quick_action_blocked_body": "「{{name}}」は、あなたが実行を許可されていないエージェントで動作します。スペース管理者にそのエージェントをチームへ公開してもらうか、共有エージェントへの変更を依頼してください。",
     "quick_action_blocked_ok": "了解",
     "pull_requests_loading": "読み込み中...",
     "pull_requests_empty": "まだリンクされた Pull request がありません。PR のブランチ名、タイトル、または本文にこのタスクの識別子を入れると、自動的にリンクされます。",
@@ -646,7 +647,7 @@
     "delete_failed": "タスクを削除できませんでした",
     "delete_dialog_title_other": "タスク {{count}} 件を削除しますか？",
     "delete_dialog_desc_other": "この操作は元に戻せません。選択したタスクと関連データがすべて完全に削除されます。",
-    "delete_dialog_warning": "ワークスペースのメンバーであれば誰でもタスクを削除できます。",
+    "delete_dialog_warning": "スペースのメンバーであれば誰でもタスクを削除できます。",
     "cancel": "キャンセル"
   },
   "card": {
@@ -726,7 +727,7 @@
     }
   },
   "labels_panel": {
-    "intro": "ワークスペース全体でタスクを分類するラベルを作成・管理します。",
+    "intro": "スペース全体でタスクを分類するラベルを作成・管理します。",
     "new_placeholder": "新しいラベル名...",
     "new_aria": "新しいラベル名",
     "add_action": "追加",
@@ -758,7 +759,7 @@
   },
   "save_view": {
     "title": "ビューとして保存",
-    "hint_workspace": "ワークスペースの全 issue をもとに作成",
+    "hint_workspace": "スペースの全 issue をもとに作成",
     "hint_my_any": "「マイ issue · すべて」をもとに作成",
     "hint_my_assigned": "「マイ issue · 自分に割り当て」をもとに作成",
     "hint_my_created": "「マイ issue · 自分が作成」をもとに作成",
@@ -770,7 +771,7 @@
     "name_label": "名前",
     "visibility_label": "公開範囲",
     "visibility_private": "自分のみ",
-    "visibility_workspace": "ワークスペースのメンバーに表示",
+    "visibility_workspace": "スペースのメンバーに表示",
     "filters_label": "フィルター",
     "custom_property": "カスタムプロパティ",
     "create": "ビューを作成",
@@ -787,8 +788,8 @@
     "update": "変更を保存",
     "toast_updated": "ビューを更新しました",
     "toast_conflict": "他のユーザーがこのビューを編集しました。開き直してから再試行してください",
-    "hint_workspace_members": "メンバーが担当するワークスペースの issue をもとに作成",
-    "hint_workspace_agents": "エージェントが担当するワークスペースの issue をもとに作成",
+    "hint_workspace_members": "メンバーが担当するスペースの issue をもとに作成",
+    "hint_workspace_agents": "エージェントが担当するスペースの issue をもとに作成",
     "scope_label_workspace": "担当者タイプ",
     "scope_label_my": "自分との関係",
     "variant_all": "担当者を問わない",
@@ -803,7 +804,7 @@
     "trigger": "ビュー",
     "empty": "保存されたビューはまだありません",
     "private_group": "プライベート",
-    "shared_group": "ワークスペース共有",
+    "shared_group": "スペース共有",
     "exit": "ビューを終了",
     "unavailable": "このビューは利用できなくなりました",
     "edit": "ビューを編集"
@@ -839,7 +840,7 @@
     "hook_never_run": "このフックはまだ実行されていません。",
     "surface_loading": "{{name}} を読み込んでいます…",
     "surface_unavailable": "{{name}} のインターフェースを読み込めません。インストール済みのバージョンに含まれていない可能性があります。",
-    "surface_navigated": "{{name}} がパネルを外部から読み込んだページに置き換えようとしました。停止して接続を切りました。ワークスペース管理者に知らせてください。"
+    "surface_navigated": "{{name}} がパネルを外部から読み込んだページに置き換えようとしました。停止して接続を切りました。スペース管理者に知らせてください。"
   },
   "flow": {
     "progress": "{{seq}}/{{total}} 番目を実行中",
@@ -847,5 +848,24 @@
     "waiting": "担当者の開始待ち",
     "start_leg": "{{seq}} 番目を開始",
     "start_failed": "開始に失敗しました"
+  },
+  "room": {
+    "parked_bar_name": "{{name}} はエージェント未接続のため、タスクはこのステップで止まっています。",
+    "parked_bar_action": "{{name}} に接続してもらう",
+    "parked_bar_skip": "このまま次へ進む",
+    "composer_placeholder": "この部屋で何か言う…",
+    "members_title": "この部屋のメンバー",
+    "member_no_agent": "エージェントなし — 順番が来ると止まります",
+    "member_agent": "{{agent}} で実行",
+    "state_pending": "未開始",
+    "state_doing": "進行中",
+    "state_waiting": "引き取り待ち",
+    "state_interrupted": "実行中断",
+    "state_done": "完了",
+    "state_parked": "停止·待機",
+    "state_skipped": "スキップ",
+    "state_unknown": "不明",
+    "resolved": "解決済み",
+    "skip_failed": "リレーを進められませんでした"
   }
 }

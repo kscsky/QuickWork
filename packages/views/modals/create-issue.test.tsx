@@ -1058,38 +1058,6 @@ describe("CreateIssueModal", () => {
     });
   });
 
-  // Manual → agent must seed the agent actor from the picked squad. Without
-  // this the agent panel silently falls back to the persisted actor / first
-  // visible agent and the user loses the squad they just chose in manual.
-  it("seeds the agent actor from the picked squad when switching to agent mode", async () => {
-    mockDraftStore.draft.manual.assigneeType = "squad";
-    mockDraftStore.draft.manual.assigneeId = "squad-1";
-    const user = userEvent.setup();
-    const onSwitchMode = vi.fn();
-
-    renderModal(
-      <ManualCreatePanel
-        onClose={vi.fn()}
-        onSwitchMode={onSwitchMode}
-        isExpanded={false}
-        setIsExpanded={vi.fn()}
-      />,
-    );
-
-    await user.type(screen.getByPlaceholderText("Issue title"), "Refactor auth");
-    await user.click(screen.getByRole("button", { name: /Switch to Agent/i }));
-
-    expect(onSwitchMode).toHaveBeenCalledTimes(1);
-    // Prompt assist-init + squad actor land in the unified agent draft.
-    expect(mockSetAgent).toHaveBeenCalledWith({ prompt: "Refactor auth" });
-    expect(mockSetAgent).toHaveBeenCalledWith({
-      actorType: "squad",
-      actorId: "squad-1",
-    });
-    // Actor rides the store, not the carry; no parent here → carry is null.
-    expect(onSwitchMode.mock.calls[0]?.[0]).toBeNull();
-  });
-
   // Reporter scenario: backend rejects same-titled create with a 409 +
   // structured duplicate body. The user should land on a duplicate toast
   // pointing at the existing issue, not a generic "create failed" message.
@@ -1201,34 +1169,6 @@ describe("CreateIssueModal", () => {
     expect(mockToastError).toHaveBeenCalledWith("Failed to create issue");
   });
 
-  // Manual → agent must preserve the picked project. It now rides the shared
-  // draft slot rather than the carry: the switch commits the (data-seeded)
-  // project into `shared` so the agent panel reads it from there.
-  it("commits the picked project to the shared draft when switching to agent mode", async () => {
-    const user = userEvent.setup();
-    const onSwitchMode = vi.fn();
-
-    renderModal(
-      <ManualCreatePanel
-        onClose={vi.fn()}
-        onSwitchMode={onSwitchMode}
-        data={{ project_id: "proj-1" }}
-        isExpanded={false}
-        setIsExpanded={vi.fn()}
-      />,
-    );
-
-    await user.type(screen.getByPlaceholderText("Issue title"), "Refactor auth");
-
-    await user.click(screen.getByRole("button", { name: /Switch to Agent/i }));
-
-    expect(onSwitchMode).toHaveBeenCalledTimes(1);
-    expect(mockSetShared).toHaveBeenCalledWith(
-      expect.objectContaining({ projectId: "proj-1" }),
-    );
-    expect(mockSetAgent).toHaveBeenCalledWith({ prompt: "Refactor auth" });
-  });
-
   it("restores an unfinished project selection after manual create remounts", async () => {
     const user = userEvent.setup();
 
@@ -1244,53 +1184,10 @@ describe("CreateIssueModal", () => {
     expect(screen.getByTestId("project-picker")).toHaveAttribute("data-project-id", "proj-1");
   });
 
-  // Manual → agent must forward parent_issue_id when the modal was opened
-  // from "Add sub issue". Before this, the agent panel received no parent
-  // context and the new issue was filed as a standalone — silently dropping
-  // the sub-issue intent set by openCreateSubIssue. The parent_issue_identifier
-  // tags along so the agent panel can render a "Sub-issue of MUL-XX" chip
-  // without an extra round-trip.
-  //
-  // The identifier fallback matters here: the mocked issueDetailOptions
-  // resolves to null (parent query not hydrated), so without the
-  // `data.parent_issue_identifier` fallback the agent chip would render as
-  // "Sub-issue of " with an empty tail. The UUID alone still wires the
-  // sub-issue relationship correctly, but the visible affordance breaks.
-  it("forwards parent_issue_id and falls back to seeded identifier when switching to agent mode", async () => {
-    const user = userEvent.setup();
-    const onSwitchMode = vi.fn();
-
-    renderModal(
-      <ManualCreatePanel
-        onClose={vi.fn()}
-        onSwitchMode={onSwitchMode}
-        data={{
-          parent_issue_id: "parent-uuid-1",
-          parent_issue_identifier: "MUL-2534",
-        }}
-        isExpanded={false}
-        setIsExpanded={vi.fn()}
-      />,
-    );
-
-    await user.type(screen.getByPlaceholderText("Issue title"), "Refactor auth");
-    await user.click(screen.getByRole("button", { name: /Switch to Agent/i }));
-
-    expect(onSwitchMode).toHaveBeenCalledTimes(1);
-    // The parent context is not persisted (a per-invocation intent), so it
-    // still rides the carry channel. The prompt rides the store now.
-    expect(onSwitchMode.mock.calls[0]?.[0]).toEqual({
-      parent_issue_id: "parent-uuid-1",
-      parent_issue_identifier: "MUL-2534",
-    });
-    expect(mockSetAgent).toHaveBeenCalledWith({ prompt: "Refactor auth" });
-  });
-
   it("keeps captured context separate from the upstream description scroller", () => {
     renderModal(
       <ManualCreatePanel
         onClose={vi.fn()}
-        onSwitchMode={vi.fn()}
         data={sourceContextPanelData()}
         isExpanded={false}
         setIsExpanded={vi.fn()}
@@ -1319,7 +1216,6 @@ describe("CreateIssueModal", () => {
     const contextRender = renderModal(
       <ManualCreatePanel
         onClose={vi.fn()}
-        onSwitchMode={vi.fn()}
         data={{
           ...sourceContextPanelData(),
           parent_issue_id: "parent-uuid-1",
@@ -1339,7 +1235,6 @@ describe("CreateIssueModal", () => {
     renderModal(
       <ManualCreatePanel
         onClose={vi.fn()}
-        onSwitchMode={vi.fn()}
         data={{
           parent_issue_id: "parent-uuid-1",
           parent_issue_identifier: "MUL-2534",
@@ -1357,7 +1252,6 @@ describe("CreateIssueModal", () => {
     renderModal(
       <ManualCreatePanel
         onClose={vi.fn()}
-        onSwitchMode={vi.fn()}
         data={sourceContextPanelData()}
         isExpanded={false}
         setIsExpanded={vi.fn()}
@@ -1477,44 +1371,9 @@ describe("CreateIssueModal", () => {
     expect(mockPush).toHaveBeenCalledWith("/ws-test/settings?tab=issue");
   });
 
-  // MUL-5181: switching to agent must PRESERVE the manual draft. The agent
-  // prompt is assist-init'd from title + description (a one-time convenience
-  // when the agent slot is empty), but the manual title/description are left
-  // untouched so a later agent→manual switch restores them verbatim — no
-  // concatenate-then-clear, no duplication on round-trips.
-  it("assist-inits the agent prompt from title and description without clearing the manual draft", async () => {
-    const user = userEvent.setup();
-
-    renderModal(
-      <ManualCreatePanel
-        onClose={vi.fn()}
-        onSwitchMode={vi.fn()}
-        isExpanded={false}
-        setIsExpanded={vi.fn()}
-      />,
-    );
-
-    await user.type(screen.getByPlaceholderText("Issue title"), "Update");
-    await user.type(screen.getByPlaceholderText("Add description..."), "Some body");
-
-    mockSetManual.mockClear();
-    mockSetAgent.mockClear();
-    await user.click(screen.getByRole("button", { name: /Switch to Agent/i }));
-
-    // Agent prompt seeded from the manual content...
-    expect(mockSetAgent).toHaveBeenCalledWith({ prompt: "Update\n\nSome body" });
-    // ...and the manual slot is never cleared.
-    expect(mockSetManual).not.toHaveBeenCalledWith(
-      expect.objectContaining({ title: "" }),
-    );
-    expect(mockSetManual).not.toHaveBeenCalledWith(
-      expect.objectContaining({ description: "" }),
-    );
-  });
-
-  // MUL-4808 — manual create had no upload gate at all: Create, Enter on the
-  // title, and Switch to Agent would each fix the draft while an image was
-  // still uploading, dropping it from the description with no warning.
+  // MUL-4808 — manual create had no upload gate at all: Create and Enter on
+  // the title would each fix the draft while an image was still uploading,
+  // dropping it from the description with no warning.
   // MUL-5181 P0: the issue draft is a SINGLETON store. A submit that outlives
   // its dialog may only consume the draft it submitted — never one the user
   // typed after closing and reopening.
@@ -1523,7 +1382,6 @@ describe("CreateIssueModal", () => {
       return renderModal(
         <ManualCreatePanel
           onClose={onClose}
-          onSwitchMode={vi.fn()}
           isExpanded={false}
           setIsExpanded={vi.fn()}
         />,
@@ -1621,16 +1479,15 @@ describe("CreateIssueModal", () => {
       return { release: (result: unknown) => release(result) };
     }
 
-    function renderManual(onSwitchMode = vi.fn()) {
+    function renderManual() {
       const view = renderModal(
         <ManualCreatePanel
           onClose={vi.fn()}
-          onSwitchMode={onSwitchMode}
           isExpanded={false}
           setIsExpanded={vi.fn()}
         />,
       );
-      return { ...view, onSwitchMode };
+      return { ...view };
     }
 
     it("disables Create and shows Uploading… while an upload is in flight", async () => {
@@ -1687,21 +1544,6 @@ describe("CreateIssueModal", () => {
       expect(mockCreateIssue).not.toHaveBeenCalled();
     });
 
-    it("blocks Switch to Agent while an upload is in flight", async () => {
-      const user = userEvent.setup();
-      const onSwitchMode = vi.fn();
-      renderManual(onSwitchMode);
-      await user.type(screen.getByPlaceholderText("Issue title"), "Has a screenshot");
-
-      startPendingUpload();
-
-      // The switch packs the description into an agent prompt and clears the
-      // manual draft — doing that mid-upload loses the image for good.
-      const switchButton = screen.getByRole("button", { name: /Switch to Agent/i });
-      await waitFor(() => expect(switchButton).toBeDisabled());
-      fireEvent.click(switchButton);
-      expect(onSwitchMode).not.toHaveBeenCalled();
-    });
   });
 
   // MUL-4931 — manual create had no submit shortcut at all, while agent create
@@ -1711,7 +1553,6 @@ describe("CreateIssueModal", () => {
       return renderModal(
         <ManualCreatePanel
           onClose={vi.fn()}
-          onSwitchMode={vi.fn()}
           isExpanded={false}
           setIsExpanded={vi.fn()}
         />,
@@ -1863,15 +1704,15 @@ describe("CreateIssueModal", () => {
     it("keeps every footer control a direct child of the grid container", () => {
       renderModal(<CreateIssueModal onClose={vi.fn()} />);
 
-      const switchToAgent = screen.getByRole("button", { name: /Switch to Agent/i });
       const create = screen.getByRole("button", { name: "Create Issue" });
 
-      // Grid placement only sees direct children — re-wrapping either control
-      // collapses the 2x2 phone footer back to one jammed row.
-      const footer = switchToAgent.parentElement;
+      // Mode switching moved to the header strip, so the footer's direct grid
+      // children are the attach group / keep-open / Create. Grid placement only
+      // sees direct children — re-wrapping any control collapses the 2x2 phone
+      // footer back to one jammed row.
+      const footer = create.parentElement;
       expect(footer?.className).toContain("grid-cols-[auto_1fr]");
       expect(footer?.className).toContain("sm:flex");
-      expect(create.parentElement).toBe(footer);
       expect(create.className).toContain("justify-self-end");
     });
   });

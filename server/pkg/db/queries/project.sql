@@ -62,3 +62,19 @@ FROM issue
 WHERE workspace_id = sqlc.arg('workspace_id')::uuid
   AND project_id = ANY(sqlc.arg('project_ids')::uuid[])
 GROUP BY project_id;
+
+-- name: GetProjectActiveTaskCounts :many
+-- In-flight work per project, for the projects list. agent_task_queue carries no
+-- project_id, so the count comes through the issue it runs against.
+-- waiting_local_directory counts as active: the task holds its slot while it
+-- waits for the directory lock, so excluding it would under-report load.
+-- Chat-spawned tasks have an empty issue_id and are therefore not attributed to
+-- any project.
+SELECT i.project_id,
+       count(*)::bigint AS active_count
+FROM agent_task_queue atq
+JOIN issue i ON i.id = atq.issue_id
+WHERE i.workspace_id = sqlc.arg('workspace_id')::uuid
+  AND i.project_id = ANY(sqlc.arg('project_ids')::uuid[])
+  AND atq.status IN ('queued', 'dispatched', 'running', 'waiting_local_directory')
+GROUP BY i.project_id;

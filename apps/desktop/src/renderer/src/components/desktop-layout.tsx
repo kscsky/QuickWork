@@ -19,7 +19,6 @@ import {
   NavigationProgress,
 } from "@quickwork/views/layout";
 import { SearchCommand, SearchTrigger } from "@quickwork/views/search";
-import { FloatingChat } from "@quickwork/views/chat";
 import { WorkspaceSlugProvider, paths, useCurrentWorkspace } from "@quickwork/core/paths";
 import { workspaceListOptions } from "@quickwork/core/workspace";
 import {
@@ -299,7 +298,6 @@ export function DesktopShell() {
                     froze until the destination committed (MUL-6404). */}
                 <NavigationProgress />
                 <TabContent />
-                {slug && <FloatingChat />}
               </MainCanvas>
             </div>
           </SidebarProvider>

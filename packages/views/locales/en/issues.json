@@ -56,7 +56,7 @@
     "author_renamed": "{{captured}} at capture · now {{current}}",
     "author_archived": "archived",
     "author_deleted_agent": "deleted agent",
-    "author_left_workspace": "no longer in workspace",
+    "author_left_workspace": "no longer in space",
     "error_source_changed": "The source changed. Review the refreshed preview, then submit again.",
     "error_agent_unsupported": "This agent runtime must be updated to use captured context. Switch to Manual or update the runtime.",
     "error_server_unsupported": "This server must be updated before it can create a sub-issue with captured context.",
@@ -78,7 +78,7 @@
   },
   "page": {
     "breadcrumb_title": "Issues",
-    "breadcrumb_workspace_fallback": "Workspace",
+    "breadcrumb_workspace_fallback": "Space",
     "empty_title": "No issues yet",
     "empty_hint": "Create an issue to get started.",
     "move_failed": "Failed to move issue"
@@ -105,7 +105,7 @@
   },
   "scope": {
     "all_label": "All",
-    "all_description": "All issues in this workspace",
+    "all_description": "All issues in this space",
     "members_label": "Members",
     "members_description": "Issues assigned to team members",
     "agents_label": "Agents",
@@ -294,7 +294,8 @@
   },
   "list": {
     "empty_status": "No issues",
-    "add_issue_tooltip": "Add issue"
+    "add_issue_tooltip": "Add issue",
+    "stream_title": "Activity"
   },
   "board": {
     "hidden_columns_label": "Hidden columns",
@@ -307,7 +308,7 @@
     "ordered_by": "Board ordered by {{field}}"
   },
   "detail": {
-    "not_found": "This issue does not exist or has been deleted in this workspace.",
+    "not_found": "This issue does not exist or has been deleted in this space.",
     "breadcrumb_project_unknown": "Unknown project",
     "back": "Back",
     "title_placeholder": "Issue title",
@@ -335,7 +336,7 @@
     "quick_action_blocked": "{{name}} could not be triggered",
     "quick_action_posted": "Comment posted",
     "quick_action_blocked_title": "You can’t run this quick action",
-    "quick_action_blocked_body": "“{{name}}” runs as an agent you’re not allowed to trigger. Ask a workspace admin to make that agent available to the team, or to point this action at a shared one.",
+    "quick_action_blocked_body": "“{{name}}” runs as an agent you’re not allowed to trigger. Ask a space admin to make that agent available to the team, or to point this action at a shared one.",
     "quick_action_blocked_ok": "Got it",
     "pull_requests_loading": "Loading…",
     "pull_requests_empty": "No linked pull requests yet. Reference this issue's identifier in a PR's branch name, title, or body to auto-link it.",
@@ -382,7 +383,7 @@
     "unsubscribe_subtree": "Unsubscribe from this issue and its sub-issues",
     "unsubscribe_subtree_failed": "Could not unsubscribe from the sub-issues. Please try again.",
     "unsubscribe_subtree_succeeded": "Unsubscribed from this issue and its sub-issues.",
-    "unsubscribe_subtree_unsupported": "This workspace's server does not support unsubscribing from sub-issues yet. Try again after the next update.",
+    "unsubscribe_subtree_unsupported": "This space's server does not support unsubscribing from sub-issues yet. Try again after the next update.",
     "subscription_update_failed": "Could not update the subscription. Please try again.",
     "no_subscribers_results": "No results found",
     "change_subscribers_placeholder": "Change subscribers...",
@@ -677,7 +678,7 @@
     "delete_dialog_title_other": "Delete {{count}} issues?",
     "delete_dialog_desc_one": "This action cannot be undone. This will permanently delete the selected issue and all associated data.",
     "delete_dialog_desc_other": "This action cannot be undone. This will permanently delete the selected issues and all associated data.",
-    "delete_dialog_warning": "Any workspace member can delete issues.",
+    "delete_dialog_warning": "Any space member can delete issues.",
     "cancel": "Cancel"
   },
   "card": {
@@ -757,7 +758,7 @@
     }
   },
   "labels_panel": {
-    "intro": "Create and manage labels to categorize issues across your workspace.",
+    "intro": "Create and manage labels to categorize issues across your space.",
     "new_placeholder": "New label name…",
     "new_aria": "New label name",
     "add_action": "Add",
@@ -789,7 +790,7 @@
   },
   "save_view": {
     "title": "Save as view",
-    "hint_workspace": "Based on all workspace issues",
+    "hint_workspace": "Based on all space issues",
     "hint_my_any": "Based on My issues · All",
     "hint_my_assigned": "Based on My issues · Assigned",
     "hint_my_created": "Based on My issues · Created",
@@ -801,7 +802,7 @@
     "name_label": "Name",
     "visibility_label": "Visibility",
     "visibility_private": "Only visible to me",
-    "visibility_workspace": "Visible to workspace members",
+    "visibility_workspace": "Visible to space members",
     "filters_label": "Filters",
     "custom_property": "Custom property",
     "create": "Create view",
@@ -818,8 +819,8 @@
     "update": "Save changes",
     "toast_updated": "View updated",
     "toast_conflict": "Someone else edited this view — reopen it and try again",
-    "hint_workspace_members": "Based on workspace issues assigned to members",
-    "hint_workspace_agents": "Based on workspace issues assigned to agents",
+    "hint_workspace_members": "Based on space issues assigned to members",
+    "hint_workspace_agents": "Based on space issues assigned to agents",
     "scope_label_workspace": "Assignee type",
     "scope_label_my": "Relation to me",
     "variant_all": "Any assignee",
@@ -834,7 +835,7 @@
     "trigger": "Views",
     "empty": "No saved views yet",
     "private_group": "Private",
-    "shared_group": "Shared with workspace",
+    "shared_group": "Shared with space",
     "exit": "Exit view",
     "unavailable": "This view is no longer available",
     "edit": "Edit view"
@@ -870,7 +871,7 @@
     "hook_never_run": "This hook has not run yet.",
     "surface_loading": "Loading {{name}}…",
     "surface_unavailable": "{{name}} could not load its interface. The installed version may not include it.",
-    "surface_navigated": "{{name}} tried to replace its panel with a page loaded from elsewhere. It has been stopped and disconnected — tell your workspace admin."
+    "surface_navigated": "{{name}} tried to replace its panel with a page loaded from elsewhere. It has been stopped and disconnected — tell your space admin."
   },
   "flow": {
     "progress": "Step {{seq}}/{{total}} in progress",
@@ -878,5 +879,24 @@
     "waiting": "Waiting for the next owner to start",
     "start_leg": "Start step {{seq}}",
     "start_failed": "Failed to start"
+  },
+  "room": {
+    "parked_bar_name": "{{name}} has not bound an agent, so the task stopped on this step.",
+    "parked_bar_action": "Ask {{name}} to bind one",
+    "parked_bar_skip": "Move on without them",
+    "composer_placeholder": "Say something in this room…",
+    "members_title": "In this room",
+    "member_no_agent": "No agent — the relay stops here",
+    "member_agent": "Runs on {{agent}}",
+    "state_pending": "Not started",
+    "state_doing": "In progress",
+    "state_waiting": "Awaiting pickup",
+    "state_interrupted": "Run stopped",
+    "state_done": "Done",
+    "state_parked": "Stopped · waiting",
+    "state_skipped": "Skipped",
+    "state_unknown": "Unknown",
+    "resolved": "Resolved",
+    "skip_failed": "Could not move the relay on"
   }
 }

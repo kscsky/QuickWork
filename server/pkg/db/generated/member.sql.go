@@ -120,7 +120,13 @@ func (q *Queries) ListMembers(ctx context.Context, workspaceID pgtype.UUID) ([]M
 
 const listMembersWithUser = `-- name: ListMembersWithUser :many
 SELECT m.id, m.workspace_id, m.user_id, m.role, m.created_at,
-       u.name as user_name, u.email as user_email, u.avatar_url as user_avatar_url
+       u.name as user_name, u.email as user_email, u.avatar_url as user_avatar_url,
+       -- The identity this person registered under (onboarding questionnaire).
+       -- Coalesced to '' so the column is never NULL: "has not declared one"
+       -- and "declared an empty one" render the same way, and a NULL would add
+       -- a second empty case for every caller to handle.
+       (COALESCE(u.onboarding_questionnaire->>'role', ''))::text AS identity,
+       (COALESCE(u.onboarding_questionnaire->>'role_other', ''))::text AS identity_other
 FROM member m
 JOIN "user" u ON u.id = m.user_id
 WHERE m.workspace_id = $1
@@ -136,6 +142,8 @@ type ListMembersWithUserRow struct {
 	UserName      string             `json:"user_name"`
 	UserEmail     string             `json:"user_email"`
 	UserAvatarUrl pgtype.Text        `json:"user_avatar_url"`
+	Identity      string             `json:"identity"`
+	IdentityOther string             `json:"identity_other"`
 }
 
 func (q *Queries) ListMembersWithUser(ctx context.Context, workspaceID pgtype.UUID) ([]ListMembersWithUserRow, error) {
@@ -156,6 +164,8 @@ func (q *Queries) ListMembersWithUser(ctx context.Context, workspaceID pgtype.UU
 			&i.UserName,
 			&i.UserEmail,
 			&i.UserAvatarUrl,
+			&i.Identity,
+			&i.IdentityOther,
 		); err != nil {
 			return nil, err
 		}

@@ -7,6 +7,7 @@ import type { TimelineEntry } from "./activity";
 import type { Workspace, MemberWithUser, Invitation } from "./workspace";
 import type { Project } from "./project";
 import type { Label } from "./label";
+import type { SquadMessage } from "./squad";
 
 // WebSocket event types (matching Go server protocol/events.go)
 export type WSEventType =
@@ -70,6 +71,8 @@ export type WSEventType =
   | "squad:created"
   | "squad:updated"
   | "squad:deleted"
+  | "squad_message:created"
+  | "issue_chain:changed"
   | "label:created"
   | "label:updated"
   | "label:deleted"
@@ -622,6 +625,10 @@ export interface WSEventPayloadMap {
   "squad:created": unknown;
   "squad:updated": unknown;
   "squad:deleted": unknown;
+  // Carries the whole message: an open room appends without a refetch.
+  "squad_message:created": { squad_id: string; message: SquadMessage };
+  // A pointer, not a copy — the answer is always the server's chain.
+  "issue_chain:changed": { issue_id: string };
   "label:created": unknown;
   "label:updated": unknown;
   "label:deleted": unknown;

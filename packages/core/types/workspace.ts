@@ -93,6 +93,15 @@ export interface MemberWithUser {
   name: string;
   email: string;
   avatar_url: string | null;
+  /**
+   * The identity this person registered under (their onboarding role), so a
+   * room can show what someone does without a request per member. Absent on
+   * older backends; empty means they have not declared one — the two render
+   * the same way, so no caller needs to tell them apart.
+   */
+  identity?: string;
+  /** Free-text identity when `identity` is "other". */
+  identity_other?: string;
 }
 
 export interface Invitation {

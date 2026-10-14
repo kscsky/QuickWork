@@ -52,9 +52,6 @@ describe("parseTabSubject", () => {
       "/acme/inbox?view=archived&issue=MUL-9",
       { kind: "inbox", selectedKey: "MUL-9", archived: true },
     ],
-    ["/acme/chat", { kind: "chat", sessionId: null }],
-    ["/acme/chat?session=sess-1", { kind: "chat", sessionId: "sess-1" }],
-    ["/acme/chat?agent=ag-1", { kind: "chat", sessionId: null }],
     // Members list route does not exist
     ["/acme/members", { kind: "unknown" }],
     // Unknown / too short
@@ -73,9 +70,10 @@ describe("parseTabSubject", () => {
       kind: "issue",
       id: "bug-1",
     });
-    expect(parseTabSubject("/acme/chat?session=s1#x")).toEqual({
-      kind: "chat",
-      sessionId: "s1",
+    expect(parseTabSubject("/acme/inbox?view=archived#x")).toEqual({
+      kind: "inbox",
+      selectedKey: null,
+      archived: true,
     });
   });
 
@@ -90,8 +88,6 @@ describe("parseTabSubject", () => {
 describe("tabSubjectKey", () => {
   it("is stable for the same subject and distinct across selections", () => {
     expect(tabSubjectKey({ kind: "issue", id: "x" })).toBe("issue:x");
-    expect(tabSubjectKey({ kind: "chat", sessionId: null })).toBe("chat:");
-    expect(tabSubjectKey({ kind: "chat", sessionId: "s1" })).toBe("chat:s1");
     expect(
       tabSubjectKey({ kind: "actor", actorType: "member", id: "m1" }),
     ).toBe("actor:member:m1");

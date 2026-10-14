@@ -298,9 +298,13 @@ func renderMemberRow(ctx context.Context, q *db.Queries, m db.SquadMember, skill
 		}
 		// Mention syntax for humans uses the user_id (matches the rest of
 		// the product — see util.MentionRe and frontend mention payloads).
-		// Humans have no QuickWork skills, so no skills segment is rendered.
+		// Humans have no QuickWork skills, so the segment carries what they
+		// bring instead: the agent they lend, named with a mention so the
+		// leader can hand work straight to it.
 		userID := util.UUIDToString(m.MemberID)
-		return formatRosterRow(user.Name, "member (human)", role, "", formatMention(user.Name, "member", userID))
+		return formatRosterRow(user.Name, "member (human)", role,
+			lentAgentRosterSegment(ctx, q, m.AgentID),
+			formatMention(user.Name, "member", userID))
 	default:
 		return ""
 	}
@@ -349,4 +353,20 @@ func formatRosterRow(name, kind, role, skills, mention string) string {
 // uses the mention:// scheme with the entity type and UUID.
 func formatMention(name, mentionType, id string) string {
 	return "[@" + name + "](mention://" + mentionType + "/" + id + ")"
+}
+
+// lentAgentRosterSegment renders what a human member brings to the squad.
+//
+// Empty when they lend nothing, which is a normal state — a person can be in
+// the room purely to talk. A lookup failure says so rather than staying silent,
+// so the leader does not read a transient error as "this person has no agent".
+func lentAgentRosterSegment(ctx context.Context, q *db.Queries, agentID pgtype.UUID) string {
+	if !agentID.Valid {
+		return ""
+	}
+	ag, err := q.GetAgent(ctx, agentID)
+	if err != nil || ag.ArchivedAt.Valid {
+		return ""
+	}
+	return "lends " + formatMention(ag.Name, "agent", util.UUIDToString(agentID))
 }

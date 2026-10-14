@@ -399,6 +399,11 @@ export function onIssueCreated(
   qc.invalidateQueries({ queryKey: issueKeys.tableAll(wsId) });
   qc.invalidateQueries({ queryKey: issueKeys.assigneeGroupsAll(wsId) });
   qc.invalidateQueries({ queryKey: issueKeys.myAssigneeGroupsAll(wsId) });
+  // The control tower's orchestration queue and running-run title windows are
+  // plain windows, not bucket caches — nothing to patch in place, so they
+  // refetch. Fired on create/update/delete; each is at most one narrow query.
+  qc.invalidateQueries({ queryKey: issueKeys.unassigned(wsId) });
+  qc.invalidateQueries({ queryKey: issueKeys.byIdsAll(wsId) });
   if (issue.project_id) {
     qc.invalidateQueries({ queryKey: projectKeys.all(wsId) });
   }
@@ -503,6 +508,16 @@ export function onIssueUpdated(
   // Group counts, branch membership and hierarchy are server-owned. Never
   // guess deltas from a partial branch; refetch the active Table queries.
   qc.invalidateQueries({ queryKey: issueKeys.tableAll(wsId) });
+
+  // Queue membership turns on exactly two fields — has an assignee, and is
+  // still open — so only those flips earn a refetch of the control tower's
+  // unassigned window. The running-run title windows are keyed by id and hold
+  // whole rows, so any field change can invalidate them; a retitled run must
+  // not keep displaying its old name.
+  if (changed.assignee || changed.status) {
+    qc.invalidateQueries({ queryKey: issueKeys.unassigned(wsId) });
+  }
+  qc.invalidateQueries({ queryKey: issueKeys.byIdsAll(wsId) });
 
   // Invalidate old parent's children (issue was removed from it)
   if (oldParentId) {
@@ -762,4 +777,8 @@ export function onIssueDeleted(
   qc.invalidateQueries({ queryKey: issueKeys.assigneeGroupsAll(wsId) });
   qc.invalidateQueries({ queryKey: issueKeys.myAssigneeGroupsAll(wsId) });
   qc.invalidateQueries({ queryKey: projectKeys.all(wsId) });
+  // A deleted issue drops out of the orchestration queue, and any running-run
+  // window still naming it has to stop.
+  qc.invalidateQueries({ queryKey: issueKeys.unassigned(wsId) });
+  qc.invalidateQueries({ queryKey: issueKeys.byIdsAll(wsId) });
 }

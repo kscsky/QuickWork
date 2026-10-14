@@ -182,6 +182,14 @@ vi.mock("@quickwork/ui/components/ui/tooltip", () => ({
   ),
 }));
 
+vi.mock("../../platform/use-local-daemon-status", () => ({
+  useLocalDaemonStatus: () => ({
+    daemonId: "daemon-1",
+    deviceName: "Test Machine",
+    running: true,
+  }),
+}));
+
 const PROJECT: Project = {
   id: "project-1",
   workspace_id: "workspace-1",
@@ -340,5 +348,94 @@ describe("ProjectsPage compact row navigation", () => {
     }
     expect(push).not.toHaveBeenCalled();
     open.mockRestore();
+  });
+});
+
+// The schema-level matrix (drift, malformed payloads, unknown modes) is
+// canonical in packages/core/api/schemas.test.ts. These keep the render: the
+// card leads with the directory, and a project without one says so.
+describe("ProjectsPage card execution summary", () => {
+  const DIRECTORY = {
+    label: "/srv/quickwork",
+    local_path: "/srv/quickwork",
+    daemon_id: "daemon-1",
+    execution_mode: "worktree" as const,
+  };
+
+  beforeEach(() => {
+    mocks.projectViewState.viewMode = "comfortable";
+  });
+
+  // daemon-1 is the local daemon the platform mock reports.
+  it("leads with the local directory, its mode, and in-flight work", () => {
+    mocks.projects = [
+      { ...PROJECT, local_directory: DIRECTORY, active_task_count: 2 },
+    ];
+    renderProjects();
+
+    expect(screen.getByText("/srv/quickwork")).toBeInTheDocument();
+    expect(screen.getByText("Parallel")).toBeInTheDocument();
+    expect(screen.getByTitle("2 in flight")).toBeInTheDocument();
+    expect(screen.getByTitle("Runs on this machine")).toBeInTheDocument();
+  });
+
+  it("renders the direct badge for an in_place directory", () => {
+    mocks.projects = [
+      {
+        ...PROJECT,
+        local_directory: { ...DIRECTORY, execution_mode: "in_place" as const },
+      },
+    ];
+    renderProjects();
+
+    expect(screen.getByText("Direct")).toBeInTheDocument();
+    expect(screen.queryByText("Parallel")).not.toBeInTheDocument();
+  });
+
+  // A directory on another machine is still shown, but it must not read as
+  // runnable from here.
+  it("marks a directory owned by another daemon as unavailable here", () => {
+    mocks.projects = [
+      { ...PROJECT, local_directory: { ...DIRECTORY, daemon_id: "daemon-other" } },
+    ];
+    renderProjects();
+
+    expect(screen.getByText("/srv/quickwork")).toBeInTheDocument();
+    expect(
+      screen.getByTitle("Only available on the machine that registered this directory."),
+    ).toBeInTheDocument();
+    expect(screen.queryByTitle("Runs on this machine")).not.toBeInTheDocument();
+  });
+
+  // A renamed directory shows the name the user chose; the path stays reachable
+  // as the tooltip.
+  it("prefers a renamed label over the path", () => {
+    mocks.projects = [
+      {
+        ...PROJECT,
+        local_directory: { ...DIRECTORY, label: "quickwork", local_path: "D:\\work\\quickwork" },
+      },
+    ];
+    renderProjects();
+
+    expect(screen.getByText("quickwork")).toBeInTheDocument();
+    expect(screen.getByTitle("D:\\work\\quickwork")).toBeInTheDocument();
+  });
+
+  it("says a project without a directory has nowhere to run", () => {
+    renderProjects();
+
+    expect(
+      screen.getByText("No local directory — agents have nowhere to run"),
+    ).toBeInTheDocument();
+  });
+
+  it("shows the repo short label when the project has one", () => {
+    mocks.projects = [
+      { ...PROJECT, repo_url: "https://github.com/example/quickwork" },
+    ];
+    renderProjects();
+
+    expect(screen.getByText("example/quickwork")).toBeInTheDocument();
   });
 });

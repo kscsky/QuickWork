@@ -18,6 +18,11 @@
     "selected_other": "{{count}} 件選択中",
     "clear_selection": "選択を解除"
   },
+  "card": {
+    "no_directory": "ローカルディレクトリ未設定 — エージェントの実行先がありません",
+    "machine_local": "このマシンで実行",
+    "active_tasks_other": "{{count}} 件実行中"
+  },
   "table": {
     "name": "名前",
     "priority": "優先度",
@@ -55,6 +60,7 @@
     "months_ago": "{{count}}か月前"
   },
   "detail": {
+    "section_issues": "タスク",
     "not_found": "プロジェクトが見つかりません",
     "breadcrumb_fallback": "プロジェクト",
     "title_placeholder": "プロジェクトのタイトル",
@@ -97,6 +103,7 @@
     "toast_removed": "リソースを削除しました",
     "toast_remove_failed": "リソースを削除できませんでした",
     "add_local_directory_button": "ローカルディレクトリを追加",
+    "local_daemon_running": "デーモン稼働中",
     "local_daemon_offline_hint": "このマシンのディレクトリを添付するには、ローカルデーモンを起動してください。",
     "local_daemon_already_attached_hint": "このマシンにはすでにローカルディレクトリが添付されています。新しく追加するには、先に既存のものを削除してください。",
     "local_rename_tooltip": "名前を変更",

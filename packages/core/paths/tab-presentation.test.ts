@@ -165,28 +165,6 @@ describe("resolveTabPresentation — containers keep their icon, title tracks se
     });
   });
 
-  it("chat: icon is always MessageSquare; title is the session or Chat", () => {
-    expect(present("/acme/chat")).toEqual({
-      visual: { kind: "icon", icon: "MessageSquare" },
-      title: { kind: "nav", navKey: "chat" },
-    });
-    // New-chat draft (?agent=) has no session yet → stays Chat.
-    expect(present("/acme/chat?agent=ag1")).toEqual({
-      visual: { kind: "icon", icon: "MessageSquare" },
-      title: { kind: "nav", navKey: "chat" },
-    });
-    expect(
-      present("/acme/chat?session=s1", { chatSessionTitle: "Deploy plan" }),
-    ).toEqual({
-      visual: { kind: "icon", icon: "MessageSquare" },
-      title: { kind: "text", text: "Deploy plan" },
-    });
-    // Selected session still loading → Chat, not empty.
-    expect(present("/acme/chat?session=s1")).toEqual({
-      visual: { kind: "icon", icon: "MessageSquare" },
-      title: { kind: "nav", navKey: "chat" },
-    });
-  });
 });
 
 describe("resolveTabPresentation — flow and unknown", () => {

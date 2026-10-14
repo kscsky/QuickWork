@@ -18,6 +18,11 @@
     "selected_other": "{{count}}개 선택됨",
     "clear_selection": "선택 해제"
   },
+  "card": {
+    "no_directory": "로컬 디렉터리 없음 — 에이전트가 실행될 곳이 없습니다",
+    "machine_local": "이 기기에서 실행",
+    "active_tasks_other": "{{count}}개 진행 중"
+  },
   "table": {
     "name": "이름",
     "priority": "우선순위",
@@ -55,6 +60,7 @@
     "months_ago": "{{count}}개월 전"
   },
   "detail": {
+    "section_issues": "작업",
     "not_found": "프로젝트를 찾을 수 없습니다",
     "breadcrumb_fallback": "프로젝트",
     "title_placeholder": "프로젝트 제목",
@@ -97,6 +103,7 @@
     "toast_removed": "리소스를 제거했습니다",
     "toast_remove_failed": "리소스를 제거하지 못했습니다",
     "add_local_directory_button": "로컬 디렉터리 추가",
+    "local_daemon_running": "데몬 실행 중",
     "local_daemon_offline_hint": "이 기기의 디렉터리를 연결하려면 로컬 데몬을 시작하세요.",
     "local_daemon_already_attached_hint": "이 기기에는 이미 로컬 디렉터리가 연결되어 있습니다. 새로 추가하려면 먼저 기존 항목을 제거하세요.",
     "local_rename_tooltip": "이름 변경",

@@ -50,7 +50,7 @@ import {
   notificationPreferenceOptions,
   notificationPreferenceKeys,
 } from "../notification-preferences/queries";
-import { workspaceKeys, workspaceListOptions } from "../workspace/queries";
+import { appendSquadMessage, workspaceKeys, workspaceListOptions } from "../workspace/queries";
 import { isWorkspaceDeletePending } from "../workspace/pending-delete";
 import {
   showWebNotification,
@@ -118,6 +118,7 @@ import type {
   ChatSession,
   ChatSessionCreatedPayload,
   InvitationCreatedPayload,
+  SquadMessage,
 } from "../types";
 
 const chatWsLogger = createLogger("chat.ws");
@@ -680,6 +681,7 @@ function invalidateWorkspaceScopedQueries(qc: QueryClient): void {
   qc.invalidateQueries({ queryKey: issueKeys.usageAll() });
   qc.invalidateQueries({ queryKey: issueKeys.attachmentsAll() });
   qc.invalidateQueries({ queryKey: issueKeys.tasksAll() });
+  qc.invalidateQueries({ queryKey: issueKeys.chainAll() });
   // Per-chat-session caches are also keyed without wsId, so the
   // chatKeys.all(wsId) prefix above only reaches session lists / aggregates.
   // Message streams rely on WS invalidation with staleTime: Infinity; recover
@@ -801,6 +803,18 @@ export function useRealtimeSync(
           qc.invalidateQueries({ queryKey: issueKeys.all(wsId) });
         }
       },
+      // A room line is APPENDED, not invalidated: the payload carries the whole
+      // message, and refetching the page would re-render every line in an open
+      // room to add one. `appendSquadMessage` dedupes by id, so the poster —
+      // who also writes the row from their own mutation — sees it once.
+      squad_message: () => {},
+      // A task's relay moved: a step finished, or the chain parked. The
+      // payload names the issue, but the invalidation is a prefix — chain
+      // strips on screen are per-issue, and refetching the full detail page
+      // per step would be the expensive way to say the same thing.
+      issue_chain: () => {
+        qc.invalidateQueries({ queryKey: issueKeys.chainAll() });
+      },
       label: () => {
         // Label catalogs are independently scoped to issues, agents, and
         // skills. The generic event prefix does not carry the scope into this
@@ -914,6 +928,11 @@ export function useRealtimeSync(
         // every list-of-tasks query stale" so cache stays fresh even
         // when the relevant component isn't currently mounted.
         qc.invalidateQueries({ queryKey: ["issues", "tasks"] });
+        // A task's relay advances as a side effect of a run finishing, so
+        // the same lifecycle signal refreshes chain strips that are on
+        // screen — without this, a completed step keeps painting as
+        // "doing" until a manual reload.
+        qc.invalidateQueries({ queryKey: issueKeys.chainAll() });
         // Per-issue token usage card (issue-detail right rail). Same
         // shape as the tasks invalidation above — any task lifecycle
         // event shifts the aggregated usage numbers.
@@ -989,6 +1008,14 @@ export function useRealtimeSync(
     // No self-event filtering: actor_id identifies the USER, not the TAB.
     // Filtering by actor_id would block other tabs of the same user.
     // Instead, both mutations and WS handlers use dedup checks to be idempotent.
+
+    const unsubSquadMessage = ws.on("squad_message:created", (payload) => {
+      const p = payload as { squad_id?: string; message?: SquadMessage };
+      const wsId = getCurrentWsId();
+      if (wsId && p.squad_id && p.message) {
+        appendSquadMessage(qc, wsId, p.squad_id, p.message);
+      }
+    });
 
     const unsubIssueUpdated = ws.on("issue:updated", (p) => {
       const payload = p as IssueUpdatedPayload;
@@ -1690,6 +1717,7 @@ export function useRealtimeSync(
 
     return () => {
       unsubAny();
+      unsubSquadMessage();
       unsubIssueUpdated();
       unsubIssueCreated();
       unsubIssueDeleted();

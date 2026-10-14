@@ -112,6 +112,23 @@ export function useCreateIssue() {
   return useIssueCreateMutation((data: CreateIssueRequest) => api.createIssue(data));
 }
 
+/**
+ * Skips the chain step a task is parked on and carries the relay on.
+ *
+ * The response IS the chain as it now stands, so it is written straight into
+ * the per-issue cache. A failure leaves the parked step parked — nothing to
+ * roll back, which is why this mutation is deliberately not optimistic.
+ */
+export function useSkipChainStep(issueId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.skipIssueChainStep(issueId),
+    onSuccess: (chain) => {
+      qc.setQueryData(issueKeys.chain(issueId), chain);
+    },
+  });
+}
+
 export function useCreateCommentSubIssue() {
   return useIssueCreateMutation(({
     anchorCommentId,

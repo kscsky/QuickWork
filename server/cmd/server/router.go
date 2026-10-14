@@ -1769,6 +1769,9 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 				r.Post("/preview-trigger", h.PreviewIssueTrigger)
 				r.Post("/batch-update", h.BatchUpdateIssues)
 				r.Post("/batch-delete", h.BatchDeleteIssues)
+				// Relays for a whole page of tasks, for the task list's chain
+				// strips. Static segment, so it wins over the {id} route below.
+				r.Post("/chains", h.ListIssueChains)
 				r.Route("/{id}", func(r chi.Router) {
 					r.Get("/", h.GetIssue)
 					r.Put("/", h.UpdateIssue)
@@ -1788,6 +1791,11 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 					r.Post("/quick-actions/{quickActionId}/run", h.RunQuickAction)
 					r.Post("/quick-actions/{quickActionId}/render", h.RenderQuickAction)
 					r.Get("/task-runs", h.ListTasksByIssue)
+					// The task's relay: the ordered steps a squad task runs, and
+					// the parked state that means someone has no agent yet.
+					r.Get("/chain", h.ListIssueChain)
+					r.Post("/chain", h.CreateIssueChain)
+					r.Post("/chain/skip", h.SkipIssueChainStep)
 					r.Get("/usage", h.GetIssueUsage)
 					r.Post("/reactions", h.AddIssueReaction)
 					r.Delete("/reactions", h.RemoveIssueReaction)
@@ -1807,6 +1815,10 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 
 			// Task messages (user-facing, not daemon auth)
 			r.Get("/api/tasks/{taskId}/messages", h.ListTaskMessagesByUser)
+			// Resolves the issue a quick-create task produced. Empty until the
+			// run links it back, so this is a poll target rather than a field
+			// on the quick-create submit response.
+			r.Get("/api/tasks/{taskId}/issue", h.GetTaskIssue)
 			r.With(handler.RequireHumanActor).Post("/api/tasks/{taskId}/retry-source-context", h.RetrySourceContextQuickCreate)
 
 			// Issue quick actions (definitions; running one lives under
@@ -1883,6 +1895,13 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 					r.Post("/members", h.AddSquadMember)
 					r.Delete("/members", h.RemoveSquadMember)
 					r.Patch("/members/role", h.UpdateSquadMemberRole)
+					r.Patch("/members/work", h.UpdateSquadMemberWork)
+					r.Patch("/members/agent", h.UpdateSquadMemberAgent)
+					r.Get("/playbooks", h.ListSquadPlaybooks)
+					r.Post("/playbooks", h.SaveSquadPlaybook)
+					r.Delete("/playbooks/{playbookId}", h.DeleteSquadPlaybook)
+					r.Get("/messages", h.ListSquadMessages)
+					r.Post("/messages", h.CreateSquadMessage)
 				})
 			})
 

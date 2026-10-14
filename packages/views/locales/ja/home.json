@@ -1,0 +1,113 @@
+{
+  "tower": {
+    "title": "管制塔",
+    "squads": {
+      "title": "スクワッド",
+      "new": "新規",
+      "load_of": "{{total}} 体中 {{working}} 体が稼働中",
+      "load": {
+        "none": "エージェントなし",
+        "idle": "空き",
+        "partial": "余裕あり",
+        "full": "満稼働"
+      },
+      "holding_other": "{{count}} 件を担当",
+      "nothing_held": "進行中の担当なし",
+      "members_other": "メンバー {{count}} 名"
+    },
+    "queue": {
+      "title": "編成待ち",
+      "empty": "担当者のいないタスクはありません",
+      "waiting_for": "{{duration}} 待機",
+      "dispatched": "割り当てました",
+      "dispatch_failed": "割り当てに失敗しました"
+    },
+    "agents": {
+      "title": "エージェント",
+      "empty": "エージェントがまだありません",
+      "busy": "稼働中",
+      "idle": "空き",
+      "idle_short": "待機",
+      "queued_only_other": "{{count}} 件待ち、未着手",
+      "queue_depth_other": "{{count}} 件待ち",
+      "holding_unnamed": "タスクを処理中"
+    }
+  },
+  "summary": {
+    "running": "稼働中",
+    "unassigned": "編成待ち",
+    "agents_busy": "エージェント稼働",
+    "agents_idle_other": "{{count}} 体が空き"
+  },
+  "composer": {
+    "squad_label": "スクワッド",
+    "squad_placeholder": "スクワッドを選択",
+    "squad_search_placeholder": "スクワッドを検索...",
+    "squad_empty": "一致するスクワッドがありません",
+    "new_squad": "スクワッドを作成",
+    "prompt_placeholder": "このスクワッドに何をさせますか？",
+    "submit": "編成を開始",
+    "submitting": "開始中...",
+    "linking": "タスクを作成中...",
+    "hint": "Enter で開始、Shift + Enter で改行",
+    "no_squad_selected": "先にスクワッドを選択してください"
+  },
+  "compose": {
+    "title": "編成",
+    "pick_squad": "チームを選択",
+    "start": "編成を開始",
+    "starting": "作成中…",
+    "start_hint": "⌘↵ で開始",
+    "from": "引き継ぎフローから開始",
+    "blank_route": "空のルート",
+    "edited_other": "{{count}} 件変更",
+    "playbook_note": "引き継ぎフローは「誰がどの工程か」を記録します。人が変わったら紐付けを変えるだけ",
+    "drag_hint": "ノードにドロップして担当を変更",
+    "save_as": "別名で保存",
+    "playbook_name_placeholder": "引き継ぎフローの名前",
+    "save": "保存",
+    "task_node": "やること",
+    "leader_locked": "リーダー · 常に最初の工程",
+    "no_agent": "エージェント未設定",
+    "remove_step": "この工程を削除",
+    "unknown_holder": "不明な担当者",
+    "parked_step": "ここで停止",
+    "empty_route": "工程がまだありません。左から人をドラッグするか、そのまま開始してください。ルート未指定ならチームの既定順になります。",
+    "playbook_count": "引き継ぎフロー",
+    "parked_warning_other": "{{count}} 件の工程がエージェント設定待ちで停止します",
+    "step_placeholder": "この工程の内容",
+    "playbook_saved": "引き継ぎフローとして保存しました",
+    "playbook_save_failed": "引き継ぎフローを保存できませんでした",
+    "ask": "このチームに何をさせますか？",
+    "ask_sub": "欲しい結果を書いてください。あとはチームが組み立てます。",
+    "route_label": "この順で進みます",
+    "route_edit": "変更",
+    "route_done": "閉じる",
+    "parked_notice": "{{name}} はエージェント未設定のため、タスクはこの工程で停止して待ちます。スキップでも失敗でもありません。",
+    "from_blank": "経路：チーム既定順",
+    "from_squad_order": "チーム既定順",
+    "leader_tag": "リーダー · 常に最初",
+    "squad_default": "{{agent}} · チーム既定",
+    "add_step": "工程を追加",
+    "agent_rule": "本人が作成したエージェントのみ",
+    "squad_default_none": "チームの既定が未設定（この工程で停止します）"
+  },
+  "empty": {
+    "title": "スクワッドがまだありません",
+    "description": "スクワッドは、1 人のリーダーが率いるエージェントとメンバーの集まりです。作成して最初のワークフローを編成しましょう。",
+    "cta": "スクワッドを作成"
+  },
+  "toasts": {
+    "started": "ワークフローを開始しました",
+    "failed": "ワークフローの開始に失敗しました",
+    "pending": "エージェントはまだ起動中です。タスクはまもなく一覧に表示されます。",
+    "chain_failed": "タスクは作成されましたが、リレーのルートを書き込めませんでした",
+    "agent_offline": "実行を担当するエージェントがオフラインです——そのマシンでデーモンを起動してから、もう一度編成を開始してください。",
+    "agent_no_runtime": "このエージェントはまだランタイムにバインドされていません——マシンをバインドしてから、もう一度編成を開始してください。",
+    "agent_cli_unusable": "エージェントのマシンの CLI はインストール済みですが実行できません——CLI を再インストールしてから、もう一度編成を開始してください。",
+    "agent_archived": "実行を担当するエージェントはアーカイブ済みです——別のエージェントかスクワッドを選んでください。",
+    "agent_unavailable": "エージェントは現在利用できません——マシンの復帰を待つか、別のエージェントを選んでください。",
+    "daemon_version": "このエージェントのデーモンのバージョンが古すぎます（現在 {{current}}、{{min}} 以上が必要）——アップグレードしてから、もう一度編成を開始してください。",
+    "version_unknown": "不明"
+  }
+}

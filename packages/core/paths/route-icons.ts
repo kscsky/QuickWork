@@ -23,6 +23,7 @@ export type RouteIconName =
   | "Inbox"
   | "MessageSquare"
   | "CircleUser"
+  | "Gauge"
   | "ListTodo"
   | "FolderKanban"
   | "Zap"
@@ -45,7 +46,8 @@ export type RouteIconName =
 /** i18n label key (under the `layout.nav` namespace) for a page. */
 export type NavLabelKey =
   | "inbox"
-  | "chat"
+  | "dispatch"
+  | "tasks"
   | "my_issues"
   | "issues"
   | "projects"
@@ -60,7 +62,8 @@ export type NavLabelKey =
 /** Stable identifier for each workspace navigation page. */
 export type WorkspacePageKey =
   | "inbox"
-  | "chat"
+  | "dispatch"
+  | "tasks"
   | "myIssues"
   | "issues"
   | "projects"
@@ -87,7 +90,11 @@ export interface WorkspacePage {
  */
 export const WORKSPACE_PAGES: Record<WorkspacePageKey, WorkspacePage> = {
   inbox: { segment: "inbox", icon: "Inbox", navKey: "inbox" },
-  chat: { segment: "chat", icon: "MessageSquare", navKey: "chat" },
+  dispatch: { segment: "dispatch", icon: "Gauge", navKey: "dispatch" },
+  // The relay feed: every task with its chain, who holds it right now, and
+  // where it has stopped. A page of its own rather than the issues list
+  // because progress here is "which step", not a status column.
+  tasks: { segment: "tasks", icon: "ListTodo", navKey: "tasks" },
   myIssues: { segment: "my-issues", icon: "CircleUser", navKey: "my_issues" },
   issues: { segment: "issues", icon: "ListTodo", navKey: "issues" },
   projects: { segment: "projects", icon: "FolderKanban", navKey: "projects" },

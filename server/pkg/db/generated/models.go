@@ -799,6 +799,19 @@ type Issue struct {
 	LastActivityAt     pgtype.Timestamptz `json:"last_activity_at"`
 }
 
+type IssueChainStep struct {
+	ID           pgtype.UUID        `json:"id"`
+	IssueID      pgtype.UUID        `json:"issue_id"`
+	Position     int32              `json:"position"`
+	HolderUserID pgtype.UUID        `json:"holder_user_id"`
+	AgentID      pgtype.UUID        `json:"agent_id"`
+	Title        string             `json:"title"`
+	State        string             `json:"state"`
+	StartedAt    pgtype.Timestamptz `json:"started_at"`
+	CompletedAt  pgtype.Timestamptz `json:"completed_at"`
+	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+}
+
 type IssueDependency struct {
 	ID               pgtype.UUID `json:"id"`
 	IssueID          pgtype.UUID `json:"issue_id"`
@@ -1291,12 +1304,37 @@ type Squad struct {
 }
 
 type SquadMember struct {
+	ID             pgtype.UUID        `json:"id"`
+	SquadID        pgtype.UUID        `json:"squad_id"`
+	MemberType     string             `json:"member_type"`
+	MemberID       pgtype.UUID        `json:"member_id"`
+	Role           string             `json:"role"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	CanReceiveWork bool               `json:"can_receive_work"`
+	AgentID        pgtype.UUID        `json:"agent_id"`
+}
+
+type SquadMessage struct {
 	ID         pgtype.UUID        `json:"id"`
 	SquadID    pgtype.UUID        `json:"squad_id"`
-	MemberType string             `json:"member_type"`
-	MemberID   pgtype.UUID        `json:"member_id"`
-	Role       string             `json:"role"`
+	AuthorType string             `json:"author_type"`
+	AuthorID   pgtype.UUID        `json:"author_id"`
+	Body       string             `json:"body"`
+	Kind       string             `json:"kind"`
+	Metadata   []byte             `json:"metadata"`
 	CreatedAt  pgtype.Timestamptz `json:"created_at"`
+}
+
+type SquadPlaybook struct {
+	ID          pgtype.UUID        `json:"id"`
+	WorkspaceID pgtype.UUID        `json:"workspace_id"`
+	SquadID     pgtype.UUID        `json:"squad_id"`
+	Name        string             `json:"name"`
+	Description string             `json:"description"`
+	Steps       []byte             `json:"steps"`
+	CreatedBy   pgtype.UUID        `json:"created_by"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
 }
 
 type SysCronExecution struct {

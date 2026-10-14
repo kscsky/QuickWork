@@ -43,7 +43,37 @@ type ProjectResponse struct {
 	// /api/projects/{id}/resources. Resources themselves stay out of this
 	// payload to keep parent metadata and child collections separate; clients
 	// that need the list call ListProjectResources directly.
+	//
+	// LocalDirectory and RepoLabel are the exception, and only on LIST-shaped
+	// responses: a project's local directory is what distinguishes it from
+	// every other project on the projects list, so the summary travels with
+	// the row instead of costing one resources request per card.
 	ResourceCount int64 `json:"resource_count"`
+	// LocalDirectory is the project's first local_directory resource by
+	// position, or nil when the project has none. That is the project's primary
+	// execution landing spot; other machines' directories stay in the
+	// sub-collection.
+	LocalDirectory *ProjectLocalDirectory `json:"local_directory,omitempty"`
+	// RepoURL is the first github_repo resource's URL by position. The raw URL,
+	// not a display label: the client already owns GitHub URL shortening
+	// (githubShortLabel), and duplicating that rule here would let the two
+	// drift.
+	RepoURL *string `json:"repo_url,omitempty"`
+	// ActiveTaskCount is in-flight work attributed to this project — queued,
+	// dispatched, running, or waiting for the directory lock. Not omitempty:
+	// zero is a fact clients render, not a missing value.
+	ActiveTaskCount int64 `json:"active_task_count"`
+}
+
+// ProjectLocalDirectory is the list-shaped summary of a project's local
+// directory resource. ExecutionMode is always populated: an absent value on the
+// stored ref means in_place, and that default is applied here so clients can
+// trust the field instead of re-deriving it.
+type ProjectLocalDirectory struct {
+	Label         string `json:"label"`
+	LocalPath     string `json:"local_path"`
+	DaemonID      string `json:"daemon_id"`
+	ExecutionMode string `json:"execution_mode"`
 }
 
 func projectToResponse(p db.Project) ProjectResponse {
@@ -96,6 +126,140 @@ func (h *Handler) loadProjectResourceCount(ctx context.Context, projectID pgtype
 		return 0
 	}
 	return rows[0].ResourceCount
+}
+
+// projectEnrichment is the batch-loaded per-project data every list-shaped
+// project response carries. ListProjects and SearchProjects render the same
+// rows, so both load it and apply it through these two functions instead of
+// each keeping a copy of the same four loops.
+type projectEnrichment struct {
+	stats          map[string]db.GetProjectIssueStatsRow
+	resourceCounts map[string]int64
+	resources      map[string][]db.ProjectResource
+	activeTasks    map[string]int64
+}
+
+func newProjectEnrichment() projectEnrichment {
+	return projectEnrichment{
+		stats:          make(map[string]db.GetProjectIssueStatsRow),
+		resourceCounts: make(map[string]int64),
+		resources:      make(map[string][]db.ProjectResource),
+		activeTasks:    make(map[string]int64),
+	}
+}
+
+// loadProjectEnrichment runs the enrichment queries in batch. Every query is
+// best-effort: one failing degrades its field to the zero value rather than
+// failing the whole list, matching the previous per-query behavior.
+func (h *Handler) loadProjectEnrichment(
+	ctx context.Context,
+	workspaceID pgtype.UUID,
+	projectIDs []pgtype.UUID,
+) projectEnrichment {
+	e := newProjectEnrichment()
+	if len(projectIDs) == 0 {
+		return e
+	}
+	stats, err := h.Queries.GetProjectIssueStats(ctx, db.GetProjectIssueStatsParams{
+		WorkspaceID:        workspaceID,
+		ProjectIds:         projectIDs,
+		TerminalStatusKeys: h.projectTerminalIssueStatusKeys(ctx, workspaceID),
+	})
+	if err == nil {
+		for _, s := range stats {
+			e.stats[uuidToString(s.ProjectID)] = s
+		}
+	}
+	counts, err := h.Queries.GetProjectResourceCounts(ctx, projectIDs)
+	if err == nil {
+		for _, c := range counts {
+			e.resourceCounts[uuidToString(c.ProjectID)] = c.ResourceCount
+		}
+	}
+	// One read serves both the local-directory summary and the repo URL:
+	// ListProjectResourcesForProjects returns every resource ordered by
+	// (project, position), so "first of each type" is just the first matching
+	// row in the group.
+	resources, err := h.Queries.ListProjectResourcesForProjects(ctx, projectIDs)
+	if err == nil {
+		for _, res := range resources {
+			id := uuidToString(res.ProjectID)
+			e.resources[id] = append(e.resources[id], res)
+		}
+	}
+	tasks, err := h.Queries.GetProjectActiveTaskCounts(ctx, db.GetProjectActiveTaskCountsParams{
+		WorkspaceID: workspaceID,
+		ProjectIds:  projectIDs,
+	})
+	if err == nil {
+		for _, t := range tasks {
+			e.activeTasks[uuidToString(t.ProjectID)] = t.ActiveCount
+		}
+	}
+	return e
+}
+
+func applyProjectEnrichment(resp []ProjectResponse, e projectEnrichment) {
+	for i := range resp {
+		if s, ok := e.stats[resp[i].ID]; ok {
+			resp[i].IssueCount = s.TotalCount
+			resp[i].DoneCount = s.DoneCount
+		}
+		resp[i].ResourceCount = e.resourceCounts[resp[i].ID]
+		resp[i].ActiveTaskCount = e.activeTasks[resp[i].ID]
+		for _, res := range e.resources[resp[i].ID] {
+			switch res.ResourceType {
+			case "local_directory":
+				if resp[i].LocalDirectory == nil {
+					resp[i].LocalDirectory = localDirectorySummary(res)
+				}
+			case "github_repo":
+				if resp[i].RepoURL == nil {
+					var ref githubRepoRef
+					if err := json.Unmarshal(res.ResourceRef, &ref); err == nil && ref.URL != "" {
+						url := ref.URL
+						resp[i].RepoURL = &url
+					}
+				}
+			}
+		}
+	}
+}
+
+// localDirectorySummary projects a stored local_directory row into the
+// list-shaped summary. A ref that fails to decode yields nil rather than a
+// zero-valued entry, so a corrupt row reads as "no directory" instead of
+// rendering a blank path as if it were real.
+func localDirectorySummary(res db.ProjectResource) *ProjectLocalDirectory {
+	var ref localDirectoryRef
+	if err := json.Unmarshal(res.ResourceRef, &ref); err != nil || ref.LocalPath == "" {
+		return nil
+	}
+	// Label precedence matches localDirectoryLabel on the client: the row
+	// column (what current renames write) outranks the legacy copy inside the
+	// ref, and the path is the last resort.
+	label := ""
+	if res.Label.Valid {
+		label = strings.TrimSpace(res.Label.String)
+	}
+	if label == "" {
+		label = strings.TrimSpace(ref.Label)
+	}
+	if label == "" {
+		label = strings.TrimSpace(ref.LocalPath)
+	}
+	// Absent execution_mode means in_place. Resolving it here is what lets the
+	// client treat the field as always populated.
+	mode := ref.ExecutionMode
+	if mode != localDirectoryModeWorktree {
+		mode = localDirectoryModeInPlace
+	}
+	return &ProjectLocalDirectory{
+		Label:         label,
+		LocalPath:     ref.LocalPath,
+		DaemonID:      ref.DaemonID,
+		ExecutionMode: mode,
+	}
 }
 
 type CreateProjectRequest struct {
@@ -157,42 +321,17 @@ func (h *Handler) ListProjects(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Batch-fetch issue stats and resource counts for all projects
-	statsMap := make(map[string]db.GetProjectIssueStatsRow)
-	resourceCountMap := make(map[string]int64)
-	if len(projects) > 0 {
-		projectIDs := make([]pgtype.UUID, len(projects))
-		for i, p := range projects {
-			projectIDs[i] = p.ID
-		}
-		terminalStatusKeys := h.projectTerminalIssueStatusKeys(r.Context(), wsUUID)
-		stats, statsErr := h.Queries.GetProjectIssueStats(r.Context(), db.GetProjectIssueStatsParams{
-			WorkspaceID:        wsUUID,
-			ProjectIds:         projectIDs,
-			TerminalStatusKeys: terminalStatusKeys,
-		})
-		if statsErr == nil {
-			for _, s := range stats {
-				statsMap[uuidToString(s.ProjectID)] = s
-			}
-		}
-		counts, err := h.Queries.GetProjectResourceCounts(r.Context(), projectIDs)
-		if err == nil {
-			for _, c := range counts {
-				resourceCountMap[uuidToString(c.ProjectID)] = c.ResourceCount
-			}
-		}
+	projectIDs := make([]pgtype.UUID, len(projects))
+	for i, p := range projects {
+		projectIDs[i] = p.ID
 	}
+	enrichment := h.loadProjectEnrichment(r.Context(), wsUUID, projectIDs)
 
 	resp := make([]ProjectResponse, len(projects))
 	for i, p := range projects {
 		resp[i] = projectToResponse(p)
-		if s, ok := statsMap[resp[i].ID]; ok {
-			resp[i].IssueCount = s.TotalCount
-			resp[i].DoneCount = s.DoneCount
-		}
-		resp[i].ResourceCount = resourceCountMap[resp[i].ID]
 	}
+	applyProjectEnrichment(resp, enrichment)
 	writeJSON(w, http.StatusOK, map[string]any{"projects": resp, "total": len(resp)})
 }
 
@@ -912,43 +1051,22 @@ func (h *Handler) SearchProjects(w http.ResponseWriter, r *http.Request) {
 		total = results[0].totalCount
 	}
 
-	// Batch-fetch issue stats and resource counts
-	statsMap := make(map[string]db.GetProjectIssueStatsRow)
-	resourceCountMap := make(map[string]int64)
-	if len(results) > 0 {
-		projectIDs := make([]pgtype.UUID, len(results))
-		for i, r := range results {
-			projectIDs[i] = r.project.ID
-		}
-		terminalStatusKeys := h.projectTerminalIssueStatusKeys(ctx, wsUUID)
-		stats, statsErr := h.Queries.GetProjectIssueStats(ctx, db.GetProjectIssueStatsParams{
-			WorkspaceID:        wsUUID,
-			ProjectIds:         projectIDs,
-			TerminalStatusKeys: terminalStatusKeys,
-		})
-		if statsErr == nil {
-			for _, s := range stats {
-				statsMap[uuidToString(s.ProjectID)] = s
-			}
-		}
-		counts, err := h.Queries.GetProjectResourceCounts(ctx, projectIDs)
-		if err == nil {
-			for _, c := range counts {
-				resourceCountMap[uuidToString(c.ProjectID)] = c.ResourceCount
-			}
-		}
+	projectIDs := make([]pgtype.UUID, len(results))
+	for i, r := range results {
+		projectIDs[i] = r.project.ID
 	}
+	enrichment := h.loadProjectEnrichment(ctx, wsUUID, projectIDs)
+
+	base := make([]ProjectResponse, len(results))
+	for i, row := range results {
+		base[i] = projectToResponse(row.project)
+	}
+	applyProjectEnrichment(base, enrichment)
 
 	resp := make([]SearchProjectResponse, len(results))
 	for i, row := range results {
-		pr := projectToResponse(row.project)
-		if s, ok := statsMap[pr.ID]; ok {
-			pr.IssueCount = s.TotalCount
-			pr.DoneCount = s.DoneCount
-		}
-		pr.ResourceCount = resourceCountMap[pr.ID]
 		spr := SearchProjectResponse{
-			ProjectResponse: pr,
+			ProjectResponse: base[i],
 			MatchSource:     row.matchSource,
 		}
 		if row.matchSource == "description" {

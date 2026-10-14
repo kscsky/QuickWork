@@ -32,7 +32,7 @@ import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@quickwork/
 import { CappedNumberFlow } from "@quickwork/ui/components/ui/number-flow";
 import { StatusIcon } from "../issues/components/status-icon";
 import { useIssueDraftStore } from "@quickwork/core/issues/stores/draft-store";
-import { openCreateIssueWithPreference } from "@quickwork/core/issues/stores/create-mode-store";
+import { openCreateIssue } from "@quickwork/core/issues/stores/create-mode-store";
 import {
   Sidebar,
   SidebarContent,
@@ -68,9 +68,6 @@ import { workspaceListOptions, myInvitationListOptions, workspaceKeys } from "@q
 import { resolvePublicFileUrl } from "@quickwork/core/workspace/avatar-url";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { inboxKeys, deduplicateInboxItems, inboxUnreadSummaryOptions, hasOtherWorkspaceUnread, unreadWorkspaceIds } from "@quickwork/core/inbox/queries";
-import { chatSessionsOptions } from "@quickwork/core/chat/queries";
-import { countUnreadChatMessages } from "@quickwork/core/chat/unread";
-import { useChatStore } from "@quickwork/core/chat";
 import { api, ApiError } from "@quickwork/core/api";
 import { useConfigStore } from "@quickwork/core/config";
 import { pinListOptions } from "@quickwork/core/pins/queries";
@@ -81,12 +78,12 @@ import type { PinnedItem } from "@quickwork/core/types";
 import { useLogout } from "../auth";
 import { ProjectIcon } from "../projects/components/project-icon";
 import { routeIconForPath } from "./route-icon-components";
+import { useRunningWork, type RunningWork } from "./sidebar-running-runs";
 import { useT } from "../i18n";
 import {
   useShortcut,
 } from "@quickwork/core/shortcuts";
 import { ShortcutKeycaps } from "../common/shortcut-keycaps";
-import { useAppForeground } from "../common/use-app-foreground";
 
 // Zone → class, spelled out: Tailwind's source scan only sees literal utility
 // names, so a template such as `bg-zone-${n}` would be dropped from the build
@@ -110,6 +107,111 @@ function isNavActive(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(href + "/");
 }
 
+/**
+ * Shared by all four nav groups. The V3 card skin: each row is its own
+ * rounded card, the icon sits in a tinted tile, and the selected one floats
+ * (surface fill + border + shadow) with a brand rail on the sidebar's edge.
+ *
+ * Hover paints a card too, so selection survives it on the dimensions hover
+ * does not touch: the shadow, the rail, the weight, and the text color. A
+ * selected row keeps its surface fill while hovered (`data-active:hover:`)
+ * rather than falling back to the hover tint.
+ */
+const NAV_BUTTON_CLASS =
+  "h-auto gap-2.5 rounded-[calc(var(--radius)*1.4)] border border-transparent " +
+  "px-2.5 py-[7px] text-muted-foreground " +
+  "hover:not-data-active:border-surface-border hover:not-data-active:bg-surface hover:not-data-active:text-foreground " +
+  "data-active:border-surface-border data-active:bg-surface data-active:text-foreground " +
+  "data-active:font-medium data-active:shadow-[var(--shadow-surface)] " +
+  "data-active:hover:bg-surface data-active:hover:text-foreground data-active:hover:border-surface-border";
+
+/** The icon tile per nav item: a tinted square instead of a bare glyph. */
+const NAV_TILE: Partial<Record<NavKey, string>> = {
+  inbox: "bg-zone-1/20 text-zone-1",
+  dispatch: "bg-zone-6/20 text-zone-6",
+  tasks: "bg-zone-1/20 text-zone-1",
+  projects: "bg-zone-2/20 text-zone-2",
+  autopilots: "bg-zone-5/20 text-zone-5",
+  agents: "bg-zone-8/20 text-zone-8",
+  squads: "bg-zone-4/20 text-zone-4",
+  usage: "bg-zone-3/20 text-zone-3",
+  runtimes: "bg-zone-3/20 text-zone-3",
+  skills: "bg-zone-4/20 text-zone-4",
+  settings: "bg-zone-6/20 text-zone-6",
+};
+
+function NavTile({
+  navKey,
+  Icon,
+}: {
+  navKey: NavKey;
+  Icon: React.ComponentType<{ className?: string }>;
+}) {
+  return (
+    <span
+      className={cn(
+        "grid size-[26px] shrink-0 place-items-center rounded-[7px]",
+        NAV_TILE[navKey] ?? "bg-muted text-muted-foreground",
+      )}
+    >
+      <Icon className="!size-3.5" />
+    </span>
+  );
+}
+
+/** The outside rail that marks the current page on a selected card. */
+function NavActiveRail() {
+  return (
+    <span
+      aria-hidden="true"
+      className="absolute -left-2 top-[9px] bottom-[9px] w-0.5 rounded-r bg-brand"
+    />
+  );
+}
+
+/** Group headings: small, spaced, with a hairline running to the edge. */
+const GROUP_LABEL_CLASS =
+  "mt-1 h-auto gap-2 px-2.5 pt-3 pb-1.5 text-micro font-medium uppercase " +
+  "tracking-[0.1em] text-faint-foreground after:h-px after:flex-1 after:bg-border";
+
+/**
+ * The one number a nav row is worth. Only the two surfaces that actually hold
+ * live work carry one: a count on every row is noise that trains people to stop
+ * reading any of them.
+ */
+function navCountText(
+  work: RunningWork,
+  t: ReturnType<typeof useT<"layout">>["t"],
+): Partial<Record<NavKey, { text: string; hot: boolean }>> {
+  const counts: Partial<Record<NavKey, { text: string; hot: boolean }>> = {};
+  if (work.runs.length > 0) {
+    counts.dispatch = {
+      text: t(($) => $.sidebar.nav_running, { count: work.runs.length }),
+      hot: true,
+    };
+  }
+  if (work.busyAgents > 0) {
+    counts.agents = {
+      text: t(($) => $.sidebar.nav_busy, { count: work.busyAgents }),
+      hot: true,
+    };
+  }
+  return counts;
+}
+
+function NavCount({ text, hot }: { text: string; hot: boolean }) {
+  return (
+    <span
+      className={cn(
+        "ml-auto shrink-0 text-micro tabular-nums",
+        hot ? "text-inflight" : "text-faint-foreground",
+      )}
+    >
+      {text}
+    </span>
+  );
+}
+
 // Stable empty arrays for query defaults. Using an inline `= []` default on
 // `useQuery` creates a new array reference on every render when `data` is
 // undefined (e.g. query disabled or loading) — which in turn breaks any
@@ -126,9 +228,8 @@ const EMPTY_INBOX_SUMMARY: Awaited<ReturnType<typeof api.getInboxUnreadSummary>>
 // Only parameterless paths are valid nav destinations.
 type NavKey =
   | "inbox"
-  | "chat"
-  | "myIssues"
-  | "issues"
+  | "dispatch"
+  | "tasks"
   | "projects"
   | "autopilots"
   | "agents"
@@ -142,9 +243,8 @@ type NavKey =
 // icons derived from the destination path via routeIconForPath.
 type NavLabelKey =
   | "inbox"
-  | "chat"
-  | "my_issues"
-  | "issues"
+  | "dispatch"
+  | "tasks"
   | "projects"
   | "autopilots"
   | "agents"
@@ -159,12 +259,11 @@ type NavLabelKey =
 // always agree. See route-icon-components.tsx.
 const personalNav: { key: NavKey; labelKey: NavLabelKey }[] = [
   { key: "inbox", labelKey: "inbox" },
-  { key: "chat", labelKey: "chat" },
-  { key: "myIssues", labelKey: "my_issues" },
 ];
 
 const workspaceNav: { key: NavKey; labelKey: NavLabelKey }[] = [
-  { key: "issues", labelKey: "issues" },
+  { key: "dispatch", labelKey: "dispatch" },
+  { key: "tasks", labelKey: "tasks" },
   { key: "projects", labelKey: "projects" },
   { key: "autopilots", labelKey: "autopilots" },
   { key: "agents", labelKey: "agents" },
@@ -470,35 +569,6 @@ export function AppSidebar({ topSlot, searchSlot, headerClassName, headerStyle }
     () => deduplicateInboxItems(inboxItems).filter((i) => !i.read).length,
     [inboxItems],
   );
-  // Chat tab unread badge: IM-style total of unread *messages* across chat
-  // threads (countUnreadChatMessages is the shared definition — mobile's tab
-  // badge derives from the same function, keeping the platforms in agreement).
-  const { data: chatSessions = [] } = useQuery({
-    ...chatSessionsOptions(wsId ?? ""),
-    enabled: !!wsId,
-  });
-  // The session the user is reading right now must not count: the thread list
-  // renders its row badge as 0 (auto mark-read is about to clear it), and a
-  // reply landing in the open conversation would otherwise flash a sidebar
-  // count with no matching row. "Reading right now" = a session is active, a
-  // chat surface is actually showing it (chat page route or the floating
-  // window), AND the app is in the foreground. When the app is backgrounded,
-  // auto mark-read is suppressed (MUL-4485) so the reply stays unread — the
-  // badge must count it, or the notification is silently eaten while the user
-  // is away. A remembered selection while both surfaces are closed also still
-  // counts, for the same reason.
-  const activeChatSessionId = useChatStore((s) => s.activeSessionId);
-  const floatingChatOpen = useChatStore((s) => s.isOpen);
-  const appForeground = useAppForeground();
-  const chatHref = p.chat();
-  const viewedChatSessionId =
-    appForeground && (floatingChatOpen || isNavActive(pathname, chatHref))
-      ? activeChatSessionId
-      : null;
-  const chatUnreadCount = React.useMemo(
-    () => countUnreadChatMessages(chatSessions, viewedChatSessionId),
-    [chatSessions, viewedChatSessionId],
-  );
   // Cross-workspace unread summary backs the workspace-switcher dot. One
   // shared cache entry across workspaces; gated on an active workspace since
   // the endpoint resolves through the workspace-member middleware.
@@ -550,6 +620,14 @@ export function AppSidebar({ topSlot, searchSlot, headerClassName, headerStyle }
     setLocalPinnedWsId(wsId ?? null);
   }, [wsId]);
   const visiblePinned = localPinnedWsId === (wsId ?? null) ? localPinned : EMPTY_PINS;
+  // One subscription backs the "in flight" block, the per-nav counts and the
+  // footer — see useRunningWork for why they share a derivation rather than
+  // three separate queries.
+  const runningWork = useRunningWork(wsId ?? "");
+  const navCounts = React.useMemo(
+    () => navCountText(runningWork, t),
+    [runningWork, t],
+  );
   // View pins are absent here (their href resolves async): while a view
   // pin is active the plain nav row for its surface stays highlighted too.
   // Accepted — suppressing it would need every view detail lifted up here.
@@ -592,7 +670,7 @@ export function AppSidebar({ topSlot, searchSlot, headerClassName, headerStyle }
         ? list.find((w) => w.id === invitation.workspace_id)
         : null;
       if (joined) {
-        push(paths.workspace(joined.slug).issues());
+        push(paths.workspace(joined.slug).dispatch());
       }
     },
   });
@@ -674,7 +752,7 @@ export function AppSidebar({ topSlot, searchSlot, headerClassName, headerStyle }
                       <DropdownMenuItem
                         key={ws.id}
                         render={
-                          <AppLink href={paths.workspace(ws.slug).issues()} />
+                          <AppLink href={paths.workspace(ws.slug).dispatch()} />
                         }
                       >
                         <WorkspaceAvatar name={ws.name} avatarUrl={ws.avatar_url} size="sm" />
@@ -758,11 +836,15 @@ export function AppSidebar({ topSlot, searchSlot, headerClassName, headerStyle }
             )}
             <SidebarMenuItem>
               <SidebarMenuButton
-                className="text-muted-foreground"
-                onClick={() => openCreateIssueWithPreference()}
+                className={
+                  "h-auto gap-2.5 rounded-[calc(var(--radius)*1.4)] border border-surface-border " +
+                  "bg-surface px-2.5 py-2 font-medium text-foreground shadow-[var(--shadow-surface)] " +
+                  "hover:border-input hover:bg-surface hover:text-foreground"
+                }
+                onClick={() => openCreateIssue()}
               >
-                <span className="relative">
-                  <SquarePen />
+                <span className="relative grid size-5 shrink-0 place-items-center rounded-md bg-brand/15 text-brand">
+                  <SquarePen className="!size-3" />
                   <DraftDot />
                 </span>
                 <span>{t(($) => $.sidebar.new_issue)}</span>
@@ -778,30 +860,24 @@ export function AppSidebar({ topSlot, searchSlot, headerClassName, headerStyle }
         <SidebarContent ref={sidebarScrollRef} style={sidebarFadeStyle}>
           <SidebarGroup>
             <SidebarGroupContent>
-              <SidebarMenu className="gap-0.5">
+              <SidebarMenu className="gap-[3px]">
                 {personalNav.map((item) => {
                   const href = p[item.key]();
                   const Icon = routeIconForPath(href);
                   const isActive = isNavActive(pathname, href);
                   return (
                     <SidebarMenuItem key={item.key}>
+                      {isActive ? <NavActiveRail /> : null}
                       <SidebarMenuButton
                         isActive={isActive}
                         render={<AppLink href={href} />}
-                        className="text-muted-foreground hover:not-data-active:bg-sidebar-accent/70 data-active:bg-sidebar-accent data-active:text-sidebar-accent-foreground"
+                        className={NAV_BUTTON_CLASS}
                       >
-                        <Icon />
+                        <NavTile navKey={item.key} Icon={Icon} />
                         <span>{t(($) => $.nav[item.labelKey])}</span>
                         {item.key === "inbox" && unreadCount > 0 && (
                           <CappedNumberFlow
                             value={unreadCount}
-                            animated={false}
-                            className="ml-auto text-caption"
-                          />
-                        )}
-                        {item.key === "chat" && chatUnreadCount > 0 && (
-                          <CappedNumberFlow
-                            value={chatUnreadCount}
                             animated={false}
                             className="ml-auto text-caption"
                           />
@@ -819,7 +895,10 @@ export function AppSidebar({ topSlot, searchSlot, headerClassName, headerStyle }
               <SidebarGroup className="group/pinned">
                 <SidebarGroupLabel
                   render={<CollapsibleTrigger />}
-                  className="group/trigger cursor-pointer hover:bg-sidebar-accent/70 hover:text-sidebar-accent-foreground"
+                  className={cn(
+                    GROUP_LABEL_CLASS,
+                    "group/trigger cursor-pointer hover:text-foreground",
+                  )}
                 >
                   <span>{t(($) => $.sidebar.pinned_label)}</span>
                   <ChevronRight className="!size-3 ml-1 stroke-[2.5] transition-transform duration-200 group-data-[panel-open]/trigger:rotate-90" />
@@ -850,23 +929,28 @@ export function AppSidebar({ topSlot, searchSlot, headerClassName, headerStyle }
           )}
 
           <SidebarGroup>
-            <SidebarGroupLabel>{t(($) => $.sidebar.workspace_group)}</SidebarGroupLabel>
+            <SidebarGroupLabel className={GROUP_LABEL_CLASS}>
+              {t(($) => $.sidebar.workspace_group)}
+            </SidebarGroupLabel>
             <SidebarGroupContent>
-              <SidebarMenu className="gap-0.5">
+              <SidebarMenu className="gap-[3px]">
                 {workspaceNav
                   .map((item) => {
                   const href = p[item.key]();
                   const Icon = routeIconForPath(href);
                   const isActive = !isActivePinnedRoute && isNavActive(pathname, href);
+                  const count = navCounts[item.key];
                   return (
                     <SidebarMenuItem key={item.key}>
+                      {isActive ? <NavActiveRail /> : null}
                       <SidebarMenuButton
                         isActive={isActive}
                         render={<AppLink href={href} />}
-                        className="text-muted-foreground hover:not-data-active:bg-sidebar-accent/70 data-active:bg-sidebar-accent data-active:text-sidebar-accent-foreground"
+                        className={NAV_BUTTON_CLASS}
                       >
-                        <Icon />
+                        <NavTile navKey={item.key} Icon={Icon} />
                         <span>{t(($) => $.nav[item.labelKey])}</span>
+                        {count ? <NavCount {...count} /> : null}
                       </SidebarMenuButton>
                     </SidebarMenuItem>
                   );
@@ -876,21 +960,24 @@ export function AppSidebar({ topSlot, searchSlot, headerClassName, headerStyle }
           </SidebarGroup>
 
           <SidebarGroup>
-            <SidebarGroupLabel>{t(($) => $.sidebar.configure_group)}</SidebarGroupLabel>
+            <SidebarGroupLabel className={GROUP_LABEL_CLASS}>
+              {t(($) => $.sidebar.configure_group)}
+            </SidebarGroupLabel>
             <SidebarGroupContent>
-              <SidebarMenu className="gap-0.5">
+              <SidebarMenu className="gap-[3px]">
                 {configureNav.map((item) => {
                   const href = p[item.key]();
                   const Icon = routeIconForPath(href);
                   const isActive = isNavActive(pathname, href);
                   return (
                     <SidebarMenuItem key={item.key}>
+                      {isActive ? <NavActiveRail /> : null}
                       <SidebarMenuButton
                         isActive={isActive}
                         render={<AppLink href={href} />}
-                        className="text-muted-foreground hover:not-data-active:bg-sidebar-accent/70 data-active:bg-sidebar-accent data-active:text-sidebar-accent-foreground"
+                        className={NAV_BUTTON_CLASS}
                       >
-                        <Icon />
+                        <NavTile navKey={item.key} Icon={Icon} />
                         <span>{t(($) => $.nav[item.labelKey])}</span>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
@@ -902,8 +989,31 @@ export function AppSidebar({ topSlot, searchSlot, headerClassName, headerStyle }
         </SidebarContent>
 
         <SidebarFooter className="p-2">
-          <div className="flex items-center justify-end gap-1">
-            <HelpLauncher />
+          {/* Fleet state at the foot of the rail: the whole roster as one
+              figure, which is what you want when deciding whether there is room
+              to file something. Deliberately a single phrase rather than a
+              "busy" count plus a "free" count — two numbers that always sum to
+              the roster say the same thing as one. */}
+          <div className="flex items-center gap-2 px-2 pb-1 text-micro">
+            <span
+              className={cn(
+                "inline-flex items-center gap-1.5 tabular-nums",
+                runningWork.busyAgents > 0
+                  ? "text-inflight"
+                  : "text-faint-foreground",
+              )}
+            >
+              {runningWork.busyAgents > 0 ? (
+                <span className="pulse size-1.5" aria-hidden="true" />
+              ) : null}
+              {t(($) => $.sidebar.fleet_state, {
+                busy: runningWork.busyAgents,
+                idle: runningWork.idleAgents,
+              })}
+            </span>
+            <span className="ml-auto">
+              <HelpLauncher />
+            </span>
           </div>
         </SidebarFooter>
         <SidebarRail />

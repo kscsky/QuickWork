@@ -4,7 +4,6 @@ import { Suspense } from "react";
 import { DashboardLayout } from "@quickwork/views/layout";
 import { QuickWorkIcon } from "@quickwork/ui/components/common/quickwork-icon";
 import { SearchCommand, SearchTrigger } from "@quickwork/views/search";
-import { FloatingChat } from "@quickwork/views/chat";
 import { WebNotificationBridge } from "@/components/web-notification-bridge";
 import { WorkspaceDocumentTitle } from "@/platform/workspace-document-title";
 
@@ -24,8 +23,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
           <>
             <SearchCommand />
             <WebNotificationBridge />
-            <FloatingChat />
-          </>
+                      </>
         }
       >
         {children}

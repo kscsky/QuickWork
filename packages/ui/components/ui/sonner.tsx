@@ -15,6 +15,10 @@ const Toaster = ({ ...props }: ToasterProps) => {
   return (
     <Sonner
       theme={resolvedTheme as ToasterProps["theme"]}
+      // All toasts surface top-center: the eye already reads the top of the
+      // screen, and a bottom-right stack was "nowhere you look". Errors get
+      // the red outline from base.css; success/info stay quiet cards.
+      position="top-center"
       className="toaster group"
       icons={{
         success: (

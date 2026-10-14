@@ -87,7 +87,6 @@ export interface TabEntityData {
   machine?: { name: string };
   runtime?: { name: string };
   /** Resolved chat session title (already includes the "New chat" fallback). */
-  chatSessionTitle?: string;
   /** Resolved inbox selection (issue identifier/title or item title). */
   inboxSelection?: InboxSelectionData;
 }
@@ -219,13 +218,6 @@ export function resolveTabPresentation(
         title = text ? { kind: "text", text } : { kind: "nav", navKey: "inbox" };
       }
       return { visual: { kind: "icon", icon: "Inbox" }, title };
-    }
-    case "chat": {
-      const title: TabTitleSpec =
-        subject.sessionId && data.chatSessionTitle?.trim()
-          ? { kind: "text", text: data.chatSessionTitle.trim() }
-          : { kind: "nav", navKey: "chat" };
-      return { visual: { kind: "icon", icon: "MessageSquare" }, title };
     }
     case "flow":
       return {

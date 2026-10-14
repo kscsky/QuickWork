@@ -2,6 +2,8 @@
   "nav": {
     "inbox": "Inbox",
     "chat": "Chat",
+    "dispatch": "Squad tasks",
+    "tasks": "Task list",
     "my_issues": "My Issues",
     "issues": "Issues",
     "projects": "Projects",
@@ -37,23 +39,33 @@
     "server_version": "Server version {{version}}"
   },
   "workspace_loader": {
-    "loading_workspace": "Loading workspace…",
+    "loading_workspace": "Loading space…",
     "loading_named_prefix": "Loading"
   },
   "sidebar": {
     "unpin_tooltip": "Unpin",
-    "workspaces_label": "Workspaces",
-    "create_workspace": "Create workspace",
+    "workspaces_label": "Spaces",
+    "create_workspace": "Create space",
     "pending_invitations_label": "Pending invitations",
-    "invitation_workspace_fallback": "Workspace",
+    "invitation_workspace_fallback": "Space",
     "invitation_join": "Join",
     "invitation_decline": "Decline",
     "log_out": "Log out",
-    "new_issue": "New Issue",
+    "new_issue": "Solo task",
     "new_issue_shortcut": "C",
     "pinned_label": "Pinned",
-    "workspace_group": "Workspace",
+    "workspace_group": "Space",
     "configure_group": "Configure",
-    "unread_overflow": "99+"
+    "unread_overflow": "99+",
+    "running_label": "In flight",
+    "running_all": "All",
+    "running_more_one": "+{{count}} more",
+    "running_more_other": "+{{count}} more",
+    "running_unnamed": "Untitled issue",
+    "nav_running_one": "{{count}} running",
+    "nav_running_other": "{{count}} running",
+    "nav_busy_one": "{{count}} busy",
+    "nav_busy_other": "{{count}} busy",
+    "fleet_state": "{{busy}} busy · {{idle}} free"
   }
 }

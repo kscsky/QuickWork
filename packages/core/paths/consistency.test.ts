@@ -18,6 +18,8 @@ describe("paths.workspace() shape", () => {
       new Set([
         "root",
         "usage",
+        "dispatch",
+        "tasks",
         "issues",
         "projects",
         "autopilots",
@@ -31,7 +33,6 @@ describe("paths.workspace() shape", () => {
         "myIssues",
         "runtimes",
         "skills",
-        "squads",
         "settings",
       ]),
     );
@@ -43,6 +44,8 @@ describe("paths.workspace() shape", () => {
     // that each method emits its explicitly registered workspace subpath.
     const expectedSegments: Array<[string, string]> = [
       ["usage", "usage"],
+      ["dispatch", "dispatch"],
+      ["tasks", "tasks"],
       ["issues", "issues"],
       ["projects", "projects"],
       ["autopilots", "autopilots"],
@@ -65,6 +68,12 @@ describe("paths.workspace() shape", () => {
       expect(typeof fn).toBe("function");
       expect(fn!()).toBe(`/acme/${segment}`);
     }
+  });
+
+  // The one parameterless route with no segment of its own — it IS the
+  // workspace root. Kept out of `expectedSegments` above, which appends a `/`.
+  it("root emits the bare /{slug}", () => {
+    expect(paths.workspace("acme").root()).toBe("/acme");
   });
 });
 

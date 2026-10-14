@@ -13,7 +13,8 @@
     },
     "no_matches": "일치하는 스쿼드가 없습니다",
     "row_menu": "스쿼드 작업",
-    "archive_action": "보관"
+    "archive_action": "보관",
+    "tagline": "리드 에이전트와 멤버로 구성되며, 작업은 체인을 따라 전달됩니다."
   },
   "inspector": {
     "details_section": "세부 정보",
@@ -42,7 +43,7 @@
   },
   "add_member_dialog": {
     "title": "멤버 추가",
-    "description": "워크스페이스 멤버 또는 에이전트를 이 스쿼드에 추가합니다.",
+    "description": "스페이스 멤버 또는 에이전트를 이 스쿼드에 추가합니다.",
     "label_member": "멤버",
     "label_role": "역할",
     "label_optional": "(선택 사항)",
@@ -87,9 +88,14 @@
     "status_archived": "보관됨",
     "issue_status_blocked": "막힘",
     "active_issue_more": "외 {{count}}개",
-    "last_active_label": "마지막 활동 {{time}}"
+    "last_active_label": "마지막 활동 {{time}}",
+    "lends_none": "에이전트 없음",
+    "lends_create": "만들기",
+    "lends_aria": "{{name}}이 빌려주는 에이전트",
+    "lends_opt_out": "빌려주지 않음"
   },
   "detail_tabs": {
+    "room": "룸",
     "members": "멤버",
     "instructions": "지침"
   },
@@ -110,7 +116,9 @@
     "leader_updated": "리더를 업데이트했습니다",
     "leader_update_failed": "리더를 업데이트하지 못했습니다",
     "archive_failed": "스쿼드를 보관하지 못했습니다",
-    "instructions_saved": "지침을 저장했습니다"
+    "instructions_saved": "지침을 저장했습니다",
+    "agent_updated": "에이전트를 변경했습니다",
+    "agent_update_failed": "에이전트를 변경하지 못했습니다"
   },
   "profile_card": {
     "unavailable": "스쿼드를 사용할 수 없습니다",
@@ -137,8 +145,32 @@
     "direction_desc": "내림차순",
     "section_columns": "열",
     "result_count_title": "일치하는 스쿼드 / 전체 스쿼드",
-    "filter_label": "필터",
-    "filter_active_count_other": "필터 {{count}}개",
-    "clear_filters": "필터 지우기"
+    "chip_named": "{{label}}: {{value}}",
+    "chip_multi": "{{label}}: {{value}}명"
+  },
+  "room": {
+    "loading": "룸을 불러오는 중…",
+    "empty": "아직 아무 말도 없습니다. 스쿼드의 작업이 여기로 흐릅니다.",
+    "older_hidden_other": "이전 메시지는 표시하지 않습니다 (페이지당 {{count}}건)",
+    "send": "보내기",
+    "send_failed": "보내지 못했습니다",
+    "composer_placeholder": "스쿼드에 한마디…",
+    "composer_hint": "Enter 로 보내기, Shift + Enter 로 줄바꿈",
+    "join_to_speak": "이 스쿼드에 참여해야 발언할 수 있습니다.",
+    "members": "멤버",
+    "unknown_person": "알 수 없음",
+    "you": "나",
+    "no_agents": "에이전트 없음",
+    "agent_holding_other": "{{count}}건 작업 중",
+    "agent_idle_other": "에이전트 {{count}}개 · 여유",
+    "not_taking_work": "받지 않음",
+    "kind_receipt": "건을 납품했습니다",
+    "role": {
+      "leader": "리더",
+      "executor": "실행",
+      "reviewer": "검토",
+      "observer": "관전"
+    },
+    "step_of": "{{step}} / {{total}} 단계"
   }
 }

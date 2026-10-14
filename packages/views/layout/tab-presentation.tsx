@@ -23,7 +23,6 @@ import {
 } from "@quickwork/core/workspace/queries";
 import { runtimeListOptions } from "@quickwork/core/runtimes/queries";
 import { runtimeDisplayName } from "@quickwork/core/runtimes";
-import { chatSessionsOptions } from "@quickwork/core/chat/queries";
 import {
   inboxListOptions,
   archivedInboxListOptions,
@@ -74,7 +73,6 @@ const PENDING_RESOURCE_KEYS: ReadonlySet<TabLabelKey> = new Set<TabLabelKey>([
 
 /** Gather cached entity data for a subject. All reads are cache-only. */
 function useTabEntityData(subject: TabSubject, wsId: string): TabEntityData {
-  const { t: chatT } = useT("chat");
 
   // Read both inbox lists cache-only; the archived view keeps its own list, so
   // an archived selection has to resolve against the archived cache — the same
@@ -133,7 +131,6 @@ function useTabEntityData(subject: TabSubject, wsId: string): TabEntityData {
   const members = useQuery({ ...memberListOptions(wsId), enabled: false }).data;
   const squads = useQuery({ ...squadListOptions(wsId), enabled: false }).data;
   const runtimes = useQuery({ ...runtimeListOptions(wsId), enabled: false }).data;
-  const sessions = useQuery({ ...chatSessionsOptions(wsId), enabled: false }).data;
 
   const data: TabEntityData = {};
   switch (subject.kind) {
@@ -175,12 +172,6 @@ function useTabEntityData(subject: TabSubject, wsId: string): TabEntityData {
       if (rt) data.runtime = { name: runtimeDisplayName(rt) };
       break;
     }
-    case "chat":
-      if (subject.sessionId) {
-        const s = sessions?.find((x) => x.id === subject.sessionId);
-        if (s) data.chatSessionTitle = s.title?.trim() || chatT(($) => $.window.untitled);
-      }
-      break;
     case "inbox":
       if (inboxItem) {
         if (inboxItem.issue_id && issue) {

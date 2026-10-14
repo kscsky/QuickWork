@@ -21,6 +21,27 @@ export interface Project {
   issue_count: number;
   done_count: number;
   resource_count: number;
+  // List-shaped responses carry a summary of the project's primary local
+  // directory and repo so a card can show where the project actually runs
+  // without a resources request per row. Optional: single-project responses
+  // (and older backends) omit them.
+  local_directory?: ProjectLocalDirectory | null;
+  repo_url?: string | null;
+  active_task_count?: number;
+}
+
+/**
+ * A project's primary local directory, as summarised on list responses.
+ *
+ * `execution_mode` is always populated — the server resolves an absent stored
+ * value to `in_place` before serialising, so unlike
+ * {@link LocalDirectoryResourceRef} this field never needs re-deriving here.
+ */
+export interface ProjectLocalDirectory {
+  label: string;
+  local_path: string;
+  daemon_id: string;
+  execution_mode: LocalDirectoryExecutionMode;
 }
 
 export interface CreateProjectRequest {

@@ -45,6 +45,7 @@ import type {
   ListGitHubInstallationsResponse,
   ListGitHubRepositoriesResponse,
   ListLabelsResponse,
+  ListProjectsResponse,
   ListWebhookDeliveriesResponse,
   IssueStatusEntry,
   ListIssueStatusesResponse,
@@ -66,6 +67,12 @@ import type {
   Skill,
   SkillImportResult,
   Squad,
+  SquadMember,
+  SquadMessage,
+  SquadRoom,
+  IssueChain,
+  IssueChainForIssue,
+  SquadPlaybook,
   TimelineEntry,
   User,
   WebhookDelivery,
@@ -1277,6 +1284,21 @@ export const EMPTY_SEARCH_ISSUES_RESPONSE: SearchIssuesResponse = {
   total: 0,
 };
 
+// List-shaped summary of a project's local directory. `execution_mode` is
+// resolved server-side (absent means in_place), but an older backend omits the
+// whole object, hence the optional wrapper below.
+//
+// The enum is explicit rather than z.string() so a mode a newer server invents
+// degrades to in_place — the conservative one-task-at-a-time reading — instead
+// of reaching a union-typed field as an arbitrary string. That mirrors the
+// server's own normalization.
+const ProjectLocalDirectorySchema = z.object({
+  label: z.string().default(""),
+  local_path: z.string().default(""),
+  daemon_id: z.string().default(""),
+  execution_mode: z.enum(["in_place", "worktree"]).catch("in_place").optional(),
+}).loose();
+
 const ProjectSchema = z.object({
   id: z.string(),
   workspace_id: z.string(),
@@ -1297,6 +1319,11 @@ const ProjectSchema = z.object({
   issue_count: z.number().default(0),
   done_count: z.number().default(0),
   resource_count: z.number().default(0),
+  // .catch(undefined) so one malformed directory does not drop the project row
+  // (and with it the whole list) — same contract as IssueSchema.source_context.
+  local_directory: ProjectLocalDirectorySchema.optional().catch(undefined),
+  repo_url: z.string().optional().catch(undefined),
+  active_task_count: z.number().default(0),
 }).loose();
 
 const SearchProjectResultSchema = ProjectSchema.extend({
@@ -1310,6 +1337,16 @@ export const SearchProjectsResponseSchema = z.object({
 }).loose();
 
 export const EMPTY_SEARCH_PROJECTS_RESPONSE: SearchProjectsResponse = {
+  projects: [],
+  total: 0,
+};
+
+export const ListProjectsResponseSchema = z.object({
+  projects: z.array(ProjectSchema).default([]),
+  total: z.number().default(0),
+}).loose();
+
+export const EMPTY_LIST_PROJECTS_RESPONSE: ListProjectsResponse = {
   projects: [],
   total: 0,
 };
@@ -2025,6 +2062,131 @@ export const EMPTY_SQUAD: Squad = {
   archived_by: null,
   member_count: 0,
   member_preview: [],
+};
+
+// One squad membership row.
+//
+// `can_receive_work` defaults to TRUE when the field is absent: an installed
+// desktop client can talk to a backend that predates the column, and a member
+// added by that backend is available — reading absence as "unavailable" would
+// silently take the whole room off dispatch.
+export const SquadMemberSchema = z.object({
+  id: z.string(),
+  squad_id: z.string(),
+  member_type: z.string(),
+  member_id: z.string(),
+  role: z.string().default(""),
+  can_receive_work: z.boolean().optional().transform((v) => v ?? true),
+  agent_id: z.string().optional().default(""),
+  created_at: z.string().default(""),
+}).loose();
+
+export const SquadMemberListSchema = z.array(SquadMemberSchema);
+export const EMPTY_SQUAD_MEMBER_LIST: SquadMember[] = [];
+export const EMPTY_SQUAD_MEMBER: SquadMember = {
+  id: "",
+  squad_id: "",
+  member_type: "member",
+  member_id: "",
+  role: "",
+  can_receive_work: true,
+  created_at: "",
+};
+
+// One line in a squad room. `kind` stays an open string on purpose: a reader
+// that does not recognise a value renders the line as plain text rather than
+// dropping it, so a newer writer can never blank an older client's stream.
+export const SquadMessageSchema = z.object({
+  id: z.string(),
+  squad_id: z.string(),
+  author_type: z.string().default("system"),
+  author_id: z.string().optional(),
+  body: z.string().default(""),
+  kind: z.string().default("text"),
+  metadata: z.record(z.string(), z.unknown()).default({}),
+  created_at: z.string().default(""),
+}).loose();
+
+export const SquadRoomSchema = z.object({
+  messages: z.array(SquadMessageSchema).default([]),
+  has_more: z.boolean().default(false),
+}).loose();
+
+export const EMPTY_SQUAD_ROOM: SquadRoom = { messages: [], has_more: false };
+
+// One step of a task's relay.
+//
+// `agent_id` is optional on the wire because absent is a real state — the
+// holder has bound no agent, which is what parks the step. `state` stays a
+// plain string: a value this client does not know renders as an unnamed
+// state rather than failing the parse and blanking the whole chain.
+export const IssueChainStepSchema = z.object({
+  id: z.string(),
+  position: z.number(),
+  holder_user_id: z.string(),
+  agent_id: z.string().optional(),
+  title: z.string().default(""),
+  state: z.string().default("pending"),
+  started_at: z.string().optional(),
+  completed_at: z.string().optional(),
+}).loose();
+
+export const IssueChainSchema = z.object({
+  steps: z.array(IssueChainStepSchema).default([]),
+  parked: z.boolean().default(false),
+}).loose();
+
+export const EMPTY_ISSUE_CHAIN_RESPONSE: IssueChain = { steps: [], parked: false };
+
+/** A task's chain tagged with the task it belongs to — the list-page shape. */
+export const IssueChainForIssueSchema = IssueChainSchema.extend({
+  issue_id: z.string(),
+});
+
+export const IssueChainListSchema = z.object({
+  chains: z.array(IssueChainForIssueSchema).default([]),
+}).loose();
+
+export const EMPTY_ISSUE_CHAIN_LIST: IssueChainForIssue[] = [];
+
+export const PlaybookStepSchema = z.object({
+  holder_user_id: z.string(),
+  title: z.string().default(""),
+}).loose();
+
+export const SquadPlaybookSchema = z.object({
+  id: z.string(),
+  workspace_id: z.string().default(""),
+  squad_id: z.string().default(""),
+  name: z.string().default(""),
+  description: z.string().default(""),
+  steps: z.array(PlaybookStepSchema).default([]),
+  created_by: z.string().default(""),
+  created_at: z.string().default(""),
+  updated_at: z.string().default(""),
+}).loose();
+
+export const SquadPlaybookListSchema = z.array(SquadPlaybookSchema);
+export const EMPTY_PLAYBOOK_LIST: SquadPlaybook[] = [];
+export const EMPTY_SQUAD_PLAYBOOK: SquadPlaybook = {
+  id: "",
+  workspace_id: "",
+  squad_id: "",
+  name: "",
+  description: "",
+  steps: [],
+  created_by: "",
+  created_at: "",
+  updated_at: "",
+};
+export const EMPTY_SQUAD_MESSAGE: SquadMessage = {
+  id: "",
+  squad_id: "",
+  author_type: "system",
+  body: "",
+  kind: "text",
+  metadata: {},
+  created_at: "",
 };
 
 // Squad member status — backs the Squad detail page's Members tab. status
@@ -2783,6 +2945,10 @@ export const MemberWithUserSchema = z.object({
   name: z.string().optional().default(""),
   email: z.string().optional().default(""),
   avatar_url: z.string().nullable().optional().default(null),
+  // Absent on older backends; "" is the same "has not declared one" state the
+  // server sends, so the two collapse into one case for every caller.
+  identity: z.string().optional().default(""),
+  identity_other: z.string().optional().default(""),
 }).loose();
 
 export const JoinShareLinkResponseSchema = z.object({
@@ -2850,3 +3016,20 @@ export const AgentSandboxProbeResponseSchema = z.object({
   create_ms: z.number().default(0),
   total_ms: z.number().default(0),
 }).loose();
+
+// ---------------------------------------------------------------------------
+// Quick-create task → issue link — GET /api/tasks/:taskId/issue.
+//
+// Quick-create answers with a task id and nothing else: the issue it produces
+// is created BY the run, so it does not exist at submit time. `issue_id` stays
+// empty until the server links it back (LinkTaskToIssue), which is why the
+// caller polls instead of reading the id off the submit response.
+// ---------------------------------------------------------------------------
+
+export const TaskIssueResponseSchema = z.object({
+  issue_id: z.string().default(""),
+}).loose();
+
+export type TaskIssueResponse = z.infer<typeof TaskIssueResponseSchema>;
+
+export const EMPTY_TASK_ISSUE: TaskIssueResponse = { issue_id: "" };

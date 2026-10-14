@@ -36,6 +36,8 @@
     --color-info: var(--info);
     --color-brand: var(--brand);
     --color-brand-foreground: var(--brand-foreground);
+    --color-brand-surface: var(--brand-surface);
+    --color-brand-surface-foreground: var(--brand-surface-foreground);
     --color-inflight: var(--inflight);
     --color-inflight-foreground: var(--inflight-foreground);
     --color-inflight-surface: var(--inflight-surface);
@@ -133,17 +135,17 @@
     /* Surface system: the app shell is the quiet outer frame; the page canvas
        is where lists, boards, and conversations live; surfaces are reserved
        for bounded content groups; raised surfaces are ephemeral overlays. */
-    --app-shell: oklch(0.964435 0.001327 258);
-    --page-canvas: oklch(0.988087 0 0);
+    --app-shell: oklch(0.97 0 0);
+    --page-canvas: oklch(1 0 0);
     --surface: oklch(1 0 0);
-    --surface-foreground: oklch(0.141 0.005 258);
+    --surface-foreground: oklch(0.25 0.032 252);
     --surface-raised: oklch(1 0 0);
-    --surface-hover: oklch(0.967 0.001 258);
-    --surface-selected: oklch(0.95 0.002 258);
-    --surface-selected-foreground: oklch(0.141 0.005 258);
-    --surface-border: oklch(0.92 0.004 258);
-    --surface-shadow: 0 1px 2px rgb(15 23 42 / 0.04), 0 1px 1px rgb(15 23 42 / 0.03);
-    --floating-shadow: 0 16px 40px rgb(15 23 42 / 0.14), 0 3px 10px rgb(15 23 42 / 0.08);
+    --surface-hover: oklch(0.972 0 0);
+    --surface-selected: oklch(0.945 0 0);
+    --surface-selected-foreground: oklch(0.25 0.032 252);
+    --surface-border: oklch(0.83 0.022 246);
+    --surface-shadow: 2px 2px 0 oklch(0.9 0.014 244);
+    --floating-shadow: 4px 4px 0 oklch(0.88 0.018 244);
 
     /* The chat launcher is an overlay pinned to the dashboard's bottom-right
        corner on every workspace page, so that corner is not available to page
@@ -159,18 +161,18 @@
     /* Menus (dropdown/context/select/popover) hover just above their trigger,
        so they carry a lighter shadow than window-level overlays (dialogs,
        sheets), which keep --floating-shadow. */
-    --menu-shadow: 0 8px 24px rgb(15 23 42 / 0.08), 0 2px 6px rgb(15 23 42 / 0.05);
+    --menu-shadow: 3px 3px 0 oklch(0.89 0.016 244);
     --background: var(--page-canvas);
-    --foreground: oklch(0.141 0.005 258);
+    --foreground: oklch(0.25 0.032 252);
     --card: var(--surface);
-    --card-foreground: oklch(0.141 0.005 258);
+    --card-foreground: oklch(0.25 0.032 252);
     --popover: var(--surface-raised);
-    --popover-foreground: oklch(0.141 0.005 258);
-    --primary: oklch(0.21 0.006 258);
-    --primary-foreground: oklch(0.985 0 0);
-    --secondary: oklch(0.967 0.001 258);
-    --secondary-foreground: oklch(0.21 0.006 258);
-    --muted: oklch(0.967 0.001 258);
+    --popover-foreground: oklch(0.25 0.032 252);
+    --primary: oklch(0.32 0.05 252);
+    --primary-foreground: oklch(0.98 0.004 240);
+    --secondary: oklch(0.955 0 0);
+    --secondary-foreground: oklch(0.28 0.032 252);
+    --muted: oklch(0.955 0 0);
     /* Lightness is pinned by WCAG AA, not by taste: muted text sits on every
        light surface we have, and the darkest of them — --sidebar-accent, the
        nav hover state — is the binding constraint. At the old 0.552 that pair
@@ -178,7 +180,7 @@
        sidebar / sidebar-accent / muted / surface-selected / surface, with the
        worst case at 4.88:1. Raise it and the nav labels fail again. Hue and
        chroma are unchanged so the neutral ramp keeps its cast. */
-    --muted-foreground: oklch(0.505 0.016 258);
+    --muted-foreground: oklch(0.505 0.032 250);
     /* The quiet step below muted, for marks that are not text: disclosure
        chevrons, separator glyphs, the em dash standing in for an empty cell,
        the large icon in an empty state. It exists because the alternative
@@ -190,13 +192,13 @@
        for text: text has one floor, --muted-foreground, and there is no room
        for a third readable step (AA caps a lighter text tone at L 0.523 here,
        0.018 away from muted — a difference no one can see). */
-    --faint-foreground: oklch(0.606 0.016 258);
-    --accent: oklch(0.967 0.001 258);
-    --accent-foreground: oklch(0.21 0.006 258);
+    --faint-foreground: oklch(0.6 0.03 248);
+    --accent: oklch(0.955 0 0);
+    --accent-foreground: oklch(0.28 0.032 252);
     --destructive: oklch(0.577 0.245 27.325);
-    --border: oklch(0.945 0.003 258);
-    --input: oklch(0.92 0.004 258);
-    --ring: oklch(0.705 0.015 258);
+    --border: oklch(0.87 0.018 246);
+    --input: oklch(0.84 0.022 246);
+    --ring: oklch(0.6 0.06 252);
     /* Brand-derived blue gradient (h=255 = brand hue). chart-1 equals brand
        so the most important series visually anchors to the product colour;
        chart-2..5 step lighter + less saturated so a stacked bar reads
@@ -207,21 +209,28 @@
     --chart-3: oklch(0.76 0.10 258);
     --chart-4: oklch(0.85 0.06 258);
     --chart-5: oklch(0.92 0.03 258);
-    /* Tighter than the 0.625rem this shipped with: a dispatch console reads as
-       instrumentation, and a 6.4px corner stops rows from looking like consumer
-       cards. Still round enough that the small end of the ramp (radius-sm
-       ~3.8px) does not collapse into a hard corner. */
-    --radius: 0.4rem;
-    --sidebar: oklch(0.964435 0.001327 258);
-    --sidebar-foreground: oklch(0.141 0.005 258);
-    --sidebar-primary: oklch(0.21 0.006 258);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.935 0.003 258);
-    --sidebar-accent-foreground: oklch(0.21 0.006 258);
-    --sidebar-border: oklch(0.92 0.004 258);
-    --sidebar-ring: oklch(0.705 0.015 258);
-    --brand: oklch(0.52 0.19 258);
+    /* Blueprint skin: near-square corners (radius ≈ 3.2px, radius-sm ≈ 1.9px)
+       — pages draw with a ruler, not with consumer-card roundness. Paired
+       with the hard offset shadows above: crisp edges, no soft blur. */
+    --radius: 0.2rem;
+    --sidebar: oklch(0.97 0 0);
+    --sidebar-foreground: oklch(0.28 0.032 252);
+    --sidebar-primary: oklch(0.32 0.05 252);
+    --sidebar-primary-foreground: oklch(0.98 0.004 240);
+    --sidebar-accent: oklch(0.94 0 0);
+    --sidebar-accent-foreground: oklch(0.28 0.032 252);
+    --sidebar-border: oklch(0.88 0.018 244);
+    --sidebar-ring: oklch(0.6 0.06 252);
+    --brand: oklch(0.5 0.14 254);
     --brand-foreground: oklch(0.985 0 0);
+    /* A brand-coloured surface you put body text on — a chat bubble, not a
+       button. --brand alone cannot serve both themes: at L 0.52 white text
+       clears AA, but the dark ramp lifts brand to L 0.70 where the same white
+       sits at roughly 2.5:1. This pair holds the fill at the lightness that
+       keeps its text legible and lets only the hue carry the identity, which
+       is the same construction as --inflight. */
+    --brand-surface: oklch(0.5 0.14 254);
+    --brand-surface-foreground: oklch(0.985 0 0);
     --success: oklch(0.55 0.16 145);
     --warning: oklch(0.75 0.16 85);
     --info: oklch(0.55 0.18 250);
@@ -265,41 +274,41 @@
 
 .dark {
     color-scheme: dark;
-    --app-shell: oklch(0.155 0.005 258);
-    --page-canvas: oklch(0.18 0.005 258);
-    --surface: oklch(0.21 0.006 258);
-    --surface-foreground: oklch(0.985 0 0);
-    --surface-raised: oklch(0.235 0.007 258);
-    --surface-hover: oklch(0.274 0.006 258);
-    --surface-selected: oklch(0.3 0.006 258);
-    --surface-selected-foreground: oklch(0.985 0 0);
-    --surface-border: oklch(1 0 0 / 10%);
-    --surface-shadow: 0 1px 2px rgb(0 0 0 / 0.2), 0 1px 1px rgb(0 0 0 / 0.16);
-    --floating-shadow: 0 20px 48px rgb(0 0 0 / 0.46), 0 4px 12px rgb(0 0 0 / 0.28);
-    --menu-shadow: 0 10px 28px rgb(0 0 0 / 0.3), 0 2px 8px rgb(0 0 0 / 0.18);
+    --app-shell: oklch(0.15 0.012 252);
+    --page-canvas: oklch(0.175 0.012 252);
+    --surface: oklch(0.205 0.014 252);
+    --surface-foreground: oklch(0.97 0.008 250);
+    --surface-raised: oklch(0.232 0.015 252);
+    --surface-hover: oklch(0.27 0.015 252);
+    --surface-selected: oklch(0.295 0.016 252);
+    --surface-selected-foreground: oklch(0.97 0.008 250);
+    --surface-border: oklch(1 0 0 / 12%);
+    --surface-shadow: 2px 2px 0 rgb(0 0 0 / 0.5);
+    --floating-shadow: 4px 4px 0 rgb(0 0 0 / 0.55);
+    --menu-shadow: 3px 3px 0 rgb(0 0 0 / 0.45);
     --background: var(--page-canvas);
-    --foreground: oklch(0.985 0 0);
+    --foreground: oklch(0.97 0.008 250);
     --card: var(--surface);
-    --card-foreground: oklch(0.985 0 0);
+    --card-foreground: oklch(0.97 0.008 250);
     --popover: var(--surface-raised);
-    --popover-foreground: oklch(0.985 0 0);
-    --primary: oklch(0.92 0.004 258);
-    --primary-foreground: oklch(0.21 0.006 258);
-    --secondary: oklch(0.274 0.006 258);
-    --secondary-foreground: oklch(0.985 0 0);
-    --muted: oklch(0.274 0.006 258);
-    --muted-foreground: oklch(0.705 0.015 258);
+    --popover-foreground: oklch(0.97 0.008 250);
+    --primary: oklch(0.9 0.012 250);
+    --primary-foreground: oklch(0.2 0.014 252);
+    --secondary: oklch(0.27 0.015 252);
+    --secondary-foreground: oklch(0.97 0.008 250);
+    --muted: oklch(0.27 0.015 252);
+    --muted-foreground: oklch(0.705 0.025 250);
     /* Same role as light mode, mirrored: fainter means darker here. 0.60 is
        the darkest step still clearing 3:1 on every dark surface, worst case
        --surface-selected at 3.45:1. The step away from muted (0.105 L) matches
        light mode's, so a chevron reads equally quiet in both themes. */
-    --faint-foreground: oklch(0.60 0.015 258);
-    --accent: oklch(0.274 0.006 258);
-    --accent-foreground: oklch(0.985 0 0);
+    --faint-foreground: oklch(0.6 0.025 250);
+    --accent: oklch(0.27 0.015 252);
+    --accent-foreground: oklch(0.97 0.008 250);
     --destructive: oklch(0.704 0.191 22.216);
-    --border: oklch(1 0 0 / 6%);
-    --input: oklch(1 0 0 / 15%);
-    --ring: oklch(0.552 0.016 258);
+    --border: oklch(1 0 0 / 8%);
+    --input: oklch(1 0 0 / 18%);
+    --ring: oklch(0.55 0.05 252);
     /* Dark mode mirrors light mode's "primary → secondary" gradient on the
        brand hue, but flips the lightness curve: the most important series
        is the brightest (so it pops on the dark background) and trailing
@@ -309,16 +318,20 @@
     --chart-3: oklch(0.52 0.10 258);
     --chart-4: oklch(0.42 0.06 258);
     --chart-5: oklch(0.32 0.03 258);
-    --sidebar: oklch(0.21 0.006 258);
-    --sidebar-foreground: oklch(0.985 0 0);
-    --sidebar-primary: oklch(0.92 0.004 258);
-    --sidebar-primary-foreground: oklch(0.21 0.006 258);
-    --sidebar-accent: oklch(0.274 0.006 258);
-    --sidebar-accent-foreground: oklch(0.985 0 0);
-    --sidebar-border: oklch(1 0 0 / 10%);
-    --sidebar-ring: oklch(0.552 0.016 258);
-    --brand: oklch(0.70 0.17 258);
+    --sidebar: oklch(0.185 0.013 252);
+    --sidebar-foreground: oklch(0.97 0.008 250);
+    --sidebar-primary: oklch(0.9 0.012 250);
+    --sidebar-primary-foreground: oklch(0.2 0.014 252);
+    --sidebar-accent: oklch(0.27 0.016 252);
+    --sidebar-accent-foreground: oklch(0.97 0.008 250);
+    --sidebar-border: oklch(1 0 0 / 12%);
+    --sidebar-ring: oklch(0.55 0.05 252);
+    --brand: oklch(0.7 0.15 256);
     --brand-foreground: oklch(0.985 0 0);
+    /* Mirrors light mode's reasoning rather than its lightness: the fill stays
+       deep so white text keeps clearing AA, where --brand deliberately lifts. */
+    --brand-surface: oklch(0.5 0.14 254);
+    --brand-surface-foreground: oklch(0.98 0.004 240);
     --success: oklch(0.65 0.15 145);
     --warning: oklch(0.70 0.16 85);
     --info: oklch(0.65 0.18 250);

@@ -13,7 +13,8 @@
     },
     "no_matches": "該当するスカッドはありません",
     "row_menu": "スカッドの操作",
-    "archive_action": "アーカイブ"
+    "archive_action": "アーカイブ",
+    "tagline": "リードのエージェントとメンバーで構成され、作業はチェーンで受け渡されます。"
   },
   "inspector": {
     "details_section": "詳細",
@@ -42,7 +43,7 @@
   },
   "add_member_dialog": {
     "title": "メンバーを追加",
-    "description": "ワークスペースのメンバーまたはエージェントをこのスクワッドに追加します。",
+    "description": "スペースのメンバーまたはエージェントをこのスクワッドに追加します。",
     "label_member": "メンバー",
     "label_role": "役割",
     "label_optional": "（任意）",
@@ -87,9 +88,14 @@
     "issue_status_blocked": "ブロック中",
     "active_issue_more": "他 {{count}}件",
     "last_active_label": "最終アクティブ {{time}}",
-    "status_archived": "アーカイブ済み"
+    "status_archived": "アーカイブ済み",
+    "lends_none": "エージェントなし",
+    "lends_create": "作成する",
+    "lends_aria": "{{name}} が貸すエージェント",
+    "lends_opt_out": "貸さない"
   },
   "detail_tabs": {
+    "room": "ルーム",
     "members": "メンバー",
     "instructions": "指示"
   },
@@ -110,7 +116,9 @@
     "leader_updated": "リーダーを更新しました",
     "leader_update_failed": "リーダーを更新できませんでした",
     "archive_failed": "スクワッドをアーカイブできませんでした",
-    "instructions_saved": "指示を保存しました"
+    "instructions_saved": "指示を保存しました",
+    "agent_updated": "エージェントを更新しました",
+    "agent_update_failed": "エージェントを変更できませんでした"
   },
   "profile_card": {
     "unavailable": "スクワッドを利用できません",
@@ -137,8 +145,32 @@
     "direction_desc": "降順",
     "section_columns": "列",
     "result_count_title": "該当スカッド / すべてのスカッド",
-    "filter_label": "フィルター",
-    "filter_active_count_other": "{{count}} 件のフィルター",
-    "clear_filters": "フィルターをクリア"
+    "chip_named": "{{label}}：{{value}}",
+    "chip_multi": "{{label}}：{{value}} 人"
+  },
+  "room": {
+    "loading": "ルームを読み込み中…",
+    "empty": "まだ誰も発言していません。スクワッドの作業はここに流れます。",
+    "older_hidden_other": "これより古いメッセージは表示していません（1 ページ {{count}} 件）",
+    "send": "送信",
+    "send_failed": "送信できませんでした",
+    "composer_placeholder": "スクワッドに一言…",
+    "composer_hint": "Enter で送信、Shift + Enter で改行",
+    "join_to_speak": "このスクワッドに参加すると発言できます。",
+    "members": "メンバー",
+    "unknown_person": "不明",
+    "you": "自分",
+    "no_agents": "エージェントなし",
+    "agent_holding_other": "{{count}} 体が稼働",
+    "agent_idle_other": "エージェント {{count}} 体 · 空き",
+    "not_taking_work": "受けない",
+    "kind_receipt": "を納品しました",
+    "role": {
+      "leader": "リーダー",
+      "executor": "実行",
+      "reviewer": "レビュー",
+      "observer": "閲覧"
+    },
+    "step_of": "{{step}} / {{total}} ステップ"
   }
 }

@@ -55,7 +55,12 @@ type SquadMemberResponse struct {
 	MemberType string `json:"member_type"`
 	MemberID   string `json:"member_id"`
 	Role       string `json:"role"`
-	CreatedAt  string `json:"created_at"`
+	// Whether work handed to the room may run on this member's agents. Role
+	// says what someone decides; this says whether their machine is available.
+	CanReceiveWork bool `json:"can_receive_work"`
+	// The one agent this person lends to the room. Empty when they bring none.
+	AgentID   string `json:"agent_id,omitempty"`
+	CreatedAt string `json:"created_at"`
 }
 
 // ── Converters ──────────────────────────────────────────────────────────────
@@ -80,12 +85,14 @@ func (h *Handler) squadToResponse(s db.Squad) SquadResponse {
 
 func squadMemberToResponse(m db.SquadMember) SquadMemberResponse {
 	return SquadMemberResponse{
-		ID:         uuidToString(m.ID),
-		SquadID:    uuidToString(m.SquadID),
-		MemberType: m.MemberType,
-		MemberID:   uuidToString(m.MemberID),
-		Role:       m.Role,
-		CreatedAt:  timestampToString(m.CreatedAt),
+		ID:             uuidToString(m.ID),
+		SquadID:        uuidToString(m.SquadID),
+		MemberType:     m.MemberType,
+		MemberID:       uuidToString(m.MemberID),
+		Role:           m.Role,
+		CanReceiveWork: m.CanReceiveWork,
+		AgentID:        uuidToString(m.AgentID),
+		CreatedAt:      timestampToString(m.CreatedAt),
 	}
 }
 
@@ -300,14 +307,6 @@ func (h *Handler) CreateSquad(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Auto-add leader as a member with role "leader".
-	h.Queries.AddSquadMember(r.Context(), db.AddSquadMemberParams{
-		SquadID:    squad.ID,
-		MemberType: "agent",
-		MemberID:   leaderUUID,
-		Role:       "leader",
-	})
-
 	resp, err := h.squadToResponseWithPreview(r.Context(), squad)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to load squad member preview")
@@ -429,21 +428,6 @@ func (h *Handler) UpdateSquad(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		// Ensure new leader is a squad member; auto-add if not.
-		isMember, err := qtx.IsSquadMember(r.Context(), db.IsSquadMemberParams{
-			SquadID: squad.ID, MemberType: "agent", MemberID: lid,
-		})
-		if err != nil {
-			writeError(w, http.StatusInternalServerError, "failed to update squad")
-			return
-		}
-		if !isMember {
-			if _, err := qtx.AddSquadMember(r.Context(), db.AddSquadMemberParams{
-				SquadID: squad.ID, MemberType: "agent", MemberID: lid, Role: "leader",
-			}); err != nil {
-				writeError(w, http.StatusInternalServerError, "failed to update squad")
-				return
-			}
-		}
 		params.LeaderID = lid
 		newLeaderRuntimeBound = newLeader.RuntimeID.Valid
 	}
@@ -632,10 +616,12 @@ func deriveSquadMemberStatus(
 }
 
 // ListSquadMemberStatus returns one entry per squad member with derived
-// status, the issues each agent member is currently running or waiting to run,
-// and the last observed runtime activity. The endpoint is read-only and
-// inherits the workspace-membership guard from the route middleware — any
-// member of the workspace can read it.
+// status, the issues each member's agent is currently running or waiting to
+// run, and the last observed runtime activity. A member's status is the state
+// of the agent they bring — their own for an agent-typed row, the one they
+// lend (squad_member.agent_id) for a person; a person who lends none reports
+// no status. The endpoint is read-only and inherits the workspace-membership
+// guard from the route middleware — any member of the workspace can read it.
 func (h *Handler) ListSquadMemberStatus(w http.ResponseWriter, r *http.Request) {
 	squad, _, ok := h.loadSquadInWorkspace(w, r)
 	if !ok {
@@ -657,6 +643,7 @@ func (h *Handler) ListSquadMemberStatus(w http.ResponseWriter, r *http.Request) 
 	type memberAcc struct {
 		response       SquadMemberStatusResponse
 		archived       bool
+		hasAgent       bool
 		hasWorkingTask bool
 		runtimeStatus  pgtype.Text
 		runtimeSeenAt  pgtype.Timestamptz
@@ -676,6 +663,10 @@ func (h *Handler) ListSquadMemberStatus(w http.ResponseWriter, r *http.Request) 
 					ActiveIssues: []SquadActiveIssueBrief{},
 				},
 				archived:      row.AgentArchivedAt.Valid,
+				// A person's status is their lent agent's status; a person who
+				// has lent none has no status at all (the client renders them
+				// without a pill rather than as "offline").
+				hasAgent:      row.MemberType == "agent" || row.LentAgentID.Valid,
 				runtimeStatus: row.RuntimeStatus,
 				runtimeSeenAt: row.RuntimeLastSeenAt,
 			}
@@ -683,7 +674,7 @@ func (h *Handler) ListSquadMemberStatus(w http.ResponseWriter, r *http.Request) 
 			order = append(order, memberID)
 		}
 
-		if row.MemberType != "agent" {
+		if !entry.hasAgent {
 			continue
 		}
 
@@ -724,7 +715,7 @@ func (h *Handler) ListSquadMemberStatus(w http.ResponseWriter, r *http.Request) 
 	}
 	for _, id := range order {
 		entry := acc[id]
-		if entry.response.MemberType == "agent" {
+		if entry.hasAgent {
 			status := deriveSquadMemberStatus(
 				entry.archived,
 				entry.runtimeStatus,
@@ -773,6 +764,13 @@ func (h *Handler) AddSquadMember(w http.ResponseWriter, r *http.Request) {
 		MemberType string `json:"member_type"`
 		MemberID   string `json:"member_id"`
 		Role       string `json:"role"`
+		// Absent means "yes": the common case is adding someone who is here to
+		// work, and a pointer is what tells an omitted field from an explicit
+		// false.
+		CanReceiveWork *bool `json:"can_receive_work"`
+		// The one agent this person lends to the room. Optional: people who
+		// bring none are still members.
+		AgentID string `json:"agent_id"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body")
@@ -817,11 +815,23 @@ func (h *Handler) AddSquadMember(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	sm, err := h.Queries.AddSquadMember(r.Context(), db.AddSquadMemberParams{
-		SquadID:    squad.ID,
-		MemberType: req.MemberType,
-		MemberID:   memberUUID,
-		Role:       req.Role,
+	canReceiveWork := true
+	if req.CanReceiveWork != nil {
+		canReceiveWork = *req.CanReceiveWork
+	}
+
+	lentAgent, ok := h.resolveLentAgent(w, r, req.MemberType, memberUUID, req.AgentID)
+	if !ok {
+		return
+	}
+
+	sm, err := h.Queries.AddSquadMemberWithWork(r.Context(), db.AddSquadMemberWithWorkParams{
+		SquadID:        squad.ID,
+		MemberType:     req.MemberType,
+		MemberID:       memberUUID,
+		Role:           req.Role,
+		CanReceiveWork: canReceiveWork,
+		AgentID:        lentAgent,
 	})
 	if err != nil {
 		if isUniqueViolation(err) {

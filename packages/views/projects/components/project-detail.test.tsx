@@ -89,36 +89,8 @@ vi.mock("sonner", () => ({
   toast: { success: mocks.toastSuccess },
 }));
 
-vi.mock("react-resizable-panels", () => ({
-  useDefaultLayout: () => ({
-    defaultLayout: undefined,
-    onLayoutChanged: vi.fn(),
-  }),
-  usePanelRef: () => ({
-    current: {
-      isCollapsed: () => false,
-      expand: vi.fn(),
-      collapse: vi.fn(),
-    },
-  }),
-}));
-
-vi.mock("@quickwork/ui/hooks/use-mobile", () => ({
-  useIsMobile: () => false,
-}));
-
 vi.mock("@quickwork/ui/components/common/emoji-picker", () => ({
   EmojiPicker: () => null,
-}));
-
-vi.mock("@quickwork/ui/components/ui/resizable", () => ({
-  ResizablePanelGroup: ({ children }: { children: React.ReactNode }) => (
-    <div>{children}</div>
-  ),
-  ResizablePanel: ({ children }: { children: React.ReactNode }) => (
-    <div>{children}</div>
-  ),
-  ResizableHandle: () => null,
 }));
 
 vi.mock("@quickwork/ui/components/ui/dropdown-menu", () => ({
@@ -222,6 +194,11 @@ vi.mock("./project-resources-section", () => ({
   ProjectResourcesSection: () => null,
 }));
 
+// The task column has its own suite; this file is about the header actions.
+vi.mock("./project-task-list", () => ({
+  ProjectTaskList: () => null,
+}));
+
 vi.mock("./project-start-date-picker", () => ({
   ProjectStartDatePicker: () => null,
 }));
@@ -230,30 +207,10 @@ vi.mock("./project-due-date-picker", () => ({
   ProjectDueDatePicker: () => null,
 }));
 
-vi.mock("../../issues/surface/issue-surface", () => ({
-  IssueSurface: () => null,
-}));
-
 vi.mock("../../layout/breadcrumb-header", () => ({
   BreadcrumbHeader: ({ actions }: { actions: React.ReactNode }) => (
     <header>{actions}</header>
   ),
-}));
-
-vi.mock("../../layout/animated-right-sidebar", () => ({
-  AnimatedRightSidebar: ({ children }: { children: React.ReactNode }) => (
-    <aside>{children}</aside>
-  ),
-  getAnimatedRightSidebarInitialOpen: () => true,
-  rightSidebarPanelMotionProps: {},
-  useRightSidebarShortcut: vi.fn(),
-  useAnimatedRightSidebarState: () => ({
-    open: true,
-    visualOpen: true,
-    motionEnabled: false,
-    beginToggle: vi.fn(),
-    handleResize: vi.fn(),
-  }),
 }));
 
 const PROJECT: Project = {

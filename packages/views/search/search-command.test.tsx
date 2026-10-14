@@ -179,7 +179,7 @@ vi.mock("@quickwork/core/issues/stores", () => {
       (wsId: string | null) =>
       (state: { byWorkspace: Record<string, typeof mockRecentItems.current> }) =>
         wsId ? (state.byWorkspace[wsId] ?? EMPTY) : EMPTY,
-    openCreateIssueWithPreference: (data?: Record<string, unknown> | null) =>
+    openCreateIssue: (data?: Record<string, unknown> | null) =>
       mockOpenModal("quick-create-issue", data ?? null),
     useCommentCollapseStore: Object.assign(vi.fn(), {
       getState: () => ({
@@ -206,8 +206,9 @@ vi.mock("@quickwork/core/paths", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@quickwork/core/paths")>()),
   useWorkspacePaths: () => ({
     inbox: () => "/ws-test/inbox",
-    chat: () => "/ws-test/chat",
+    tasks: () => "/ws-test/tasks",
     myIssues: () => "/ws-test/my-issues",
+    dispatch: () => "/ws-test/dispatch",
     issues: () => "/ws-test/issues",
     projects: () => "/ws-test/projects",
     autopilots: () => "/ws-test/autopilots",

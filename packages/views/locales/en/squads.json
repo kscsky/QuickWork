@@ -13,7 +13,8 @@
     },
     "no_matches": "No squads match",
     "row_menu": "Squad actions",
-    "archive_action": "Archive"
+    "archive_action": "Archive",
+    "tagline": "A leader agent plus members — work hands off down the chain."
   },
   "inspector": {
     "details_section": "Details",
@@ -42,7 +43,7 @@
   },
   "add_member_dialog": {
     "title": "Add Member",
-    "description": "Add a workspace member or agent to this squad.",
+    "description": "Add a space member or agent to this squad.",
     "label_member": "Member",
     "label_role": "Role",
     "label_optional": "(optional)",
@@ -88,9 +89,14 @@
     "status_archived": "Archived",
     "issue_status_blocked": "blocked",
     "active_issue_more": "and {{count}} more",
-    "last_active_label": "last active {{time}}"
+    "last_active_label": "last active {{time}}",
+    "lends_none": "No agent",
+    "lends_create": "create one",
+    "lends_aria": "Agent {{name}} lends to this squad",
+    "lends_opt_out": "Lends nothing"
   },
   "detail_tabs": {
+    "room": "Room",
     "members": "Members",
     "instructions": "Instructions"
   },
@@ -111,7 +117,9 @@
     "leader_updated": "Leader updated",
     "leader_update_failed": "Failed to update leader",
     "archive_failed": "Failed to archive squad",
-    "instructions_saved": "Instructions saved"
+    "instructions_saved": "Instructions saved",
+    "agent_updated": "Agent updated",
+    "agent_update_failed": "Could not change the agent"
   },
   "profile_card": {
     "unavailable": "Squad unavailable",
@@ -140,9 +148,35 @@
     "direction_desc": "Descending",
     "section_columns": "Columns",
     "result_count_title": "Matching squads / all squads",
-    "filter_label": "Filter",
-    "filter_active_count_one": "{{count}} filter",
-    "filter_active_count_other": "{{count}} filters",
-    "clear_filters": "Clear filters"
+    "chip_named": "{{label}}: {{value}}",
+    "chip_multi": "{{label}}: {{value}} selected"
+  },
+  "room": {
+    "loading": "Loading the room…",
+    "empty": "Nothing said yet. This room is where the squad's work shows up.",
+    "older_hidden_one": "Older messages are not shown ({{count}} per page)",
+    "older_hidden_other": "Older messages are not shown ({{count}} per page)",
+    "send": "Send",
+    "send_failed": "Could not send",
+    "composer_placeholder": "Say something to the squad…",
+    "composer_hint": "Enter to send, Shift + Enter for a new line",
+    "join_to_speak": "Join this squad to post in its room.",
+    "members": "Members",
+    "unknown_person": "Unknown",
+    "you": "You",
+    "no_agents": "No agents",
+    "agent_holding_one": "{{count}} running",
+    "agent_holding_other": "{{count}} running",
+    "agent_idle_one": "{{count}} agent, free",
+    "agent_idle_other": "{{count}} agents, free",
+    "not_taking_work": "Not taking work",
+    "kind_receipt": "delivered something",
+    "role": {
+      "leader": "Leader",
+      "executor": "Executor",
+      "reviewer": "Reviewer",
+      "observer": "Observer"
+    },
+    "step_of": "Step {{step}} of {{total}}"
   }
 }

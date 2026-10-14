@@ -42,7 +42,6 @@ export type TabSubject =
    */
   | { kind: "inbox"; selectedKey: string | null; archived: boolean }
   /** The Chat container; `sessionId` is the `?session=` selection or null. */
-  | { kind: "chat"; sessionId: string | null }
   /** A creation flow that has not produced a resource yet. */
   | { kind: "flow"; flow: "create-agent" }
   /** An unrecognized URL. Never impersonate a real page. */
@@ -104,8 +103,6 @@ export function parseTabSubject(url: string): TabSubject {
         selectedKey: query.get("issue") || null,
         archived: query.get("view") === "archived",
       };
-    case "chat":
-      return { kind: "chat", sessionId: query.get("session") || null };
     case "runtimes":
       if (!id) return { kind: "page", page: "runtimes" };
       // `/runtimes/:machineId/runtime/:runtimeId` — nested runtime.
@@ -159,8 +156,6 @@ export function tabSubjectKey(subject: TabSubject): string {
       return `attachment:${subject.id}:${subject.filename ?? ""}`;
     case "inbox":
       return `inbox:${subject.archived ? "archived" : "inbox"}:${subject.selectedKey ?? ""}`;
-    case "chat":
-      return `chat:${subject.sessionId ?? ""}`;
     case "flow":
       return `flow:${subject.flow}`;
     case "unknown":

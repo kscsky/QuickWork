@@ -26,6 +26,8 @@ import type runtimes from "../locales/en/runtimes.json";
 import type layout from "../locales/en/layout.json";
 import type usage from "../locales/en/usage.json";
 import type squads from "../locales/en/squads.json";
+import type home from "../locales/en/home.json";
+import type tasks from "../locales/en/tasks.json";
 
 // Module augmentation enables i18next v26 selector API across the monorepo:
 // `t($ => $.signin.title)` resolves to the value in en/auth.json.
@@ -66,6 +68,8 @@ declare global {
     layout: typeof layout;
     usage: typeof usage;
     squads: typeof squads;
+    home: typeof home;
+    tasks: typeof tasks;
   }
 }
 

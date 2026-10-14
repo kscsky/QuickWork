@@ -2,6 +2,8 @@
   "nav": {
     "inbox": "인박스",
     "chat": "채팅",
+    "dispatch": "스쿼드 태스크",
+    "tasks": "작업 목록",
     "my_issues": "내 태스크",
     "issues": "태스크",
     "projects": "프로젝트",
@@ -37,23 +39,30 @@
     "server_version": "서버 버전 {{version}}"
   },
   "workspace_loader": {
-    "loading_workspace": "워크스페이스 로딩 중...",
+    "loading_workspace": "스페이스 로딩 중...",
     "loading_named_prefix": "로딩 중"
   },
   "sidebar": {
     "unpin_tooltip": "고정 해제",
-    "workspaces_label": "워크스페이스",
-    "create_workspace": "워크스페이스 만들기",
+    "workspaces_label": "스페이스",
+    "create_workspace": "스페이스 만들기",
     "pending_invitations_label": "대기 중인 초대",
-    "invitation_workspace_fallback": "워크스페이스",
+    "invitation_workspace_fallback": "스페이스",
     "invitation_join": "참가",
     "invitation_decline": "거절",
     "log_out": "로그아웃",
-    "new_issue": "새 태스크",
+    "new_issue": "솔로 태스크",
     "new_issue_shortcut": "C",
     "pinned_label": "고정됨",
-    "workspace_group": "워크스페이스",
+    "workspace_group": "스페이스",
     "configure_group": "설정",
-    "unread_overflow": "99+"
+    "unread_overflow": "99+",
+    "running_label": "작업 중",
+    "running_all": "전체",
+    "running_more_other": "{{count}}건 더",
+    "running_unnamed": "제목 없는 태스크",
+    "nav_running_other": "{{count}} 작업 중",
+    "nav_busy_other": "{{count}} 작업",
+    "fleet_state": "{{busy}} 작업 · {{idle}} 여유"
   }
 }

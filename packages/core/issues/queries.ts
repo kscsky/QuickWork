@@ -8,6 +8,8 @@ import { api, ApiError } from "../api";
 import type {
   Issue,
   IssueAssigneeType,
+  IssueChain,
+  IssueChainForIssue,
   IssueStatusCategory,
   IssueTableFacetsRequest,
   IssueTableGroupSpec,
@@ -177,8 +179,31 @@ export const issueKeys = {
   tasksAll: () => ["issues", "tasks"] as const,
   /** Per-issue task list (issue-detail Execution log section). */
   tasks: (issueId: string) => [...issueKeys.tasksAll(), issueId] as const,
+  /** Prefix across every task's relay. Keyed without wsId like the per-issue
+   *  caches above, so all-issue invalidation must go through this prefix.
+   *  The relay advances as a side effect of runs finishing, so the `task:`
+   *  WS path refreshes it off the same signal the task lists use. */
+  chainAll: () => ["issues", "chain"] as const,
+  /** One task's relay: ordered steps plus the parked flag. */
+  chain: (issueId: string) => [...issueKeys.chainAll(), issueId] as const,
+  /** Relays for a page of tasks, fetched in one request. The ids ARE the
+   *  query, so they belong in the key (sorted for stability). */
+  chains: (issueIds: readonly string[]) =>
+    [...issueKeys.chainAll(), "bulk", [...issueIds].sort()] as const,
   sourceContextPreview: (wsId: string, anchorCommentId: string) =>
     ["source-context", "preview", wsId, anchorCommentId] as const,
+  /** Open issues with no assignee — the control tower's orchestration queue. */
+  unassigned: (wsId: string) =>
+    [...issueKeys.all(wsId), "unassigned"] as const,
+  /** Issues bound to one project — the project detail page's task column. */
+  projectTasks: (wsId: string, projectId: string) =>
+    [...issueKeys.all(wsId), "project-tasks", projectId] as const,
+  /** PREFIX over every by-id window — what the issue WS updaters invalidate. */
+  byIdsAll: (wsId: string) => [...issueKeys.all(wsId), "by-ids"] as const,
+  /** Flat window pinned to an explicit id set (running-task titles, agent
+   *  holds). The ids ARE the query, so they belong in the key. */
+  byIds: (wsId: string, ids: readonly string[]) =>
+    [...issueKeys.byIdsAll(wsId), [...ids].sort()] as const,
 };
 
 export function sourceContextPreviewOptions(
@@ -357,6 +382,81 @@ export function issueListOptions(wsId: string, sort?: IssueSortParam) {
     queryFn: () => fetchFirstPages({}, sort),
     select: flattenIssueBuckets,
     placeholderData: keepPreviousData,
+  });
+}
+
+/** Window size for the control tower's unassigned queue. The column scrolls;
+ *  nobody orchestrates a backlog deeper than this from the home page. */
+export const UNASSIGNED_QUEUE_LIMIT = 50;
+
+/**
+ * Open issues nobody owns yet — the control tower's "待编排" column.
+ *
+ * Deliberately not {@link issueListOptions}: that one fans out over the seven
+ * status buckets and has no room for `include_no_assignee`, which the server
+ * applies as a filter. Oldest first, so the queue reads as "what has been
+ * waiting longest" rather than "what was filed last".
+ */
+export function unassignedIssueListOptions(wsId: string) {
+  return queryOptions({
+    queryKey: issueKeys.unassigned(wsId),
+    queryFn: () =>
+      api.listIssues({
+        include_no_assignee: true,
+        open_only: true,
+        limit: UNASSIGNED_QUEUE_LIMIT,
+        sort_by: "created_at",
+        sort_direction: "asc",
+      }),
+    enabled: !!wsId,
+    select: (res) => res.issues,
+  });
+}
+
+/** Window for the project detail page's task column. It scrolls; a project
+ *  deeper than this is being read from the issues page, not from here. */
+export const PROJECT_TASK_LIST_LIMIT = 50;
+
+/**
+ * Issues bound to one project — the project detail page's task column.
+ *
+ * Deliberately neither {@link issueListOptions} nor an issue surface: those fan
+ * out over the seven status buckets and render each as a collapsible group, so
+ * a project with four tasks shows six "no issues" placeholders between them.
+ * The question this column answers is "what is on this project", and a flat
+ * newest-first list answers it.
+ */
+export function projectTaskListOptions(wsId: string, projectId: string) {
+  return queryOptions({
+    queryKey: issueKeys.projectTasks(wsId, projectId),
+    queryFn: () =>
+      api.listIssues({
+        project_id: projectId,
+        limit: PROJECT_TASK_LIST_LIMIT,
+        sort_by: "created_at",
+        sort_direction: "desc",
+      }),
+    enabled: !!wsId && !!projectId,
+    select: (res) => res.issues,
+  });
+}
+
+/**
+ * Titles for an explicit id set — how the home page and sidebar turn the
+ * running-task snapshot's `issue_id`s into something readable, in one request
+ * instead of one per row.
+ *
+ * `enabled` is part of the contract, not an optimization: the server reads a
+ * PRESENT-but-empty `ids` as "nothing matched", so an empty set must never
+ * reach the wire (see the note in `ApiClient.listIssues`). Returning [] here
+ * lets callers skip their own guard.
+ */
+export function issuesByIdsOptions(wsId: string, ids: readonly string[]) {
+  return queryOptions({
+    queryKey: issueKeys.byIds(wsId, ids),
+    queryFn: () =>
+      api.listIssues({ ids: [...ids], limit: ids.length }).then((res) => res.issues),
+    enabled: !!wsId && ids.length > 0,
   });
 }
 
@@ -576,6 +676,35 @@ export function issueTimelineOptions(issueId: string) {
   return queryOptions({
     queryKey: issueKeys.timeline(issueId),
     queryFn: () => api.listTimeline(issueId),
+  });
+}
+
+/**
+ * A task's relay: the ordered steps, who holds each one, and whether the
+ * chain is parked. `staleTime: 0` because the chain moves on its own — a run
+ * finishing advances it server-side — so a cached copy that looks current
+ * but shows the wrong holder is worse than a refetch.
+ */
+export function issueChainOptions(issueId: string) {
+  return queryOptions<IssueChain>({
+    queryKey: issueKeys.chain(issueId),
+    queryFn: () => api.getIssueChain(issueId),
+    enabled: !!issueId,
+    staleTime: 0,
+  });
+}
+
+/**
+ * Relays for a whole page of tasks in one request — the task list's chain
+ * strips. Tasks with no chain simply do not appear in the result; the caller
+ * treats absence as "no relay", not as "still loading".
+ */
+export function issueChainsOptions(issueIds: readonly string[]) {
+  return queryOptions<IssueChainForIssue[]>({
+    queryKey: issueKeys.chains(issueIds),
+    queryFn: () => api.listIssueChains([...issueIds]),
+    enabled: issueIds.length > 0,
+    staleTime: 0,
   });
 }
 

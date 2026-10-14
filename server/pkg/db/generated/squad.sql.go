@@ -14,7 +14,7 @@ import (
 const addSquadMember = `-- name: AddSquadMember :one
 INSERT INTO squad_member (squad_id, member_type, member_id, role)
 VALUES ($1, $2, $3, $4)
-RETURNING id, squad_id, member_type, member_id, role, created_at
+RETURNING id, squad_id, member_type, member_id, role, created_at, can_receive_work, agent_id
 `
 
 type AddSquadMemberParams struct {
@@ -39,6 +39,46 @@ func (q *Queries) AddSquadMember(ctx context.Context, arg AddSquadMemberParams) 
 		&i.MemberID,
 		&i.Role,
 		&i.CreatedAt,
+		&i.CanReceiveWork,
+		&i.AgentID,
+	)
+	return i, err
+}
+
+const addSquadMemberWithWork = `-- name: AddSquadMemberWithWork :one
+INSERT INTO squad_member (squad_id, member_type, member_id, role, can_receive_work, agent_id)
+VALUES ($1, $2, $3, $4, $5, $6::uuid)
+RETURNING id, squad_id, member_type, member_id, role, created_at, can_receive_work, agent_id
+`
+
+type AddSquadMemberWithWorkParams struct {
+	SquadID        pgtype.UUID `json:"squad_id"`
+	MemberType     string      `json:"member_type"`
+	MemberID       pgtype.UUID `json:"member_id"`
+	Role           string      `json:"role"`
+	CanReceiveWork bool        `json:"can_receive_work"`
+	AgentID        pgtype.UUID `json:"agent_id"`
+}
+
+func (q *Queries) AddSquadMemberWithWork(ctx context.Context, arg AddSquadMemberWithWorkParams) (SquadMember, error) {
+	row := q.db.QueryRow(ctx, addSquadMemberWithWork,
+		arg.SquadID,
+		arg.MemberType,
+		arg.MemberID,
+		arg.Role,
+		arg.CanReceiveWork,
+		arg.AgentID,
+	)
+	var i SquadMember
+	err := row.Scan(
+		&i.ID,
+		&i.SquadID,
+		&i.MemberType,
+		&i.MemberID,
+		&i.Role,
+		&i.CreatedAt,
+		&i.CanReceiveWork,
+		&i.AgentID,
 	)
 	return i, err
 }
@@ -368,6 +408,7 @@ SELECT
     sm.id              AS squad_member_id,
     sm.member_type     AS member_type,
     sm.member_id       AS member_id,
+    sm.agent_id        AS lent_agent_id,
     a.archived_at      AS agent_archived_at,
     ar.status          AS runtime_status,
     ar.last_seen_at    AS runtime_last_seen_at,
@@ -380,13 +421,12 @@ SELECT
     i.status           AS issue_status
 FROM squad_member sm
 LEFT JOIN agent a
-       ON sm.member_type = 'agent' AND a.id = sm.member_id
+       ON a.id = CASE WHEN sm.member_type = 'agent' THEN sm.member_id ELSE sm.agent_id END
 LEFT JOIN agent_runtime ar
        ON ar.id = a.runtime_id
 LEFT JOIN agent_task_queue atq
-       ON sm.member_type = 'agent'
-      AND atq.agent_id = sm.member_id
-      AND atq.status IN ('dispatched', 'running', 'waiting_local_directory')
+       ON atq.agent_id = CASE WHEN sm.member_type = 'agent' THEN sm.member_id ELSE sm.agent_id END
+      AND atq.status IN ('queued', 'dispatched', 'running', 'waiting_local_directory')
 LEFT JOIN issue i
        ON i.id = atq.issue_id
 WHERE sm.squad_id = $1
@@ -397,6 +437,7 @@ type ListSquadMemberStatusRowsRow struct {
 	SquadMemberID     pgtype.UUID        `json:"squad_member_id"`
 	MemberType        string             `json:"member_type"`
 	MemberID          pgtype.UUID        `json:"member_id"`
+	LentAgentID       pgtype.UUID        `json:"lent_agent_id"`
 	AgentArchivedAt   pgtype.Timestamptz `json:"agent_archived_at"`
 	RuntimeStatus     pgtype.Text        `json:"runtime_status"`
 	RuntimeLastSeenAt pgtype.Timestamptz `json:"runtime_last_seen_at"`
@@ -411,11 +452,21 @@ type ListSquadMemberStatusRowsRow struct {
 
 // Per-row join used to build the squad-members status view. One row per
 // (squad_member × in_flight_task); members with no in-flight task return a
-// single row with NULL task_* columns. Human members and agent members
-// with no agent row also return one row with NULL agent_/runtime_ columns.
-// waiting_local_directory stays in the row set so its issue remains visible,
-// but the handler only treats dispatched/running rows as working because the
-// squad status vocabulary has no queued bucket.
+// single row with NULL task_* columns. Members with no effective agent
+// (a person who has lent none) also return one row with NULL agent_/runtime_
+// columns.
+//
+// A member's effective agent is their own id when the row IS an agent, and
+// the agent they lend (sm.agent_id) when the row is a person — the room model
+// is people who bring their own agent along. Joining only agent-typed rows
+// (the pre-room model) left every person with NULL status, so squad load,
+// working state and active issues all read zero.
+//
+// queued and waiting_local_directory stay in the row set so their issue
+// remains visible — the work is assigned even when it is waiting for the
+// holder's environment to pick it up — but the handler only treats
+// dispatched/running rows as working: the status vocabulary has no
+// "waiting for pickup" bucket.
 func (q *Queries) ListSquadMemberStatusRows(ctx context.Context, squadID pgtype.UUID) ([]ListSquadMemberStatusRowsRow, error) {
 	rows, err := q.db.Query(ctx, listSquadMemberStatusRows, squadID)
 	if err != nil {
@@ -429,6 +480,7 @@ func (q *Queries) ListSquadMemberStatusRows(ctx context.Context, squadID pgtype.
 			&i.SquadMemberID,
 			&i.MemberType,
 			&i.MemberID,
+			&i.LentAgentID,
 			&i.AgentArchivedAt,
 			&i.RuntimeStatus,
 			&i.RuntimeLastSeenAt,
@@ -451,7 +503,7 @@ func (q *Queries) ListSquadMemberStatusRows(ctx context.Context, squadID pgtype.
 }
 
 const listSquadMembers = `-- name: ListSquadMembers :many
-SELECT id, squad_id, member_type, member_id, role, created_at FROM squad_member WHERE squad_id = $1 ORDER BY created_at ASC
+SELECT id, squad_id, member_type, member_id, role, created_at, can_receive_work, agent_id FROM squad_member WHERE squad_id = $1 ORDER BY created_at ASC
 `
 
 func (q *Queries) ListSquadMembers(ctx context.Context, squadID pgtype.UUID) ([]SquadMember, error) {
@@ -470,6 +522,8 @@ func (q *Queries) ListSquadMembers(ctx context.Context, squadID pgtype.UUID) ([]
 			&i.MemberID,
 			&i.Role,
 			&i.CreatedAt,
+			&i.CanReceiveWork,
+			&i.AgentID,
 		); err != nil {
 			return nil, err
 		}
@@ -741,10 +795,80 @@ func (q *Queries) UpdateSquad(ctx context.Context, arg UpdateSquadParams) (Squad
 	return i, err
 }
 
+const updateSquadMemberAgent = `-- name: UpdateSquadMemberAgent :one
+UPDATE squad_member SET agent_id = $4::uuid
+WHERE squad_id = $1 AND member_type = $2 AND member_id = $3
+RETURNING id, squad_id, member_type, member_id, role, created_at, can_receive_work, agent_id
+`
+
+type UpdateSquadMemberAgentParams struct {
+	SquadID    pgtype.UUID `json:"squad_id"`
+	MemberType string      `json:"member_type"`
+	MemberID   pgtype.UUID `json:"member_id"`
+	AgentID    pgtype.UUID `json:"agent_id"`
+}
+
+func (q *Queries) UpdateSquadMemberAgent(ctx context.Context, arg UpdateSquadMemberAgentParams) (SquadMember, error) {
+	row := q.db.QueryRow(ctx, updateSquadMemberAgent,
+		arg.SquadID,
+		arg.MemberType,
+		arg.MemberID,
+		arg.AgentID,
+	)
+	var i SquadMember
+	err := row.Scan(
+		&i.ID,
+		&i.SquadID,
+		&i.MemberType,
+		&i.MemberID,
+		&i.Role,
+		&i.CreatedAt,
+		&i.CanReceiveWork,
+		&i.AgentID,
+	)
+	return i, err
+}
+
+const updateSquadMemberAssignment = `-- name: UpdateSquadMemberAssignment :one
+UPDATE squad_member SET role = $4, can_receive_work = $5
+WHERE squad_id = $1 AND member_type = $2 AND member_id = $3
+RETURNING id, squad_id, member_type, member_id, role, created_at, can_receive_work, agent_id
+`
+
+type UpdateSquadMemberAssignmentParams struct {
+	SquadID        pgtype.UUID `json:"squad_id"`
+	MemberType     string      `json:"member_type"`
+	MemberID       pgtype.UUID `json:"member_id"`
+	Role           string      `json:"role"`
+	CanReceiveWork bool        `json:"can_receive_work"`
+}
+
+func (q *Queries) UpdateSquadMemberAssignment(ctx context.Context, arg UpdateSquadMemberAssignmentParams) (SquadMember, error) {
+	row := q.db.QueryRow(ctx, updateSquadMemberAssignment,
+		arg.SquadID,
+		arg.MemberType,
+		arg.MemberID,
+		arg.Role,
+		arg.CanReceiveWork,
+	)
+	var i SquadMember
+	err := row.Scan(
+		&i.ID,
+		&i.SquadID,
+		&i.MemberType,
+		&i.MemberID,
+		&i.Role,
+		&i.CreatedAt,
+		&i.CanReceiveWork,
+		&i.AgentID,
+	)
+	return i, err
+}
+
 const updateSquadMemberRole = `-- name: UpdateSquadMemberRole :one
 UPDATE squad_member SET role = $4
 WHERE squad_id = $1 AND member_type = $2 AND member_id = $3
-RETURNING id, squad_id, member_type, member_id, role, created_at
+RETURNING id, squad_id, member_type, member_id, role, created_at, can_receive_work, agent_id
 `
 
 type UpdateSquadMemberRoleParams struct {
@@ -769,6 +893,42 @@ func (q *Queries) UpdateSquadMemberRole(ctx context.Context, arg UpdateSquadMemb
 		&i.MemberID,
 		&i.Role,
 		&i.CreatedAt,
+		&i.CanReceiveWork,
+		&i.AgentID,
+	)
+	return i, err
+}
+
+const updateSquadMemberWork = `-- name: UpdateSquadMemberWork :one
+UPDATE squad_member SET can_receive_work = $4
+WHERE squad_id = $1 AND member_type = $2 AND member_id = $3
+RETURNING id, squad_id, member_type, member_id, role, created_at, can_receive_work, agent_id
+`
+
+type UpdateSquadMemberWorkParams struct {
+	SquadID        pgtype.UUID `json:"squad_id"`
+	MemberType     string      `json:"member_type"`
+	MemberID       pgtype.UUID `json:"member_id"`
+	CanReceiveWork bool        `json:"can_receive_work"`
+}
+
+func (q *Queries) UpdateSquadMemberWork(ctx context.Context, arg UpdateSquadMemberWorkParams) (SquadMember, error) {
+	row := q.db.QueryRow(ctx, updateSquadMemberWork,
+		arg.SquadID,
+		arg.MemberType,
+		arg.MemberID,
+		arg.CanReceiveWork,
+	)
+	var i SquadMember
+	err := row.Scan(
+		&i.ID,
+		&i.SquadID,
+		&i.MemberType,
+		&i.MemberID,
+		&i.Role,
+		&i.CreatedAt,
+		&i.CanReceiveWork,
+		&i.AgentID,
 	)
 	return i, err
 }

@@ -199,6 +199,12 @@ import type {
   RegisterTelegramRequest,
   RedeemTelegramBindingTokenResponse,
   Squad,
+  SquadMessage,
+  SquadPlaybook,
+  SquadRoom,
+  IssueChain,
+  IssueChainForIssue,
+  DispatchStep,
   SquadMember,
   SquadMemberStatusListResponse,
   SourceContextPreview,
@@ -258,6 +264,7 @@ import {
   EMPTY_ISSUE_TABLE_GROUPS_RESPONSE,
   EMPTY_ISSUE_TABLE_ROWS_RESPONSE,
   EMPTY_LIST_ISSUES_RESPONSE,
+  EMPTY_LIST_PROJECTS_RESPONSE,
   EMPTY_SEARCH_ISSUES_RESPONSE,
   EMPTY_SEARCH_PROJECTS_RESPONSE,
   EMPTY_SQUAD,
@@ -281,6 +288,7 @@ import {
   CronPreviewResponseSchema,
   UNREADABLE_CRON_PREVIEW_RESPONSE,
   ListIssuesResponseSchema,
+  ListProjectsResponseSchema,
   CreateIssueResponseSchema,
   IssueSchema,
   AgentTaskSchema,
@@ -295,8 +303,26 @@ import {
   SearchProjectsResponseSchema,
   SquadSchema,
   SquadListSchema,
+  SquadMemberSchema,
+  SquadMemberListSchema,
+  EMPTY_SQUAD_MEMBER_LIST,
+  EMPTY_SQUAD_MEMBER,
+  SquadMessageSchema,
+  SquadRoomSchema,
+  IssueChainSchema,
+  IssueChainListSchema,
+  EMPTY_ISSUE_CHAIN_RESPONSE,
+  SquadPlaybookSchema,
+  SquadPlaybookListSchema,
+  EMPTY_PLAYBOOK_LIST,
+  EMPTY_SQUAD_PLAYBOOK,
+  EMPTY_SQUAD_ROOM,
+  EMPTY_SQUAD_MESSAGE,
   SquadMemberStatusListResponseSchema,
   SubscribersListSchema,
+  TaskIssueResponseSchema,
+  EMPTY_TASK_ISSUE,
+  type TaskIssueResponse,
   TimelineEntriesSchema,
   UserSchema,
   WebhookDeliveryResponseSchema,
@@ -829,6 +855,14 @@ export class ApiClient {
     if (params?.q?.trim()) search.set("q", params.q.trim());
     if (params?.status) search.set("status", params.status);
     if (params?.statuses?.length) search.set("statuses", params.statuses.join(","));
+    // Category filters, not exact keys: a board column holds a category's
+    // canonical status plus every custom status inheriting it (MUL-6243).
+    // Omitting them here made the bucketed fetch send seven identical
+    // requests and flatten every issue once per bucket.
+    if (params?.status_category) search.set("status_category", params.status_category);
+    if (params?.status_categories?.length) {
+      search.set("status_categories", params.status_categories.join(","));
+    }
     if (params?.priority) search.set("priority", params.priority);
     if (params?.priorities?.length) search.set("priorities", params.priorities.join(","));
     if (params?.assignee_id) search.set("assignee_id", params.assignee_id);
@@ -1062,6 +1096,16 @@ export class ApiClient {
     return this.fetch("/api/issues/quick-create", {
       method: "POST",
       body: JSON.stringify(data),
+    });
+  }
+
+  // Resolves the issue a quick-create task produced. `issue_id` is empty while
+  // the run is still creating it — that is a "not yet", not an error, so an
+  // empty answer parses to an empty id rather than throwing.
+  async getTaskIssue(taskId: string): Promise<TaskIssueResponse> {
+    const raw = await this.fetch<unknown>(`/api/tasks/${taskId}/issue`);
+    return parseWithFallback(raw, TaskIssueResponseSchema, EMPTY_TASK_ISSUE, {
+      endpoint: "GET /api/tasks/:taskId/issue",
     });
   }
 
@@ -3170,7 +3214,10 @@ export class ApiClient {
   async listProjects(params?: { status?: string }): Promise<ListProjectsResponse> {
     const search = new URLSearchParams();
     if (params?.status) search.set("status", params.status);
-    return this.fetch(`/api/projects?${search}`);
+    const raw = await this.fetch<unknown>(`/api/projects?${search}`);
+    return parseWithFallback(raw, ListProjectsResponseSchema, EMPTY_LIST_PROJECTS_RESPONSE, {
+      endpoint: "GET /api/projects",
+    });
   }
 
   async getProject(id: string): Promise<Project> {
@@ -3683,11 +3730,144 @@ export class ApiClient {
   }
 
   async listSquadMembers(squadId: string): Promise<SquadMember[]> {
-    return this.fetch(`/api/squads/${squadId}/members`);
+    const raw = await this.fetch<unknown>(`/api/squads/${squadId}/members`);
+    return parseWithFallback(raw, SquadMemberListSchema, EMPTY_SQUAD_MEMBER_LIST, {
+      endpoint: "GET /api/squads/:id/members",
+    }) as SquadMember[];
   }
 
-  async addSquadMember(squadId: string, data: { member_type: string; member_id: string; role?: string }): Promise<SquadMember> {
-    return this.fetch(`/api/squads/${squadId}/members`, { method: "POST", body: JSON.stringify(data) });
+  async addSquadMember(squadId: string, data: { member_type: string; member_id: string; role?: string; can_receive_work?: boolean; agent_id?: string }): Promise<SquadMember> {
+    const raw = await this.fetch<unknown>(`/api/squads/${squadId}/members`, { method: "POST", body: JSON.stringify(data) });
+    return parseWithFallback(raw, SquadMemberSchema, EMPTY_SQUAD_MEMBER, {
+      endpoint: "POST /api/squads/:id/members",
+    }) as SquadMember;
+  }
+
+  /** A task's relay: the ordered steps and whether it is waiting on someone. */
+  async getIssueChain(issueId: string): Promise<IssueChain> {
+    const raw = await this.fetch<unknown>(`/api/issues/${issueId}/chain`);
+    return parseWithFallback(raw, IssueChainSchema, EMPTY_ISSUE_CHAIN_RESPONSE, {
+      endpoint: "GET /api/issues/:id/chain",
+    }) as IssueChain;
+  }
+
+  /**
+   * Writes a relay onto an existing task and starts its head.
+   *
+   * Three sources, in precedence order: `playbook_id` (a saved route),
+   * `steps` (a route arranged on the compose canvas and never saved), and —
+   * when neither is given — the squad's own order, whoever joined first is
+   * next in line.
+   */
+  async createIssueChain(
+    issueId: string,
+    data: { playbook_id?: string; steps?: DispatchStep[] } = {},
+  ): Promise<IssueChain> {
+    const raw = await this.fetch<unknown>(`/api/issues/${issueId}/chain`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+    return parseWithFallback(raw, IssueChainSchema, EMPTY_ISSUE_CHAIN_RESPONSE, {
+      endpoint: "POST /api/issues/:id/chain",
+    }) as IssueChain;
+  }
+
+  /**
+   * Relays for a whole page of tasks at once — the task list's chain strips.
+   *
+   * An empty id list answers "no chains" without a request: the server reads
+   * "exists but empty" as an empty result, so asking would only spend a round
+   * trip to learn what the caller already knows.
+   */
+  async listIssueChains(issueIds: string[]): Promise<IssueChainForIssue[]> {
+    if (issueIds.length === 0) return [];
+    const raw = await this.fetch<unknown>(`/api/issues/chains`, {
+      method: "POST",
+      body: JSON.stringify({ issue_ids: issueIds }),
+    });
+    const parsed = parseWithFallback(raw, IssueChainListSchema, { chains: [] }, {
+      endpoint: "POST /api/issues/chains",
+    }) as { chains: IssueChainForIssue[] };
+    return parsed.chains;
+  }
+
+  /** Skips the parked step and returns the chain as it now stands. */
+  async skipIssueChainStep(issueId: string): Promise<IssueChain> {
+    const raw = await this.fetch<unknown>(`/api/issues/${issueId}/chain/skip`, {
+      method: "POST",
+      body: JSON.stringify({}),
+    });
+    return parseWithFallback(raw, IssueChainSchema, EMPTY_ISSUE_CHAIN_RESPONSE, {
+      endpoint: "POST /api/issues/:id/chain/skip",
+    }) as IssueChain;
+  }
+
+  async listSquadPlaybooks(squadId: string): Promise<SquadPlaybook[]> {
+    const raw = await this.fetch<unknown>(`/api/squads/${squadId}/playbooks`);
+    return parseWithFallback(raw, SquadPlaybookListSchema, EMPTY_PLAYBOOK_LIST, {
+      endpoint: "GET /api/squads/:id/playbooks",
+    }) as SquadPlaybook[];
+  }
+
+  /** Creates a playbook, or replaces one when `id` is present. */
+  async saveSquadPlaybook(
+    squadId: string,
+    data: { id?: string; name: string; description?: string; steps: { holder_user_id: string; title: string }[] },
+  ): Promise<SquadPlaybook> {
+    const raw = await this.fetch<unknown>(`/api/squads/${squadId}/playbooks`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+    return parseWithFallback(raw, SquadPlaybookSchema, EMPTY_SQUAD_PLAYBOOK, {
+      endpoint: "POST /api/squads/:id/playbooks",
+    }) as SquadPlaybook;
+  }
+
+  async deleteSquadPlaybook(squadId: string, playbookId: string): Promise<void> {
+    await this.fetch(`/api/squads/${squadId}/playbooks/${playbookId}`, { method: "DELETE" });
+  }
+
+  /** Sets which of their own agents a member lends to the room. */
+  async updateSquadMemberAgent(squadId: string, data: { member_type: string; member_id: string; agent_id: string }): Promise<SquadMember> {
+    const raw = await this.fetch<unknown>(`/api/squads/${squadId}/members/agent`, { method: "PATCH", body: JSON.stringify(data) });
+    return parseWithFallback(raw, SquadMemberSchema, EMPTY_SQUAD_MEMBER, {
+      endpoint: "PATCH /api/squads/:id/members/agent",
+    }) as SquadMember;
+  }
+
+  async updateSquadMemberWork(squadId: string, data: { member_type: string; member_id: string; can_receive_work: boolean }): Promise<SquadMember> {
+    const raw = await this.fetch<unknown>(`/api/squads/${squadId}/members/work`, { method: "PATCH", body: JSON.stringify(data) });
+    return parseWithFallback(raw, SquadMemberSchema, EMPTY_SQUAD_MEMBER, {
+      endpoint: "PATCH /api/squads/:id/members/work",
+    }) as SquadMember;
+  }
+
+  /**
+   * The newest page of a squad room, oldest-first. `has_more` says older rows
+   * exist; the room is not a paged archive, so a caller asks for a bigger limit
+   * rather than tracking a cursor.
+   */
+  async listSquadMessages(squadId: string, limit?: number): Promise<SquadRoom> {
+    const query = limit ? `?limit=${limit}` : "";
+    const raw = await this.fetch<unknown>(
+      `/api/squads/${squadId}/messages${query}`,
+    );
+    return parseWithFallback(raw, SquadRoomSchema, EMPTY_SQUAD_ROOM, {
+      endpoint: "GET /api/squads/:id/messages",
+    }) as SquadRoom;
+  }
+
+  async createSquadMessage(
+    squadId: string,
+    data: { body: string; kind?: string; metadata?: Record<string, unknown> },
+  ): Promise<SquadMessage> {
+    const raw = await this.fetch<unknown>(`/api/squads/${squadId}/messages`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+    return parseWithFallback(raw, SquadMessageSchema, EMPTY_SQUAD_MESSAGE, {
+      endpoint: "POST /api/squads/:id/messages",
+    }) as SquadMessage;
   }
 
   async removeSquadMember(squadId: string, data: { member_type: string; member_id: string }): Promise<void> {

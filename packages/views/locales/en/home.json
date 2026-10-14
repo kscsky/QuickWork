@@ -1,0 +1,120 @@
+{
+  "tower": {
+    "title": "Control tower",
+    "squads": {
+      "title": "Squads",
+      "new": "New",
+      "load_of": "{{working}} of {{total}} running",
+      "load": {
+        "none": "No agents",
+        "idle": "Free",
+        "partial": "Has room",
+        "full": "At capacity"
+      },
+      "holding_one": "holding {{count}} issue",
+      "holding_other": "holding {{count}} issues",
+      "nothing_held": "Nothing in flight",
+      "members_one": "{{count}} member",
+      "members_other": "{{count}} members"
+    },
+    "queue": {
+      "title": "Needs orchestrating",
+      "empty": "Nothing is waiting for an owner",
+      "waiting_for": "waiting {{duration}}",
+      "dispatched": "Assigned",
+      "dispatch_failed": "Could not assign"
+    },
+    "agents": {
+      "title": "Agents",
+      "empty": "No agents yet",
+      "busy": "Running",
+      "idle": "Free",
+      "idle_short": "Free",
+      "queued_only_one": "{{count}} queued, not started",
+      "queued_only_other": "{{count}} queued, not started",
+      "queue_depth_one": "{{count}} queued",
+      "queue_depth_other": "{{count}} queued",
+      "holding_unnamed": "Working on an issue"
+    }
+  },
+  "summary": {
+    "running": "Running",
+    "unassigned": "Needs orchestrating",
+    "agents_busy": "Agents busy",
+    "agents_idle_one": "{{count}} free",
+    "agents_idle_other": "{{count}} free"
+  },
+  "composer": {
+    "squad_label": "Squad",
+    "squad_placeholder": "Select a squad",
+    "squad_search_placeholder": "Search squads...",
+    "squad_empty": "No squads found",
+    "new_squad": "New squad",
+    "prompt_placeholder": "What should this squad work on?",
+    "submit": "Orchestrate",
+    "submitting": "Starting...",
+    "linking": "Creating the issue...",
+    "hint": "Enter to start, Shift + Enter for a new line",
+    "no_squad_selected": "Select a squad first"
+  },
+  "compose": {
+    "title": "Compose",
+    "pick_squad": "Pick a squad",
+    "start": "Start",
+    "starting": "Creating…",
+    "start_hint": "⌘↵ to start",
+    "from": "Start from a handoff flow",
+    "blank_route": "Blank route",
+    "edited_one": "{{count}} change",
+    "edited_other": "{{count}} changes",
+    "playbook_note": "A handoff flow records who does which step; when people change, rebind",
+    "drag_hint": "Drag onto a step to change its holder",
+    "save_as": "Save as",
+    "playbook_name_placeholder": "Handoff flow name",
+    "save": "Save",
+    "task_node": "What to do",
+    "leader_locked": "Leader · always step one",
+    "no_agent": "No agent yet",
+    "remove_step": "Remove this step",
+    "unknown_holder": "Unknown person",
+    "parked_step": "Stops here",
+    "empty_route": "No steps yet. Drag someone in, or just start — with no route the squad's own order is used.",
+    "playbook_count": "Handoff flows",
+    "parked_warning_one": "{{count}} step waits for someone to bind an agent",
+    "parked_warning_other": "{{count}} steps wait for someone to bind an agent",
+    "step_placeholder": "What happens here",
+    "playbook_saved": "Saved as a handoff flow",
+    "playbook_save_failed": "Could not save the handoff flow",
+    "ask": "What should this squad work on?",
+    "ask_sub": "Describe the outcome you want. The squad sorts out the rest.",
+    "route_label": "It will go",
+    "route_edit": "Change",
+    "route_done": "Done",
+    "parked_notice": "{{name}} has no agent bound, so the task stops at their step and waits — not skipped, and not a failure.",
+    "from_blank": "Route: squad order",
+    "from_squad_order": "Squad order",
+    "leader_tag": "Leader · always first",
+    "squad_default": "{{agent}} · squad default",
+    "add_step": "Add a step",
+    "agent_rule": "Only agents this person created",
+    "squad_default_none": "Nothing set for this squad (the step will park)"
+  },
+  "empty": {
+    "title": "No squads yet",
+    "description": "A squad is a group of agents and teammates led by one leader. Create one to orchestrate your first workflow.",
+    "cta": "New squad"
+  },
+  "toasts": {
+    "started": "Workflow started",
+    "failed": "Failed to start the workflow",
+    "pending": "The agent is still starting. The issue will show up in the list.",
+    "chain_failed": "The task was created, but the relay route was not written",
+    "agent_offline": "The agent that would run this is offline — start its daemon on that machine, then start again.",
+    "agent_no_runtime": "This agent has no runtime bound — bind a machine, then start again.",
+    "agent_cli_unusable": "The agent CLI on that machine is installed but cannot execute — reinstall it, then start again.",
+    "agent_archived": "The agent that would run this is archived — pick another agent or squad.",
+    "agent_unavailable": "The agent is unavailable right now — wait for its machine or pick another agent.",
+    "daemon_version": "That agent's daemon is too old ({{current}}, needs ≥ {{min}}) — upgrade it, then start again.",
+    "version_unknown": "unknown"
+  }
+}

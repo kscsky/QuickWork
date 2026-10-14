@@ -7,16 +7,12 @@ import { AppLink, resolveClickIntent, useNavigation } from "../navigation";
 import {
   AlertTriangle,
   ArrowDown,
-  ArrowLeftRight,
   ArrowUp,
   CalendarClock,
   CalendarDays,
   Check,
-  ChevronRight,
   CircleUser,
   FolderKanban,
-  Maximize2,
-  Minimize2,
   MoreHorizontal,
   Settings2,
   Shapes,
@@ -53,6 +49,7 @@ import { Button } from "@quickwork/ui/components/ui/button";
 import { Switch } from "@quickwork/ui/components/ui/switch";
 import { ContentEditor, type ContentEditorRef, TitleEditor, type TitleEditorRef, useFileDropZone, FileDropOverlay, useUploadGate, useComposerSubmit } from "../editor";
 import { useIssueCreateUploads } from "./use-issue-create-uploads";
+import { DocketStrip } from "./docket-strip";
 import { useShortcut } from "@quickwork/core/shortcuts";
 import { ShortcutKeycaps } from "../common/shortcut-keycaps";
 import { StatusIcon, StatusPicker, PriorityIcon, PriorityPicker, StagePicker, AssigneePicker, StartDatePicker, DueDatePicker, LabelPicker } from "../issues/components";
@@ -64,7 +61,6 @@ import { useCurrentWorkspace, useWorkspacePaths } from "@quickwork/core/paths";
 import { useWorkspaceId } from "@quickwork/core/hooks";
 import { useIssueStatuses } from "@quickwork/core/issue-statuses/hooks";
 import { useIssueDraftStore, type IssueCreateDraft } from "@quickwork/core/issues/stores/draft-store";
-import { useCreateModeStore } from "@quickwork/core/issues/stores/create-mode-store";
 import { useQuickCreateStore } from "@quickwork/core/issues/stores/quick-create-store";
 import {
   useIssueCreateSettingsStore,
@@ -100,11 +96,11 @@ import { useT } from "../i18n";
 import { SourceContextPreviewCard, useSourceContextFailureMessage } from "./source-context-preview";
 
 // ---------------------------------------------------------------------------
-// ManualCreatePanel — manual-mode body of the create-issue dialog. Renders
-// DialogContent + everything inside; the surrounding `<Dialog>` is owned by
-// CreateIssueDialog so mode switching swaps only the inner panel without
-// remounting the Dialog Root (no overlay flash). `onSwitchMode` flips the
-// shell's local mode state.
+// ManualCreatePanel — the manual create form. It is no longer offered by the
+// 单人任务 dialog (execution lands on an agent either way, so the agent-only
+// entry dropped the "自己写" choice); surfaces that need a plain issue with
+// seeded fields — inbox, issue surfaces — still open this panel directly via
+// the "create-issue" modal type.
 // ---------------------------------------------------------------------------
 
 // CreateRunHint is the create modal's passive pre-trigger label (MUL-3375 §4):
@@ -199,18 +195,13 @@ function CreateRunHint({
 
 export function ManualCreatePanel({
   onClose,
-  onSwitchMode,
   data,
   isExpanded,
   setIsExpanded,
 }: {
   onClose: () => void;
-  /** Called with the carry payload to seed the agent panel after switch. */
-  onSwitchMode?: (carry?: Record<string, unknown> | null) => void;
   data?: Record<string, unknown> | null;
-  /** Lifted to the shell so DialogContent's mode-aware className can react
-   *  without the body itself having to live inside DialogContent (which would
-   *  re-mount the Portal on mode swap and replay the open animation). */
+  /** Lifted to the shell so DialogContent's className can react. */
   isExpanded: boolean;
   setIsExpanded: (v: boolean) => void;
 }) {
@@ -236,11 +227,9 @@ export function ManualCreatePanel({
   const draft = useIssueDraftStore((s) => s.draft);
   const setManual = useIssueDraftStore((s) => s.setManual);
   const setShared = useIssueDraftStore((s) => s.setShared);
-  const setAgent = useIssueDraftStore((s) => s.setAgent);
   const setActiveMode = useIssueDraftStore((s) => s.setActiveMode);
   const clearDraft = useIssueDraftStore((s) => s.clearDraft);
   const setLastAssignee = useIssueDraftStore((s) => s.setLastAssignee);
-  const setLastMode = useCreateModeStore((s) => s.setLastMode);
   const keepOpen = useQuickCreateStore((s) => s.keepOpen);
   const setKeepOpen = useQuickCreateStore((s) => s.setKeepOpen);
   const manualFields = useIssueCreateSettingsStore((s) => s.manualCreateFields);
@@ -733,7 +722,6 @@ export function ManualCreatePanel({
       // These preferences derive from the SUBMITTED values, not the live
       // draft — an issue was created, so record them regardless of the guard.
       setLastAssignee(assigneeType, assigneeId);
-      setLastMode("manual");
       // Success may only consume the draft it submitted (MUL-5181 P0): any
       // edit after the submit snapshot — typing while the request is in
       // flight, or a reopened dialog — survives, and the dialog then stays
@@ -767,55 +755,6 @@ export function ManualCreatePanel({
     void composer.submit();
   };
   const submitting = composer.submitting;
-
-  // Switch to agent mode WITHOUT destroying the manual draft. The manual slot
-  // (title, description, …) is left untouched so a later agent→manual flip
-  // restores it verbatim. Project / priority / due date already live in the
-  // shared slot, so they carry across for free. Only two things are handed to
-  // the agent panel:
-  //   1. A one-time assist-init of the agent prompt / actor: when the agent
-  //      draft is still empty, seed the prompt from title + description and the
-  //      actor from the manual assignee (if agent-like). An existing agent
-  //      draft is preserved — no repeated concatenate-then-clobber.
-  //   2. The parent-issue context, which is not persisted in the draft (it is a
-  //      per-invocation intent from "Add sub issue"), so it rides the carry.
-  const switchToAgent = () => {
-    // Serializing mid-upload packs a description that has already lost the
-    // pending image into the agent prompt, so gate the switch too.
-    if (gate.isBlocked()) return;
-    // Commit the shared fields to the draft so the agent panel reads them from
-    // there. Local state can hold a value seeded from `data` (e.g. an opener's
-    // project) that was never written through a picker, so a plain flip would
-    // otherwise drop it.
-    setShared({ projectId, priority, dueDate });
-    const existingPrompt = draft.agent.prompt;
-    if (!existingPrompt.trim()) {
-      const desc = descEditorRef.current?.getMarkdown()?.trim() ?? "";
-      const seeded = [title.trim(), desc].filter(Boolean).join("\n\n");
-      if (seeded) setAgent({ prompt: seeded });
-    }
-    if (
-      !draft.agent.actorId &&
-      assigneeId &&
-      (assigneeType === "agent" || assigneeType === "squad")
-    ) {
-      setAgent({ actorType: assigneeType, actorId: assigneeId });
-    }
-    setLastMode("agent");
-    setActiveMode("agent");
-    // Prefer the hydrated identifier from `parentIssue`, but fall back to the
-    // identifier the modal opener seeded on `data`. Without the fallback, a
-    // flip that happens before the issue detail query resolves drops the
-    // identifier and the agent chip renders as "Sub-issue of " with an empty
-    // tail. The UUID alone still wires the sub-issue relationship correctly;
-    // this only affects the display affordance.
-    const carryParentIdentifier =
-      parentIssue?.identifier ?? (data?.parent_issue_identifier as string | undefined);
-    const carry: Record<string, unknown> = {};
-    if (parentIssueId) carry.parent_issue_id = parentIssueId;
-    if (carryParentIdentifier) carry.parent_issue_identifier = carryParentIdentifier;
-    onSwitchMode?.(Object.keys(carry).length > 0 ? carry : null);
-  };
 
   // One state for the button and the keyboard paths, so a rendered affordance
   // can never disagree with what `handleSubmit` will actually do.
@@ -878,48 +817,12 @@ export function ManualCreatePanel({
     <>
             <DialogTitle className="sr-only">{t(($) => $.create_issue.sr_manual)}</DialogTitle>
 
-            {/* Header */}
-            <div className="flex items-center justify-between px-5 pt-3 pb-2 shrink-0">
-              <div className="flex items-center gap-1.5 text-caption">
-                <span className="text-muted-foreground">{workspaceName}</span>
-                <ChevronRight className="size-3 text-faint-foreground" />
-                <span className="font-medium">{t(($) => $.create_issue.manual_breadcrumb)}</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <Tooltip>
-                  <TooltipTrigger
-                    render={
-                      <button
-                        type="button"
-                        onClick={() => setIsExpanded(!isExpanded)}
-                        className="rounded-sm p-1.5 opacity-70 hover:opacity-100 hover:bg-accent/60 transition-all cursor-pointer"
-                      >
-                        {isExpanded ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
-                      </button>
-                    }
-                  />
-                  <TooltipContent side="bottom">
-                    {isExpanded
-                      ? t(($) => $.common.collapse_tooltip)
-                      : t(($) => $.common.expand_tooltip)}
-                  </TooltipContent>
-                </Tooltip>
-                <Tooltip>
-                  <TooltipTrigger
-                    render={
-                      <button
-                        type="button"
-                        onClick={onClose}
-                        className="rounded-sm p-1.5 opacity-70 hover:opacity-100 hover:bg-accent/60 transition-all cursor-pointer"
-                      >
-                        <XIcon className="size-4" />
-                      </button>
-                    }
-                  />
-                  <TooltipContent side="bottom">{t(($) => $.common.close)}</TooltipContent>
-                </Tooltip>
-              </div>
-            </div>
+            <DocketStrip
+              workspaceName={workspaceName ?? ""}
+              isExpanded={isExpanded}
+              onToggleExpanded={() => setIsExpanded(!isExpanded)}
+              onClose={onClose}
+            />
 
             {/* Title */}
             <div className="px-5 pb-2 shrink-0">
@@ -1367,18 +1270,6 @@ export function ManualCreatePanel({
                   onSelect={(file) => descEditorRef.current?.uploadFile(file)}
                 />
               </div>
-              <button
-                type="button"
-                onClick={switchToAgent}
-                disabled={gate.uploading}
-                aria-disabled={gate.uploading || undefined}
-                aria-busy={gate.uploading || undefined}
-                title={t(($) => $.create_issue.switch_to_agent_tooltip)}
-                className="border-beam group flex shrink-0 items-center gap-1.5 justify-self-end text-caption px-2 py-1 rounded-sm text-muted-foreground bg-brand/5 hover:bg-brand/10 hover:text-foreground transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <ArrowLeftRight className="size-3.5 text-brand transition-transform duration-300 group-hover:rotate-180" />
-                {t(($) => $.create_issue.switch_to_agent)}
-              </button>
               <label className="flex shrink-0 items-center gap-1.5 text-caption text-muted-foreground cursor-pointer select-none">
                 <Switch
                   size="sm"

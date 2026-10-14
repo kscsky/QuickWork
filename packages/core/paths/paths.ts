@@ -25,8 +25,17 @@ export const AGENT_FOCUS_CONVERSATION_STARTERS = "conversation_starters";
 function workspaceScoped(slug: string) {
   const ws = `/${encode(slug)}`;
   return {
-    root: () => `${ws}/issues`,
+    // The workspace home: the orchestration entry point. Distinct from
+    // `issues()`, which is the list of work already filed.
+    root: () => ws,
     usage: () => `${ws}/usage`,
+    // The dispatch stand: squads, the unowned queue, and what each agent is
+    // holding. Same page the workspace home renders, surfaced as a nav
+    // destination of its own.
+    dispatch: () => `${ws}/dispatch`,
+    // The task feed: every task with its relay, who holds it, and where it
+    // has stopped.
+    tasks: () => `${ws}/tasks`,
     issues: () => `${ws}/issues`,
     issueDetail: (id: string) => `${ws}/issues/${encode(id)}`,
     projects: () => `${ws}/projects`,

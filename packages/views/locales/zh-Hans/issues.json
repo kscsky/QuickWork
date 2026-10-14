@@ -55,7 +55,7 @@
     "author_renamed": "捕获时为 {{captured}} · 现为 {{current}}",
     "author_archived": "已归档",
     "author_deleted_agent": "智能体已删除",
-    "author_left_workspace": "已不在工作区",
+    "author_left_workspace": "已不在空间",
     "error_source_changed": "来源已发生变化。请检查刷新后的预览，再次提交。",
     "error_agent_unsupported": "此智能体运行时需要更新后才能使用已捕获上下文。请切换到手动模式或更新运行时。",
     "error_server_unsupported": "服务端需要更新后才能创建带已捕获上下文的子任务。",
@@ -77,7 +77,7 @@
   },
   "page": {
     "breadcrumb_title": "任务",
-    "breadcrumb_workspace_fallback": "工作区",
+    "breadcrumb_workspace_fallback": "空间",
     "empty_title": "还没有任务",
     "empty_hint": "创建一个任务开始使用。",
     "move_failed": "移动任务失败"
@@ -104,7 +104,7 @@
   },
   "scope": {
     "all_label": "全部",
-    "all_description": "工作区内的全部任务",
+    "all_description": "空间内的全部任务",
     "members_label": "成员",
     "members_description": "分配给成员的任务",
     "agents_label": "智能体",
@@ -291,7 +291,8 @@
   },
   "list": {
     "empty_status": "无任务",
-    "add_issue_tooltip": "新建任务"
+    "add_issue_tooltip": "新建任务",
+    "stream_title": "活动流"
   },
   "board": {
     "hidden_columns_label": "隐藏的列",
@@ -304,7 +305,7 @@
     "ordered_by": "按{{field}}排序"
   },
   "detail": {
-    "not_found": "这个任务不存在或已在该工作区被删除。",
+    "not_found": "这个任务不存在或已在该空间被删除。",
     "breadcrumb_project_unknown": "未知项目",
     "back": "返回",
     "title_placeholder": "任务标题",
@@ -332,7 +333,7 @@
     "quick_action_blocked": "无法触发 {{name}}",
     "quick_action_posted": "评论已发布",
     "quick_action_blocked_title": "你无法执行这条快捷操作",
-    "quick_action_blocked_body": "\"{{name}}\"由一个你无权触发的智能体执行。可以请工作区管理员把该智能体开放给团队，或把这条操作改绑一个共享的智能体。",
+    "quick_action_blocked_body": "\"{{name}}\"由一个你无权触发的智能体执行。可以请空间管理员把该智能体开放给团队，或把这条操作改绑一个共享的智能体。",
     "quick_action_blocked_ok": "知道了",
     "pull_requests_loading": "加载中...",
     "pull_requests_empty": "还没有关联的 PR。在 PR 的分支名、标题或正文里引用本任务的 identifier 即可自动关联。",
@@ -646,7 +647,7 @@
     "delete_failed": "删除任务失败",
     "delete_dialog_title_other": "删除 {{count}} 个任务？",
     "delete_dialog_desc_other": "此操作无法撤销，所选任务及其全部关联数据都会被永久删除。",
-    "delete_dialog_warning": "任何工作区成员都可以删除任务。",
+    "delete_dialog_warning": "任何空间成员都可以删除任务。",
     "cancel": "取消"
   },
   "card": {
@@ -726,7 +727,7 @@
     }
   },
   "labels_panel": {
-    "intro": "创建和管理标签，用于在工作区内分类任务。",
+    "intro": "创建和管理标签，用于在空间内分类任务。",
     "new_placeholder": "新标签名称...",
     "new_aria": "新标签名称",
     "add_action": "添加",
@@ -758,7 +759,7 @@
   },
   "save_view": {
     "title": "保存为视图",
-    "hint_workspace": "基于工作区全部任务创建",
+    "hint_workspace": "基于空间全部任务创建",
     "hint_my_any": "基于「我的任务 · 全部」创建",
     "hint_my_assigned": "基于「我的任务 · 分配给我」创建",
     "hint_my_created": "基于「我的任务 · 我创建的」创建",
@@ -770,7 +771,7 @@
     "name_label": "名称",
     "visibility_label": "可见性",
     "visibility_private": "仅自己可见",
-    "visibility_workspace": "工作区成员可见",
+    "visibility_workspace": "空间成员可见",
     "filters_label": "筛选",
     "custom_property": "自定义属性",
     "create": "创建视图",
@@ -787,8 +788,8 @@
     "update": "保存修改",
     "toast_updated": "视图已更新",
     "toast_conflict": "视图已被他人修改，请重新打开后再试",
-    "hint_workspace_members": "基于工作区中成员负责的任务创建",
-    "hint_workspace_agents": "基于工作区中智能体负责的任务创建",
+    "hint_workspace_members": "基于空间中成员负责的任务创建",
+    "hint_workspace_agents": "基于空间中智能体负责的任务创建",
     "scope_label_workspace": "负责人类型",
     "scope_label_my": "与我的关系",
     "variant_all": "不限负责人",
@@ -803,7 +804,7 @@
     "trigger": "视图",
     "empty": "还没有保存的视图",
     "private_group": "私有",
-    "shared_group": "工作区共享",
+    "shared_group": "空间共享",
     "exit": "退出视图",
     "unavailable": "该视图已不可用",
     "edit": "编辑视图"
@@ -839,7 +840,7 @@
     "hook_never_run": "该 hook 尚未运行过。",
     "surface_loading": "正在加载 {{name}}…",
     "surface_unavailable": "{{name}} 的界面无法加载，已安装的版本可能不包含它。",
-    "surface_navigated": "{{name}} 试图把面板替换成从别处加载的页面。已经拦下并断开连接，建议告知工作区管理员。"
+    "surface_navigated": "{{name}} 试图把面板替换成从别处加载的页面。已经拦下并断开连接，建议告知空间管理员。"
   },
   "flow": {
     "progress": "第 {{seq}}/{{total}} 棒进行中",
@@ -847,5 +848,24 @@
     "waiting": "等待接手人启动",
     "start_leg": "开始第 {{seq}} 棒",
     "start_failed": "启动失败"
+  },
+  "room": {
+    "parked_bar_name": "{{name}} 还没设智能体，任务停在这一步。",
+    "parked_bar_action": "让 {{name}} 去绑定",
+    "parked_bar_skip": "跳到下一步",
+    "composer_placeholder": "在这间房里说点什么…",
+    "members_title": "房间成员",
+    "member_no_agent": "没有智能体 — 轮到他会停住",
+    "member_agent": "用 {{agent}} 跑",
+    "state_pending": "未开始",
+    "state_doing": "进行中",
+    "state_waiting": "等待接手",
+    "state_interrupted": "执行中断",
+    "state_done": "完成",
+    "state_parked": "卡住·等人",
+    "state_skipped": "已跳过",
+    "state_unknown": "未知",
+    "resolved": "已解决",
+    "skip_failed": "没能让链路往前走"
   }
 }

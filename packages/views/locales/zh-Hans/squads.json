@@ -13,7 +13,8 @@
     },
     "no_matches": "没有匹配的小队",
     "row_menu": "小队操作",
-    "archive_action": "归档"
+    "archive_action": "归档",
+    "tagline": "队长带着成员，按链路接活"
   },
   "inspector": {
     "details_section": "详情",
@@ -42,7 +43,7 @@
   },
   "add_member_dialog": {
     "title": "添加成员",
-    "description": "添加工作区成员或智能体到这个小队。",
+    "description": "添加空间成员或智能体到这个小队。",
     "label_member": "成员",
     "label_role": "角色",
     "label_optional": "（可选）",
@@ -87,9 +88,14 @@
     "status_archived": "已归档",
     "issue_status_blocked": "已阻塞",
     "active_issue_more": "还有 {{count}} 个",
-    "last_active_label": "最近活动 {{time}}"
+    "last_active_label": "最近活动 {{time}}",
+    "lends_none": "没有智能体",
+    "lends_create": "去建一个",
+    "lends_aria": "{{name}} 借给小队的智能体",
+    "lends_opt_out": "不借出"
   },
   "detail_tabs": {
+    "room": "房间",
     "members": "成员",
     "instructions": "指引"
   },
@@ -110,7 +116,9 @@
     "leader_updated": "队长已更新",
     "leader_update_failed": "更新队长失败",
     "archive_failed": "归档小队失败",
-    "instructions_saved": "指引已保存"
+    "instructions_saved": "指引已保存",
+    "agent_updated": "已更新智能体",
+    "agent_update_failed": "更新智能体失败"
   },
   "profile_card": {
     "unavailable": "小队不可用",
@@ -137,8 +145,32 @@
     "direction_desc": "降序",
     "section_columns": "列",
     "result_count_title": "当前结果 / 全部小队",
-    "filter_label": "筛选",
-    "filter_active_count_other": "{{count}} 项筛选",
-    "clear_filters": "清除筛选"
+    "chip_named": "{{label}}：{{value}}",
+    "chip_multi": "{{label}}：{{value}} 人"
+  },
+  "room": {
+    "loading": "正在加载房间…",
+    "empty": "还没有人说话。小队的活会出现在这里。",
+    "older_hidden_other": "更早的消息没有显示（每页 {{count}} 条）",
+    "send": "发送",
+    "send_failed": "发送失败",
+    "composer_placeholder": "对小队说点什么…",
+    "composer_hint": "Enter 发送，Shift + Enter 换行",
+    "join_to_speak": "加入这个小队才能在房间里发言。",
+    "members": "成员",
+    "unknown_person": "未知",
+    "you": "我",
+    "no_agents": "没有智能体",
+    "agent_holding_other": "{{count}} 个在跑",
+    "agent_idle_other": "{{count}} 个智能体 · 空闲",
+    "not_taking_work": "不接活",
+    "kind_receipt": "交付了一件活",
+    "role": {
+      "leader": "队长",
+      "executor": "执行",
+      "reviewer": "复核",
+      "observer": "只看"
+    },
+    "step_of": "第 {{step}} / {{total}} 步"
   }
 }

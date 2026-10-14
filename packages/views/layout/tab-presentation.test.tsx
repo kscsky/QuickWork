@@ -4,7 +4,6 @@ import { render, renderHook } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { issueDetailOptions } from "@quickwork/core/issues/queries";
 import { projectDetailOptions } from "@quickwork/core/projects/queries";
-import { chatSessionsOptions } from "@quickwork/core/chat/queries";
 import {
   inboxListOptions,
   archivedInboxListOptions,
@@ -64,10 +63,6 @@ function seed(qc: QueryClient) {
     icon: "🚀",
     title: "Apollo",
   } as never);
-  qc.setQueryData(chatSessionsOptions("ws1").queryKey, [
-    { id: "s1", title: "Deploy plan", status: "active" },
-    { id: "s2", title: "  ", status: "active" },
-  ] as never);
   qc.setQueryData(inboxListOptions("ws1").queryKey, [
     { id: "n1", issue_id: "i9", title: "Assigned to you", type: "issue_assigned" },
     { id: "n2", issue_id: null, title: "Quick create failed", type: "quick_create_failed" },
@@ -134,24 +129,6 @@ describe("useTabPresentation — live from cache", () => {
     expect(presentationOf("/acme/runtimes/rt1")).toEqual({
       visual: { kind: "icon", icon: "Monitor" },
       title: "Prod Box",
-    });
-  });
-
-  it("chat container: MessageSquare icon + session title", () => {
-    expect(presentationOf("/acme/chat?session=s1")).toEqual({
-      visual: { kind: "icon", icon: "MessageSquare" },
-      title: "Deploy plan",
-    });
-  });
-
-  it("chat container: blank session title uses the New chat fallback", () => {
-    expect(presentationOf("/acme/chat?session=s2").title).toBe("New chat");
-  });
-
-  it("chat container: no session stays Chat", () => {
-    expect(presentationOf("/acme/chat")).toEqual({
-      visual: { kind: "icon", icon: "MessageSquare" },
-      title: "Chat",
     });
   });
 

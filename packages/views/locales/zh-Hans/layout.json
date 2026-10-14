@@ -2,6 +2,8 @@
   "nav": {
     "inbox": "收件箱",
     "chat": "聊天",
+    "dispatch": "小队任务",
+    "tasks": "任务列表",
     "my_issues": "我的任务",
     "issues": "任务",
     "projects": "项目",
@@ -37,23 +39,30 @@
     "server_version": "服务器版本 {{version}}"
   },
   "workspace_loader": {
-    "loading_workspace": "正在加载工作区...",
+    "loading_workspace": "正在加载空间...",
     "loading_named_prefix": "正在加载"
   },
   "sidebar": {
     "unpin_tooltip": "取消固定",
-    "workspaces_label": "工作区",
-    "create_workspace": "创建工作区",
+    "workspaces_label": "空间",
+    "create_workspace": "创建空间",
     "pending_invitations_label": "待处理的邀请",
-    "invitation_workspace_fallback": "工作区",
+    "invitation_workspace_fallback": "空间",
     "invitation_join": "加入",
     "invitation_decline": "拒绝",
     "log_out": "退出登录",
-    "new_issue": "新建任务",
+    "new_issue": "单人任务",
     "new_issue_shortcut": "C",
     "pinned_label": "固定",
-    "workspace_group": "工作区",
+    "workspace_group": "空间",
     "configure_group": "配置",
-    "unread_overflow": "99+"
+    "unread_overflow": "99+",
+    "running_label": "在跑",
+    "running_all": "全部",
+    "running_more_other": "还有 {{count}} 条",
+    "running_unnamed": "未命名任务",
+    "nav_running_other": "{{count}} 在跑",
+    "nav_busy_other": "{{count}} 忙",
+    "fleet_state": "{{busy}} 忙 · {{idle}} 闲"
   }
 }

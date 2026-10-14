@@ -23,9 +23,15 @@ interface CommentInputProps {
   onSubmit: (content: string, attachmentIds?: string[], suppressAgentIds?: string[]) => Promise<string | boolean>;
   /** Called after the server accepts the comment and the composer is cleared. */
   onAccepted?: (commentId: string) => void;
+  /**
+   * Overrides the editor's placeholder. The room composer uses it to speak
+   * the room's language ("say something in this room") — same box, same
+   * behavior, one different prompt.
+   */
+  placeholder?: string;
 }
 
-function CommentInput({ issueId, onSubmit, onAccepted }: CommentInputProps) {
+function CommentInput({ issueId, onSubmit, onAccepted, placeholder }: CommentInputProps) {
   const { t } = useT("issues");
   const { t: tEditor } = useT("editor");
   const sendShortcut = useShortcut("send");
@@ -220,7 +226,7 @@ function CommentInput({ issueId, onSubmit, onAccepted }: CommentInputProps) {
           ref={editorRef}
           defaultValue={initialDraft}
           onReady={lazy.onReady}
-          placeholder={t(($) => $.comment.leave_comment_placeholder)}
+          placeholder={placeholder ?? t(($) => $.comment.leave_comment_placeholder)}
           onUpdate={(md) => {
             setContent(md);
             setIsEmpty(!md.trim());
@@ -250,7 +256,7 @@ function CommentInput({ issueId, onSubmit, onAccepted }: CommentInputProps) {
           data-testid="comment-composer-shell"
           role="button"
           tabIndex={0}
-          aria-label={t(($) => $.comment.leave_comment_placeholder)}
+          aria-label={placeholder ?? t(($) => $.comment.leave_comment_placeholder)}
           className="flex-1 min-h-0 cursor-text px-3 py-2"
           onClick={() => lazy.activate()}
           onKeyDown={(e) => {
@@ -264,7 +270,9 @@ function CommentInput({ issueId, onSubmit, onAccepted }: CommentInputProps) {
               exact type metrics (line-height 1.625 from prose.css), so the
               shell→editor swap doesn't shift layout. */}
           <div className="rich-text-editor text-body">
-            <p className="text-muted-foreground">{t(($) => $.comment.leave_comment_placeholder)}</p>
+            <p className="text-muted-foreground">
+              {placeholder ?? t(($) => $.comment.leave_comment_placeholder)}
+            </p>
           </div>
         </div>
       )}

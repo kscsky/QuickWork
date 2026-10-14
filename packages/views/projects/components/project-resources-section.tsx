@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
-  ChevronRight,
   FolderGit,
   FolderOpen,
   GitBranch,
@@ -107,7 +106,6 @@ export function ProjectResourcesSection({ projectId }: { projectId: string }) {
   const wsId = useWorkspaceId();
   const workspace = useCurrentWorkspace();
   const daemonStatus = useLocalDaemonStatus();
-  const [open, setOpen] = useState(true);
   const [addOpen, setAddOpen] = useState(false);
   const [repoSearch, setRepoSearch] = useState("");
   const [picking, setPicking] = useState(false);
@@ -356,172 +354,165 @@ export function ProjectResourcesSection({ projectId }: { projectId: string }) {
   };
 
   return (
-    <div>
-      <button
-        type="button"
-        className={`flex w-full items-center gap-1 rounded-md px-2 py-1 text-caption font-medium transition-colors mb-2 hover:bg-accent/70 ${open ? "" : "text-muted-foreground hover:text-foreground"}`}
-        onClick={() => setOpen(!open)}
-      >
-        {t(($) => $.resources.section_header)}
-        <ChevronRight
-          className={`!size-3 shrink-0 stroke-[2.5] text-muted-foreground transition-transform ${open ? "rotate-90" : ""}`}
+    <div className="space-y-2">
+      {/* An empty resources area is the project's most important fact, not a
+          gap in the layout: with no directory there is nowhere for the work to
+          happen. Say so, in the same words the projects list uses. */}
+      {resources.length === 0 && (
+        <div className="rounded-lg border border-dashed p-3">
+          <p className="text-caption text-muted-foreground">
+            {t(($) => $.resources.empty)}
+          </p>
+          <p className="mt-1 text-micro text-muted-foreground">
+            {t(($) => $.card.no_directory)}
+          </p>
+        </div>
+      )}
+      {resources.map((resource) => (
+        <ResourceRow
+          key={resource.id}
+          resource={resource}
+          localDaemonId={localDaemonId}
+          localDeviceName={daemonStatus.deviceName}
+          localDaemonRunning={daemonStatus.running}
+          canEdit={desktopMode}
+          onRemove={() => handleRemove(resource)}
+          onRenameLocalDirectory={handleRenameLocalDirectory}
+          onEditLocalDirectoryMode={(target) => {
+            setModeError(null);
+            setModeDialog({
+              path: target.resource_ref.local_path,
+              daemonId: target.resource_ref.daemon_id,
+              mode: executionModeOf(target.resource_ref),
+              // The path is already saved, so there is nothing to
+              // re-validate from the browser; the desktop check only
+              // runs at pick time. Unknown means the option stays
+              // available and the daemon has the final say.
+              isGitRepo: undefined,
+              resource: target,
+            });
+          }}
         />
-      </button>
-      {open && (
-        <div className="pl-2 space-y-1.5">
-          {resources.length === 0 && (
-            <p className="text-caption text-muted-foreground">
-              {t(($) => $.resources.empty)}
-            </p>
-          )}
-          {resources.length > 0 && (
-            <div className="max-h-64 space-y-1.5 overflow-y-auto pr-1">
-              {resources.map((resource) => (
-                <ResourceRow
-                  key={resource.id}
-                  resource={resource}
-                  localDaemonId={localDaemonId}
-                  canEdit={desktopMode}
-                  onRemove={() => handleRemove(resource)}
-                  onRenameLocalDirectory={handleRenameLocalDirectory}
-                  onEditLocalDirectoryMode={(target) => {
-                    setModeError(null);
-                    setModeDialog({
-                      path: target.resource_ref.local_path,
-                      daemonId: target.resource_ref.daemon_id,
-                      mode: executionModeOf(target.resource_ref),
-                      // The path is already saved, so there is nothing to
-                      // re-validate from the browser; the desktop check only
-                      // runs at pick time. Unknown means the option stays
-                      // available and the daemon has the final say.
-                      isGitRepo: undefined,
-                      resource: target,
-                    });
-                  }}
-                />
-              ))}
-            </div>
-          )}
-          <Popover
-            open={addOpen}
-            onOpenChange={(v) => {
-              setAddOpen(v);
-              if (!v) setRepoSearch("");
-            }}
-          >
-            <PopoverTrigger
-              render={
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 px-2 text-caption text-muted-foreground hover:text-foreground"
-                >
-                  <Plus className="size-3" />
-                  {t(($) => $.resources.add_button)}
-                </Button>
-              }
-            />
-            <PopoverContent align="start" className="w-72 p-2 space-y-2">
-              <div className="text-caption font-medium text-muted-foreground">
-                {t(($) => $.resources.popover_title)}
-              </div>
-              {workspace?.repos && workspace.repos.length > 0 && (
-                <>
-                  <div className="relative">
-                    <Search className="pointer-events-none absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-                    <input
-                      type="text"
-                      value={repoSearch}
-                      onChange={(e) => setRepoSearch(e.target.value)}
-                      aria-label={t(($) => $.resources.repos_search_placeholder)}
-                      placeholder={t(($) => $.resources.repos_search_placeholder)}
-                      className="h-8 w-full rounded-md border bg-transparent pl-7 pr-2 text-caption outline-none placeholder:text-muted-foreground focus-visible:ring-1 focus-visible:ring-ring"
-                    />
-                  </div>
-                  <div className="max-h-48 space-y-1 overflow-y-auto">
-                    {filteredRepos.length === 0 && repoQuery && (
-                      <p className="py-2 text-center text-caption text-muted-foreground">
-                        {t(($) => $.resources.repos_search_empty)}
-                      </p>
-                    )}
-                    {filteredRepos.map((repo) => {
-                      const isAttached = attachedUrls.has(repo.url);
-                      const isDisabled = isAttached || createResource.isPending;
-                      return (
-                        // Use aria-disabled instead of the native `disabled` attribute so
-                        // hover events still reach the tooltip trigger on attached rows
-                        // (browsers suppress pointer events on disabled form controls).
-                        <button
-                          key={repo.url}
-                          type="button"
-                          aria-disabled={isDisabled}
-                          onClick={async () => {
-                            if (isDisabled) return;
-                            await handleAttach(repo.url);
-                            setAddOpen(false);
-                          }}
-                          className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-caption text-left hover:bg-accent transition-colors aria-disabled:opacity-50 aria-disabled:cursor-not-allowed aria-disabled:hover:bg-transparent"
-                        >
-                          <FolderGit className="size-3.5" />
-                          <Tooltip>
-                            <TooltipTrigger
-                              render={
-                                <span className="truncate flex-1">{githubShortLabel(repo.url)}</span>
-                              }
-                            />
-                            <TooltipContent side="top">{repo.url}</TooltipContent>
-                          </Tooltip>
-                          {isAttached && (
-                            <span className="text-micro text-muted-foreground">
-                              {t(($) => $.resources.attached_badge)}
-                            </span>
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </>
-              )}
-              <CustomRepoForm
-                onSubmit={async (url) => {
-                  await handleAttach(url);
-                  setAddOpen(false);
-                }}
-              />
-            </PopoverContent>
-          </Popover>
-          {desktopMode && (
-            <div className="flex flex-col">
+      ))}
+
+      <div className="flex flex-wrap items-center gap-1 pt-0.5">
+        <Popover
+          open={addOpen}
+          onOpenChange={(v) => {
+            setAddOpen(v);
+            if (!v) setRepoSearch("");
+          }}
+        >
+          <PopoverTrigger
+            render={
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-7 justify-start px-2 text-caption text-muted-foreground hover:text-foreground"
-                disabled={
-                  picking ||
-                  createResource.isPending ||
-                  !daemonStatus.running ||
-                  hasLocalDirectoryForCurrentDaemon
-                }
-                onClick={() => {
-                  void handleAttachLocalDirectory();
-                }}
+                className="h-7 px-2 text-caption text-muted-foreground hover:text-foreground"
               >
-                <FolderOpen className="size-3" />
-                {t(($) => $.resources.add_local_directory_button)}
+                <Plus className="size-3" />
+                {t(($) => $.resources.add_button)}
               </Button>
-              {!daemonStatus.running && (
-                <p className="px-2 pt-0.5 text-micro text-muted-foreground">
-                  {t(($) => $.resources.local_daemon_offline_hint)}
-                </p>
-              )}
-              {daemonStatus.running && hasLocalDirectoryForCurrentDaemon && (
-                <p className="px-2 pt-0.5 text-micro text-muted-foreground">
-                  {t(($) => $.resources.local_daemon_already_attached_hint)}
-                </p>
-              )}
+            }
+          />
+          <PopoverContent align="start" className="w-72 p-2 space-y-2">
+            <div className="text-caption font-medium text-muted-foreground">
+              {t(($) => $.resources.popover_title)}
             </div>
-          )}
-        </div>
+            {workspace?.repos && workspace.repos.length > 0 && (
+              <>
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-2 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                  <input
+                    type="text"
+                    value={repoSearch}
+                    onChange={(e) => setRepoSearch(e.target.value)}
+                    aria-label={t(($) => $.resources.repos_search_placeholder)}
+                    placeholder={t(($) => $.resources.repos_search_placeholder)}
+                    className="h-8 w-full rounded-md border bg-transparent pl-7 pr-2 text-caption outline-none placeholder:text-muted-foreground focus-visible:ring-1 focus-visible:ring-ring"
+                  />
+                </div>
+                <div className="max-h-48 space-y-1 overflow-y-auto">
+                  {filteredRepos.length === 0 && repoQuery && (
+                    <p className="py-2 text-center text-caption text-muted-foreground">
+                      {t(($) => $.resources.repos_search_empty)}
+                    </p>
+                  )}
+                  {filteredRepos.map((repo) => {
+                    const isAttached = attachedUrls.has(repo.url);
+                    const isDisabled = isAttached || createResource.isPending;
+                    return (
+                      // Use aria-disabled instead of the native `disabled` attribute so
+                      // hover events still reach the tooltip trigger on attached rows
+                      // (browsers suppress pointer events on disabled form controls).
+                      <button
+                        key={repo.url}
+                        type="button"
+                        aria-disabled={isDisabled}
+                        onClick={async () => {
+                          if (isDisabled) return;
+                          await handleAttach(repo.url);
+                          setAddOpen(false);
+                        }}
+                        className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-caption text-left hover:bg-accent transition-colors aria-disabled:opacity-50 aria-disabled:cursor-not-allowed aria-disabled:hover:bg-transparent"
+                      >
+                        <FolderGit className="size-3.5" />
+                        <Tooltip>
+                          <TooltipTrigger
+                            render={
+                              <span className="truncate flex-1">{githubShortLabel(repo.url)}</span>
+                            }
+                          />
+                          <TooltipContent side="top">{repo.url}</TooltipContent>
+                        </Tooltip>
+                        {isAttached && (
+                          <span className="text-micro text-muted-foreground">
+                            {t(($) => $.resources.attached_badge)}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+            <CustomRepoForm
+              onSubmit={async (url) => {
+                await handleAttach(url);
+                setAddOpen(false);
+              }}
+            />
+          </PopoverContent>
+        </Popover>
+        {desktopMode && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 px-2 text-caption text-muted-foreground hover:text-foreground"
+            disabled={
+              picking ||
+              createResource.isPending ||
+              !daemonStatus.running ||
+              hasLocalDirectoryForCurrentDaemon
+            }
+            onClick={() => {
+              void handleAttachLocalDirectory();
+            }}
+          >
+            <FolderOpen className="size-3" />
+            {t(($) => $.resources.add_local_directory_button)}
+          </Button>
+        )}
+      </div>
+      {desktopMode && !daemonStatus.running && (
+        <p className="text-micro text-muted-foreground">
+          {t(($) => $.resources.local_daemon_offline_hint)}
+        </p>
+      )}
+      {desktopMode && daemonStatus.running && hasLocalDirectoryForCurrentDaemon && (
+        <p className="text-micro text-muted-foreground">
+          {t(($) => $.resources.local_daemon_already_attached_hint)}
+        </p>
       )}
       {modeDialog && (
         <LocalDirectoryModeDialog
@@ -578,6 +569,8 @@ function worktreeUnavailableReason(
 interface ResourceRowProps {
   resource: ProjectResource;
   localDaemonId: string | null;
+  localDeviceName: string | null;
+  localDaemonRunning: boolean;
   canEdit: boolean;
   onRemove: () => void;
   onRenameLocalDirectory: (
@@ -592,6 +585,8 @@ interface ResourceRowProps {
 function ResourceRow({
   resource,
   localDaemonId,
+  localDeviceName,
+  localDaemonRunning,
   canEdit,
   onRemove,
   onRenameLocalDirectory,
@@ -634,9 +629,11 @@ function ResourceRow({
 
   if (isLocalDirectoryRef(resource)) {
     return (
-      <LocalDirectoryRow
+      <LocalDirectoryCard
         resource={resource}
         localDaemonId={localDaemonId}
+        localDeviceName={localDeviceName}
+        localDaemonRunning={localDaemonRunning}
         canEdit={canEdit}
         onRemove={onRemove}
         onRename={onRenameLocalDirectory}
@@ -662,9 +659,11 @@ function ResourceRow({
   );
 }
 
-interface LocalDirectoryRowProps {
+interface LocalDirectoryCardProps {
   resource: ProjectResource & { resource_ref: LocalDirectoryResourceRef };
   localDaemonId: string | null;
+  localDeviceName: string | null;
+  localDaemonRunning: boolean;
   canEdit: boolean;
   onRemove: () => void;
   onRename: (
@@ -676,14 +675,22 @@ interface LocalDirectoryRowProps {
   ) => void;
 }
 
-function LocalDirectoryRow({
+/**
+ * The project's landing spot, rendered as the page's headline rather than a row
+ * in a list. In the narrow rail this replaced, the path was tooltip-only and the
+ * mode control was hover-only — which hid the two facts that decide whether the
+ * project can run at all.
+ */
+function LocalDirectoryCard({
   resource,
   localDaemonId,
+  localDeviceName,
+  localDaemonRunning,
   canEdit,
   onRemove,
   onRename,
   onEditMode,
-}: LocalDirectoryRowProps) {
+}: LocalDirectoryCardProps) {
   const { t } = useT("projects");
   const ref = resource.resource_ref;
   const mode = executionModeOf(ref);
@@ -696,6 +703,7 @@ function LocalDirectoryRow({
   // belongs to the owning device. Delete stays available so the user can
   // drop a stale registration from any device.
   const mismatch = isForeignDaemon || isLocalUnknown;
+  const isWorktree = mode === "worktree";
 
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(display);
@@ -713,102 +721,132 @@ function LocalDirectoryRow({
     setDraft(display);
   };
 
+  // What we can honestly say about the machine. When this client doesn't know
+  // its own daemon (the web app), it can't place the directory either way, so
+  // the line is omitted rather than turned into a warning — on the old rail
+  // this text was tooltip-only, and here it is the card's second line.
+  const machineState = isForeignDaemon
+    ? t(($) => $.resources.local_other_machine_tooltip)
+    : isLocalUnknown
+      ? null
+      : localDaemonRunning
+        ? [localDeviceName, t(($) => $.resources.local_daemon_running)].filter(Boolean).join(" · ")
+        : t(($) => $.resources.local_no_daemon_tooltip);
+
   return (
+    // Faded only when we know the directory belongs to another machine. An
+    // unknown local daemon (the web app) is ignorance, not unavailability, and
+    // fading the page's headline card for it reads as "something is wrong".
     <div
-      className={`flex items-center gap-2 text-caption group ${
-        mismatch ? "opacity-60" : ""
-      }`}
+      className={`rounded-lg border bg-card p-3 ${isForeignDaemon ? "opacity-70" : ""}`}
     >
-      <FolderOpen className="size-3.5 text-muted-foreground shrink-0" />
-      {editing ? (
-        <input
-          autoFocus
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onBlur={() => void commit()}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              void commit();
-            } else if (e.key === "Escape") {
-              e.preventDefault();
-              cancel();
-            }
-          }}
-          className="flex-1 min-w-0 rounded-sm border bg-transparent px-1 py-0.5 text-caption outline-none focus-visible:ring-1 focus-visible:ring-ring"
-          aria-label={t(($) => $.resources.local_rename_label)}
+      <div className="flex items-center gap-2">
+        <span
+          aria-hidden="true"
+          className={`size-1.5 shrink-0 rounded-full ${
+            mismatch
+              ? "bg-muted-foreground/40"
+              : localDaemonRunning
+                ? "bg-emerald-500"
+                : "bg-warning"
+          }`}
         />
-      ) : (
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              <span className="truncate flex-1">{display}</span>
-            }
+        {editing ? (
+          <input
+            autoFocus
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onBlur={() => void commit()}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                void commit();
+              } else if (e.key === "Escape") {
+                e.preventDefault();
+                cancel();
+              }
+            }}
+            className="min-w-0 flex-1 rounded-sm border bg-transparent px-1 py-0.5 text-caption outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            aria-label={t(($) => $.resources.local_rename_label)}
           />
-          <TooltipContent side="top">
-            <div className="space-y-0.5 text-micro">
-              <div className="font-mono">{ref.local_path}</div>
-              {mismatch && (
-                <div className="text-muted-foreground">
-                  {isLocalUnknown
-                    ? t(($) => $.resources.local_no_daemon_tooltip)
-                    : t(($) => $.resources.local_other_machine_tooltip)}
-                </div>
-              )}
-            </div>
-          </TooltipContent>
-        </Tooltip>
-      )}
-      {/* Always visible, unlike the hover-only actions: without it there is no
-          way to tell whether tasks on this folder edit it directly or hand back
-          a branch, which is the first thing someone asks when a task queues (or
-          does not). */}
-      {mode === "worktree" && !editing && (
+        ) : (
+          <span
+            className="min-w-0 flex-1 truncate font-mono text-caption"
+            title={ref.local_path}
+          >
+            {display}
+          </span>
+        )}
         <Tooltip>
           <TooltipTrigger
             render={
-              <Badge variant="secondary" className="shrink-0 gap-1 font-normal">
-                <GitBranch className="size-3" />
-                {t(($) => $.resources.mode_badge_worktree)}
+              <Badge
+                variant={isWorktree ? "secondary" : "outline"}
+                className="shrink-0 gap-1 font-normal"
+              >
+                {isWorktree ? <GitBranch className="size-3" /> : null}
+                {isWorktree
+                  ? t(($) => $.resources.mode_badge_worktree)
+                  : t(($) => $.resources.mode_badge_in_place)}
               </Badge>
             }
           />
           <TooltipContent side="top">
-            {t(($) => $.resources.mode_badge_worktree_tooltip)}
+            {isWorktree
+              ? t(($) => $.resources.mode_badge_worktree_tooltip)
+              : t(($) => $.resources.mode_in_place_description)}
           </TooltipContent>
         </Tooltip>
-      )}
-      {/* Not gated on `mismatch`: switching the mode only rewrites a field, so
-          it works from the web app or another device, unlike rename (whose
-          label belongs to the owning machine) or the folder picker. */}
+      </div>
+
+      {machineState ? (
+        <div className="mt-1.5 truncate text-micro text-muted-foreground">
+          {machineState}
+        </div>
+      ) : null}
+
+      {/* What the mode means for the work, stated once on the card. Someone
+          asking "where did my task go" is usually asking this. */}
+      <p className="mt-2 rounded-md bg-muted/60 px-2 py-1.5 text-micro leading-relaxed text-muted-foreground">
+        {isWorktree
+          ? t(($) => $.resources.mode_worktree_description)
+          : t(($) => $.resources.mode_in_place_description)}
+      </p>
+
       {!editing && (
-        <button
-          type="button"
-          onClick={() => onEditMode(resource)}
-          className="opacity-0 group-hover:opacity-100 transition-opacity rounded-sm p-0.5 hover:bg-accent"
-          title={t(($) => $.resources.mode_edit_tooltip)}
-        >
-          <GitBranch className="size-3 text-muted-foreground" />
-        </button>
+        <div className="mt-2 flex items-center gap-1">
+          {/* Not gated on `mismatch`: switching the mode only rewrites a field,
+              so it works from the web app or another device, unlike rename
+              (whose label belongs to the owning machine). */}
+          <button
+            type="button"
+            onClick={() => onEditMode(resource)}
+            title={t(($) => $.resources.mode_edit_tooltip)}
+            className="rounded-sm px-1.5 py-0.5 text-micro text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          >
+            {t(($) => $.resources.mode_edit_tooltip)}
+          </button>
+          {canEdit && !mismatch && (
+            <button
+              type="button"
+              onClick={startEdit}
+              title={t(($) => $.resources.local_rename_tooltip)}
+              className="rounded-sm p-0.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            >
+              <Pencil className="size-3" />
+            </button>
+          )}
+          <span className="flex-1" />
+          <button
+            type="button"
+            onClick={onRemove}
+            title={t(($) => $.resources.remove_tooltip)}
+            className="rounded-sm p-0.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          >
+            <Trash2 className="size-3" />
+          </button>
+        </div>
       )}
-      {canEdit && !mismatch && !editing && (
-        <button
-          type="button"
-          onClick={startEdit}
-          className="opacity-0 group-hover:opacity-100 transition-opacity rounded-sm p-0.5 hover:bg-accent"
-          title={t(($) => $.resources.local_rename_tooltip)}
-        >
-          <Pencil className="size-3 text-muted-foreground" />
-        </button>
-      )}
-      <button
-        type="button"
-        onClick={onRemove}
-        className="opacity-0 group-hover:opacity-100 transition-opacity rounded-sm p-0.5 hover:bg-accent"
-        title={t(($) => $.resources.remove_tooltip)}
-      >
-        <Trash2 className="size-3 text-muted-foreground" />
-      </button>
     </div>
   );
 }

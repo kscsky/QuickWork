@@ -137,10 +137,21 @@ const (
 	EventAutopilotRunStart = "autopilot:run_start"
 	EventAutopilotRunDone  = "autopilot:run_done"
 
+	// A task's relay moved: a step finished, or the chain parked on someone
+	// with no agent. One event for both, because every consumer answers the
+	// same way — re-read the chain. Carries only the issue id: the payload is
+	// a pointer, not a copy, so a re-opened step on another member's screen
+	// cannot diverge from the server's.
+	EventIssueChainChanged = "issue_chain:changed"
+
 	// Squad events
 	EventSquadCreated = "squad:created"
 	EventSquadUpdated = "squad:updated"
 	EventSquadDeleted = "squad:deleted"
+	// A line was posted in a squad room. Carries the whole message so an
+	// open room appends without a refetch; rooms are low-traffic compared
+	// with issue streams, so the payload cost is not worth a bare invalidate.
+	EventSquadMessageCreated = "squad_message:created"
 
 	// Daemon events
 	EventDaemonHeartbeat              = "daemon:heartbeat"

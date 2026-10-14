@@ -100,10 +100,6 @@ vi.mock("@quickwork/views/search", () => ({
   SearchTrigger: () => null,
 }));
 
-vi.mock("@quickwork/views/chat", () => ({
-  FloatingChat: () => <div data-testid="floating-chat" />,
-}));
-
 vi.mock("./tab-bar", () => ({ TabBar: () => null }));
 vi.mock("./window-overlay", () => ({ WindowOverlay: () => null }));
 vi.mock("./tab-content", () => ({
@@ -147,7 +143,6 @@ describe("DesktopShell workspace gating", () => {
     expect(queryByTestId("search-command")).not.toBeNull();
     expect(queryByTestId("global-shortcuts")).not.toBeNull();
     expect(queryByTestId("modal-registry")).not.toBeNull();
-    expect(queryByTestId("floating-chat")).not.toBeNull();
   });
 
   it("drops workspace-scoped chrome when the singleton still points at a deleted workspace", () => {
@@ -161,7 +156,6 @@ describe("DesktopShell workspace gating", () => {
     expect(queryByTestId("search-command")).toBeNull();
     expect(queryByTestId("global-shortcuts")).toBeNull();
     expect(queryByTestId("modal-registry")).toBeNull();
-    expect(queryByTestId("floating-chat")).toBeNull();
   });
 
   it("keeps TabContent mounted with no workspace so the tab router can still resolve one", () => {

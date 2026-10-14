@@ -9,9 +9,18 @@ import enCommon from "../locales/en/common.json";
 import enModals from "../locales/en/modals.json";
 import enAgents from "../locales/en/agents.json";
 import enIssues from "../locales/en/issues.json";
+import enOnboarding from "../locales/en/onboarding.json";
+import enSquads from "../locales/en/squads.json";
 
 const TEST_RESOURCES = {
-  en: { common: enCommon, modals: enModals, agents: enAgents, issues: enIssues },
+  en: {
+    common: enCommon,
+    modals: enModals,
+    agents: enAgents,
+    issues: enIssues,
+    onboarding: enOnboarding,
+    squads: enSquads,
+  },
 };
 
 const ME = "user-me";
@@ -23,6 +32,7 @@ const mocks = vi.hoisted(() => ({
   members: [] as MemberWithUser[],
   createSquad: vi.fn(),
   addSquadMember: vi.fn(),
+  updateMe: vi.fn(),
   navigationPush: vi.fn(),
   toastSuccess: vi.fn(),
   toastError: vi.fn(),
@@ -54,6 +64,7 @@ vi.mock("@quickwork/core/api", () => ({
   api: {
     createSquad: (...args: unknown[]) => mocks.createSquad(...args),
     addSquadMember: (...args: unknown[]) => mocks.addSquadMember(...args),
+    updateMe: (...args: unknown[]) => mocks.updateMe(...args),
   },
 }));
 
@@ -249,28 +260,12 @@ function makeSquad(overrides: Partial<Squad> = {}): Squad {
   };
 }
 
-// "Create Squad" is both the dialog title and the submit button label. Always
-// pick by role so tests don't depend on DOM order between the two.
-function getSubmitButton(): HTMLButtonElement {
-  const btn = screen
-    .getAllByRole("button")
-    .find((b) => b.textContent === "Create Squad");
-  if (!btn) throw new Error("Create Squad submit button not found");
-  return btn as HTMLButtonElement;
-}
-
 // getAllByText is typed to never return undefined slots, but the indexed
 // access goes through `noUncheckedIndexedAccess` so we narrow explicitly.
-function firstMatch(label: string): HTMLElement {
+function firstMatch(label: string | RegExp): HTMLElement {
   const matches = screen.getAllByText(label);
-  if (matches.length === 0) throw new Error(`no match for "${label}"`);
+  if (matches.length === 0) throw new Error(`no match for "${String(label)}"`);
   return matches[0]!;
-}
-
-function lastMatch(label: string): HTMLElement {
-  const matches = screen.getAllByText(label);
-  if (matches.length === 0) throw new Error(`no match for "${label}"`);
-  return matches[matches.length - 1]!;
 }
 
 function renderModal() {
@@ -293,187 +288,260 @@ describe("CreateSquadModal", () => {
     vi.clearAllMocks();
     mocks.agents = [otherAgent, myAgent, myAgent2];
     mocks.members = [wsMember];
+    mocks.updateMe.mockResolvedValue({ id: ME });
+    mocks.createSquad.mockResolvedValue(makeSquad());
+    mocks.addSquadMember.mockResolvedValue({});
   });
 
-  it("binds the name and description inputs in the identity row", () => {
-    renderModal();
-    const name = screen.getByPlaceholderText(/e\.g\. Frontend Team/i) as HTMLInputElement;
-    fireEvent.change(name, { target: { value: "Platform Team" } });
-    expect(name.value).toBe("Platform Team");
+  // The wizard gates each step on the one before it, so a test that needs a
+  // later step has to walk there. Buttons are found by label rather than by
+  // index, so reordering the footer cannot silently change what a test presses.
+  function clickButton(label: string | RegExp) {
+    const btn = screen
+      .getAllByRole("button")
+      .find((b) =>
+        typeof label === "string"
+          ? b.textContent?.includes(label)
+          : label.test(b.textContent ?? ""),
+      );
+    if (!btn) throw new Error(`button not found: ${String(label)}`);
+    fireEvent.click(btn);
+    return btn;
+  }
 
-    const desc = screen.getByPlaceholderText(/Describe what this squad/i) as HTMLInputElement;
-    fireEvent.change(desc, { target: { value: "We own infra" } });
-    expect(desc.value).toBe("We own infra");
-    // Char counter reflects the typed length.
-    expect(screen.getByTestId("char-counter").textContent).toMatch(/^12\//);
-  });
+  function nextButton(): HTMLButtonElement {
+    const btn = screen
+      .getAllByRole("button")
+      .find((b) => b.textContent?.includes("Next"));
+    if (!btn) throw new Error("Next button not found");
+    return btn as HTMLButtonElement;
+  }
 
-  it("renders the leader picker with 'My Agents' before 'Workspace Agents'", () => {
-    renderModal();
-    // The leader group headers come from the LeaderPicker — agent name "MineAgentOne"
-    // appears under the My Agents section, "OtherAgentOne" under Workspace Agents.
-    const myGroupLabels = screen.getAllByText("My Agents");
-    const wsGroupLabels = screen.getAllByText("Workspace Agents");
-    expect(myGroupLabels.length).toBeGreaterThanOrEqual(1);
-    expect(wsGroupLabels.length).toBeGreaterThanOrEqual(1);
+  function toPeopleStep(identity: RegExp = /Engineer/i) {
+    clickButton(identity);
+    clickButton("Next");
+  }
 
-    // Verify ordering: the first occurrence of My Agents appears before the
-    // first occurrence of Workspace Agents in the DOM (leader picker shows
-    // both sections; the additional-members picker also has them, but both
-    // pickers follow the same order so the assertion holds either way).
-    const all = Array.from(document.querySelectorAll("*"));
-    const myIdx = all.findIndex((n) => n.textContent === "My Agents");
-    const wsIdx = all.findIndex((n) => n.textContent === "Workspace Agents");
-    expect(myIdx).toBeLessThan(wsIdx);
-  });
+  function toRolesStep(identity?: RegExp) {
+    toPeopleStep(identity);
+    clickButton("Next");
+  }
 
-  it("auto-clears an additional-members entry when the same agent is picked as leader", async () => {
-    renderModal();
-    // Find the "MineAgentTwo" row inside the additional-members picker (the
-    // leader picker also has it; clicking either toggles its respective
-    // state). We pick it as an additional member via the second occurrence,
-    // then promote it to leader via the first.
-    // The additional-members picker's MineAgentTwo row is the LAST occurrence —
-    // leader picker renders earlier in the tree.
-    fireEvent.click(lastMatch("MineAgentTwo"));
+  function toRoomStep(identity?: RegExp) {
+    toRolesStep(identity);
+    // Step 3 is gated on the leader having an agent to route work to. The
+    // caller leads by default and owns myAgent, so this passes without a pick.
+    clickButton("Next");
+  }
 
-    // Chip should appear (the trigger now lists MineAgentTwo).
-    await waitFor(() => {
-      expect(screen.getAllByText("MineAgentTwo").length).toBeGreaterThanOrEqual(2);
-    });
-
-    // Promote MineAgentTwo to leader by clicking the first occurrence.
-    fireEvent.click(firstMatch("MineAgentTwo"));
-
-    // Wire up the rest of the submit path so we can verify the sanitized
-    // payload sent to addSquadMember (none — leader was the only pick).
-    mocks.createSquad.mockResolvedValue(makeSquad({ leader_id: "agent-mine-2" }));
+  function nameTheRoom(label = "Payments") {
     fireEvent.change(screen.getByPlaceholderText(/e\.g\. Frontend Team/i), {
-      target: { value: "Platform" },
+      target: { value: label },
     });
-    fireEvent.click(getSubmitButton());
+  }
 
-    await waitFor(() => {
-      expect(mocks.createSquad).toHaveBeenCalledTimes(1);
-    });
-    // addSquadMember must NOT be called for the agent we promoted to leader.
-    expect(mocks.addSquadMember).not.toHaveBeenCalled();
+  // ── step 1: identity ──────────────────────────────────────────────────
+
+  it("gates the first step on declaring an identity", () => {
+    mocks.members = []; // nobody in this workspace has declared one yet
+    renderModal();
+
+    expect(nextButton()).toBeDisabled();
+
+    fireEvent.click(firstMatch(/Engineer/i));
+    expect(nextButton()).not.toBeDisabled();
   });
 
-  it("removes a member promoted to leader from selectedMembers so switching leader away does not resurrect it", async () => {
+  it("pre-selects the identity the caller already registered", () => {
+    mocks.members = [wsMember, { ...makeMember(ME, "Me"), identity: "designer" }];
     renderModal();
-    // 1. Add MineAgentTwo as an additional member.
-    fireEvent.click(lastMatch("MineAgentTwo"));
-    await waitFor(() => {
-      expect(screen.getAllByText("MineAgentTwo").length).toBeGreaterThanOrEqual(2);
-    });
 
-    // 2. Promote MineAgentTwo to leader (first occurrence is the leader picker row).
-    fireEvent.click(firstMatch("MineAgentTwo"));
-
-    // 3. Switch leader back to MineAgentOne. With MineAgentTwo now the leader,
-    //    the additional-members picker filters it out, so MineAgentOne only
-    //    appears twice (leader picker + members picker) and firstMatch hits
-    //    the leader picker row.
-    fireEvent.click(firstMatch("MineAgentOne"));
-
-    // 4. Submit and assert MineAgentTwo is NOT submitted as a member — the
-    //    promotion must have permanently dropped it from selectedMembers.
-    mocks.createSquad.mockResolvedValue(makeSquad({ id: "sq-3", leader_id: "agent-mine-1" }));
-    fireEvent.change(screen.getByPlaceholderText(/e\.g\. Frontend Team/i), {
-      target: { value: "Swap Squad" },
-    });
-    fireEvent.click(getSubmitButton());
-
-    await waitFor(() => {
-      expect(mocks.createSquad).toHaveBeenCalledWith({
-        name: "Swap Squad",
-        description: undefined,
-        leader_id: "agent-mine-1",
-        avatar_url: undefined,
-      });
-    });
-    expect(mocks.addSquadMember).not.toHaveBeenCalled();
+    // Already answered, so the step advances without an explicit pick.
+    expect(nextButton()).not.toBeDisabled();
+    expect(screen.getByText(/Registered as Designer/i)).toBeDefined();
   });
 
-  it("on success with no additional members fires exactly one success toast and navigates", async () => {
+  // ── step 3: roles and the work switch ─────────────────────────────────
+
+  it("carries a role control for every member including the caller", () => {
     renderModal();
-    fireEvent.change(screen.getByPlaceholderText(/e\.g\. Frontend Team/i), {
-      target: { value: "Solo Squad" },
-    });
-    // Click MineAgentOne in the leader picker (first occurrence is leader picker row).
-    fireEvent.click(firstMatch("MineAgentOne"));
+    toRolesStep();
 
-    mocks.createSquad.mockResolvedValue(makeSquad({ id: "sq-1", leader_id: "agent-mine-1" }));
-
-    fireEvent.click(getSubmitButton());
-
-    await waitFor(() => {
-      expect(mocks.createSquad).toHaveBeenCalledWith({
-        name: "Solo Squad",
-        description: undefined,
-        leader_id: "agent-mine-1",
-        avatar_url: undefined,
-      });
-    });
-    await waitFor(() => {
-      expect(mocks.toastSuccess).toHaveBeenCalledTimes(1);
-    });
-    expect(mocks.addSquadMember).not.toHaveBeenCalled();
-    expect(mocks.toastWarning).not.toHaveBeenCalled();
-    expect(mocks.navigationPush).toHaveBeenCalledWith("/test-ws/squads/sq-1");
+    expect(screen.getByLabelText(/Role for You/i)).toBeDefined();
   });
 
-  it("on success with partial member failure shows success + warning toasts and still navigates", async () => {
+  it("keeps exactly one leader, demoting the previous one", () => {
     renderModal();
-    fireEvent.change(screen.getByPlaceholderText(/e\.g\. Frontend Team/i), {
-      target: { value: "Mixed Squad" },
-    });
-    fireEvent.click(firstMatch("MineAgentOne"));
+    toPeopleStep();
+    fireEvent.click(firstMatch("Workspace Pal"));
+    clickButton("Next");
 
-    // Add two additional members: the workspace pal (member) + OtherAgentOne (agent).
-    // Locate them in the additional-members picker (last occurrence of each).
-    fireEvent.click(lastMatch("OtherAgentOne"));
-    fireEvent.click(lastMatch("Workspace Pal"));
-
-    mocks.createSquad.mockResolvedValue(makeSquad({ id: "sq-2", leader_id: "agent-mine-1" }));
-    mocks.addSquadMember
-      .mockResolvedValueOnce({}) // first call succeeds
-      .mockRejectedValueOnce(new Error("boom")); // second fails
-
-    fireEvent.click(getSubmitButton());
-
-    await waitFor(() => {
-      expect(mocks.createSquad).toHaveBeenCalledTimes(1);
+    // The caller starts as leader; promoting the pick must hand it over rather
+    // than leaving two, because the squad routes its work to the leader.
+    fireEvent.change(screen.getByLabelText(/Role for Workspace Pal/i), {
+      target: { value: "leader" },
     });
-    await waitFor(() => {
-      expect(mocks.addSquadMember).toHaveBeenCalledTimes(2);
-    });
-    await waitFor(() => {
-      expect(mocks.toastSuccess).toHaveBeenCalledTimes(1);
-    });
-    expect(mocks.toastWarning).toHaveBeenCalledTimes(1);
-    expect(mocks.navigationPush).toHaveBeenCalledWith("/test-ws/squads/sq-2");
+
+    expect(
+      (screen.getByLabelText(/Role for Workspace Pal/i) as HTMLSelectElement).value,
+    ).toBe("leader");
+    expect(
+      (screen.getByLabelText(/Role for You/i) as HTMLSelectElement).value,
+    ).toBe("executor");
   });
 
-  it("on createSquad failure shows an error toast, does not navigate, and re-enables submit", async () => {
+  it("offers no way to add an agent directly — only people", () => {
     renderModal();
-    fireEvent.change(screen.getByPlaceholderText(/e\.g\. Frontend Team/i), {
-      target: { value: "Boom Squad" },
+    toPeopleStep();
+
+    // The old picker listed workspace agents beside the people; an agent now
+    // reaches a room only through its owner.
+    expect(screen.queryByTestId("avatar-agent-other-1")).toBeNull();
+    expect(screen.getByText("Workspace Pal")).toBeDefined();
+  });
+
+  it("toggles whether a member's agents may take work", () => {
+    renderModal();
+    toPeopleStep();
+    fireEvent.click(firstMatch("Workspace Pal"));
+    clickButton("Next");
+
+    const toggle = screen.getByLabelText(/Take work for Workspace Pal/i);
+    expect(toggle.getAttribute("aria-pressed")).toBe("true");
+
+    fireEvent.click(toggle);
+    expect(toggle.getAttribute("aria-pressed")).toBe("false");
+  });
+
+  // ── submit ────────────────────────────────────────────────────────────
+
+  it("writes a newly declared identity to the account before creating", async () => {
+    renderModal();
+    toRoomStep();
+    nameTheRoom();
+    clickButton("Create Squad");
+
+    await waitFor(() => expect(mocks.createSquad).toHaveBeenCalledTimes(1));
+    expect(mocks.updateMe).toHaveBeenCalledWith({ identity: "engineer" });
+  });
+
+  it("does not rewrite the identity when it is already the registered one", async () => {
+    mocks.members = [wsMember, { ...makeMember(ME, "Me"), identity: "engineer" }];
+    renderModal();
+    toRoomStep();
+    nameTheRoom();
+    clickButton("Create Squad");
+
+    await waitFor(() => expect(mocks.createSquad).toHaveBeenCalledTimes(1));
+    expect(mocks.updateMe).not.toHaveBeenCalled();
+  });
+
+  it("lets the leader name which of their agents routes the squad's work", async () => {
+    // The caller owns two agents and leads by default, so both chips are
+    // offered — silently taking the first is how a fixture agent ends up
+    // leading a room nobody meant to give it to.
+    renderModal();
+    toRolesStep();
+
+    // The leader's lent agent IS the routing agent, so this one control
+    // decides both.
+    fireEvent.change(screen.getByLabelText(/Agent You lends to this squad/i), {
+      target: { value: "agent-mine-2" },
     });
-    fireEvent.click(firstMatch("MineAgentOne"));
+    clickButton("Next");
+    nameTheRoom();
+    clickButton("Create Squad");
 
-    mocks.createSquad.mockRejectedValueOnce(new Error("server down"));
+    await waitFor(() => expect(mocks.createSquad).toHaveBeenCalledTimes(1));
+    expect(mocks.createSquad).toHaveBeenCalledWith(
+      expect.objectContaining({ leader_id: "agent-mine-2" }),
+    );
+  });
 
-    fireEvent.click(getSubmitButton());
+  it("puts the caller in their own room so they can speak in it", async () => {
+    renderModal();
+    toRoomStep();
+    nameTheRoom();
+    clickButton("Create Squad");
 
-    await waitFor(() => {
-      expect(mocks.toastError).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(mocks.addSquadMember).toHaveBeenCalledTimes(1));
+    expect(mocks.addSquadMember).toHaveBeenCalledWith("sq-new", {
+      member_type: "member",
+      member_id: ME,
+      role: "leader",
+      can_receive_work: true,
+      // Nobody chose an agent, so the leader defaults to their first.
+      agent_id: "agent-mine-1",
     });
+  });
+
+  it("sends each picked member's role and work switch", async () => {
+    renderModal();
+    toPeopleStep();
+    fireEvent.click(firstMatch("Workspace Pal"));
+    clickButton("Next");
+
+    // Demote the pick to an observer who is not available for work.
+    fireEvent.change(screen.getByLabelText(/Role for Workspace Pal/i), {
+      target: { value: "observer" },
+    });
+    fireEvent.click(screen.getByLabelText(/Take work for Workspace Pal/i));
+
+    // No agent to pick: the caller leads and owns myAgent, which the squad
+    // routes its work through.
+    clickButton("Next");
+    nameTheRoom();
+    clickButton("Create Squad");
+
+    await waitFor(() => expect(mocks.addSquadMember).toHaveBeenCalledTimes(2));
+    expect(mocks.addSquadMember).toHaveBeenCalledWith("sq-new", {
+      member_type: "member",
+      member_id: OTHER,
+      role: "observer",
+      can_receive_work: false,
+      // They own exactly one agent, so adding them lends it without a second
+      // decision.
+      agent_id: "agent-other-1",
+    });
+  });
+
+  it("navigates to the new room and closes on success", async () => {
+    const { onClose } = renderModal();
+    toRoomStep();
+    nameTheRoom();
+    clickButton("Create Squad");
+
+    await waitFor(() =>
+      expect(mocks.navigationPush).toHaveBeenCalledWith("/test-ws/squads/sq-new"),
+    );
+    expect(onClose).toHaveBeenCalled();
+    expect(mocks.toastSuccess).toHaveBeenCalled();
+  });
+
+  it("reports a partial member failure but still creates the room", async () => {
+    mocks.addSquadMember.mockRejectedValueOnce(new Error("nope"));
+    renderModal();
+    toRoomStep();
+    nameTheRoom();
+    clickButton("Create Squad");
+
+    await waitFor(() => expect(mocks.toastWarning).toHaveBeenCalled());
+    expect(mocks.navigationPush).toHaveBeenCalled();
+  });
+
+  it("stays put and re-enables submit when creation fails", async () => {
+    mocks.createSquad.mockRejectedValue(new Error("boom"));
+    renderModal();
+    toRoomStep();
+    nameTheRoom();
+    clickButton("Create Squad");
+
+    await waitFor(() => expect(mocks.toastError).toHaveBeenCalled());
     expect(mocks.navigationPush).not.toHaveBeenCalled();
-    // Submit button is re-enabled (textContent reads "Create Squad" again,
-    // not "Creating...").
-    const button = getSubmitButton();
-    expect(button.disabled).toBe(false);
+    expect(
+      screen
+        .getAllByRole("button")
+        .find((b) => b.textContent?.includes("Create Squad")),
+    ).not.toBeDisabled();
   });
 });

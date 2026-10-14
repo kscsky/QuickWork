@@ -142,6 +142,87 @@ describe("ApiClient edit guards", () => {
   });
 });
 
+describe("ApiClient issue list filters", () => {
+  // Regression: the bucketed list fetch (issueListOptions) passed
+  // `status_category` through ListIssuesParams, but the client never wrote it
+  // into the query string — every bucket request came back unfiltered and the
+  // flattened list contained each issue once per bucket.
+  it("serializes status_category so a bucketed fetch filters server-side", async () => {
+    const fetchMock = vi.fn().mockImplementation(() =>
+      Promise.resolve(
+        new Response(JSON.stringify({ issues: [], total: 0 }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const client = new ApiClient("https://api.example.test");
+
+    await client.listIssues({ status_category: "blocked", limit: 50, offset: 0 });
+    await client.listIssues({ status_categories: ["todo", "in_progress"] });
+
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain("status_category=blocked");
+    expect(String(fetchMock.mock.calls[1]?.[0])).toContain(
+      "status_categories=todo%2Cin_progress",
+    );
+  });
+});
+
+describe("ApiClient issue chains", () => {
+  it("answers an empty id window without a request", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const client = new ApiClient("https://api.example.test");
+
+    await expect(client.listIssueChains([])).resolves.toEqual([]);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("parses a chain list and degrades a malformed body to no chains", async () => {
+    const valid = {
+      chains: [
+        {
+          issue_id: "issue-1",
+          parked: true,
+          steps: [
+            {
+              id: "step-1",
+              position: 0,
+              holder_user_id: "user-1",
+              title: "Break it down",
+              state: "parked",
+            },
+          ],
+        },
+      ],
+    };
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify(valid), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ chains: "not-an-array" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+    const client = new ApiClient("https://api.example.test");
+
+    const chains = await client.listIssueChains(["issue-1"]);
+    expect(chains).toHaveLength(1);
+    expect(chains[0]).toMatchObject({ issue_id: "issue-1", parked: true });
+    expect(chains[0]?.steps[0]).toMatchObject({ holder_user_id: "user-1", state: "parked" });
+
+    await expect(client.listIssueChains(["issue-1"])).resolves.toEqual([]);
+  });
+});
+
 describe("ApiClient pull-request response schema", () => {
   const validPR = {
     id: "pr-1",
@@ -715,6 +796,75 @@ describe("ApiClient label response schemas", () => {
     ).resolves.toEqual({ labels: [] });
 
     expect(fetchMock).toHaveBeenCalledTimes(10);
+  });
+});
+
+describe("ApiClient projects list response schema", () => {
+  const jsonResponse = (body: unknown, status: number) =>
+    new Response(JSON.stringify(body), {
+      status,
+      headers: { "Content-Type": "application/json" },
+    });
+
+  const project = {
+    id: "p-1",
+    workspace_id: "ws-1",
+    title: "QuickWork",
+    description: null,
+    icon: null,
+    status: "in_progress",
+    priority: "high",
+    lead_type: null,
+    lead_id: null,
+    created_at: "2026-01-01T00:00:00Z",
+    updated_at: "2026-01-01T00:00:00Z",
+    issue_count: 3,
+    done_count: 1,
+    resource_count: 1,
+  };
+
+  it("returns the execution summary alongside the project", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse({
+      projects: [{
+        ...project,
+        local_directory: {
+          label: "quickwork",
+          local_path: "/srv/quickwork",
+          daemon_id: "daemon-1",
+          execution_mode: "worktree",
+        },
+        repo_url: "https://github.com/example/quickwork",
+        active_task_count: 2,
+      }],
+      total: 1,
+    }, 200)));
+
+    const client = new ApiClient("https://api.example.test");
+    const page = await client.listProjects();
+    expect(page.projects[0]?.local_directory?.execution_mode).toBe("worktree");
+    expect(page.projects[0]?.active_task_count).toBe(2);
+  });
+
+  // The projects page renders straight from this call, so a bad summary must
+  // cost one card its hero rather than blank the page.
+  it("keeps the project when its local_directory is malformed", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse({
+      projects: [{ ...project, local_directory: { local_path: 42 }, active_task_count: 1 }],
+      total: 1,
+    }, 200)));
+
+    const client = new ApiClient("https://api.example.test");
+    const page = await client.listProjects();
+    expect(page.projects).toHaveLength(1);
+    expect(page.projects[0]?.title).toBe("QuickWork");
+    expect(page.projects[0]?.local_directory).toBeUndefined();
+  });
+
+  it("falls back to an empty list for a malformed response", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse({ projects: "broken" }, 200)));
+
+    const client = new ApiClient("https://api.example.test");
+    await expect(client.listProjects()).resolves.toEqual({ projects: [], total: 0 });
   });
 });
 

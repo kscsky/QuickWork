@@ -2,6 +2,8 @@
   "nav": {
     "inbox": "インボックス",
     "chat": "チャット",
+    "dispatch": "スクワッドタスク",
+    "tasks": "タスクリスト",
     "my_issues": "マイタスク",
     "issues": "タスク",
     "projects": "プロジェクト",
@@ -37,23 +39,30 @@
     "server_version": "サーバーバージョン {{version}}"
   },
   "workspace_loader": {
-    "loading_workspace": "ワークスペースを読み込み中…",
+    "loading_workspace": "スペースを読み込み中…",
     "loading_named_prefix": "読み込み中"
   },
   "sidebar": {
     "unpin_tooltip": "ピン留めを解除",
-    "workspaces_label": "ワークスペース",
-    "create_workspace": "ワークスペースを作成",
+    "workspaces_label": "スペース",
+    "create_workspace": "スペースを作成",
     "pending_invitations_label": "保留中の招待",
-    "invitation_workspace_fallback": "ワークスペース",
+    "invitation_workspace_fallback": "スペース",
     "invitation_join": "参加",
     "invitation_decline": "辞退",
     "log_out": "ログアウト",
-    "new_issue": "新規タスク",
+    "new_issue": "ソロタスク",
     "new_issue_shortcut": "C",
     "pinned_label": "ピン留め済み",
-    "workspace_group": "ワークスペース",
+    "workspace_group": "スペース",
     "configure_group": "設定",
-    "unread_overflow": "99+"
+    "unread_overflow": "99+",
+    "running_label": "稼働中",
+    "running_all": "すべて",
+    "running_more_other": "他 {{count}} 件",
+    "running_unnamed": "無題のタスク",
+    "nav_running_other": "{{count}} 稼働中",
+    "nav_busy_other": "{{count}} 稼働",
+    "fleet_state": "{{busy}} 稼働 · {{idle}} 空き"
   }
 }

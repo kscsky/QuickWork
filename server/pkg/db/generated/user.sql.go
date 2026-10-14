@@ -299,3 +299,47 @@ func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) (User, e
 	)
 	return i, err
 }
+
+const updateUserIdentity = `-- name: UpdateUserIdentity :one
+UPDATE "user" SET
+    onboarding_questionnaire = jsonb_set(
+        COALESCE(onboarding_questionnaire, '{}'::jsonb),
+        '{role}',
+        to_jsonb($2::text),
+        true
+    ),
+    updated_at = now()
+WHERE id = $1
+RETURNING id, name, email, avatar_url, created_at, updated_at, onboarded_at, onboarding_questionnaire, starter_content_state, language, profile_description, timezone
+`
+
+type UpdateUserIdentityParams struct {
+	ID      pgtype.UUID `json:"id"`
+	Column2 string      `json:"column_2"`
+}
+
+// Sets the single `role` key inside the onboarding questionnaire, leaving every
+// other answer alone.
+//
+// Deliberately not PatchUserOnboarding: that one REPLACES the whole JSONB, so
+// writing an identity through it would wipe the use-case and source answers a
+// user gave during onboarding. jsonb_set with create_missing merges instead.
+func (q *Queries) UpdateUserIdentity(ctx context.Context, arg UpdateUserIdentityParams) (User, error) {
+	row := q.db.QueryRow(ctx, updateUserIdentity, arg.ID, arg.Column2)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Email,
+		&i.AvatarUrl,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.OnboardedAt,
+		&i.OnboardingQuestionnaire,
+		&i.StarterContentState,
+		&i.Language,
+		&i.ProfileDescription,
+		&i.Timezone,
+	)
+	return i, err
+}

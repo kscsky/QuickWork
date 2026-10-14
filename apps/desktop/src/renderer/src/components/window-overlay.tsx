@@ -6,7 +6,6 @@ import { useNavigation } from "@quickwork/views/navigation";
 import { paths } from "@quickwork/core/paths";
 import { workspaceListOptions } from "@quickwork/core/workspace/queries";
 import { useWindowOverlayStore } from "@/stores/window-overlay-store";
-import { useLocalRuntimesPending } from "../platform/use-local-runtimes-pending";
 
 /**
  * Window-level transition overlay: renders above the tab system when the
@@ -37,9 +36,6 @@ function WindowOverlayInner() {
   const close = useWindowOverlayStore((s) => s.close);
   const { push } = useNavigation();
   const { data: wsList = [] } = useQuery(workspaceListOptions());
-  // Live local-daemon signal for the onboarding runtime step so it doesn't
-  // flash "no runtime found" while the daemon is still probing CLI versions.
-  const runtimesPending = useLocalRuntimesPending();
 
   if (!overlay) return null;
 
@@ -47,14 +43,6 @@ function WindowOverlayInner() {
   // has at least one workspace. Zero-workspace users can only Log out or
   // complete the flow.
   const onBack = wsList.length > 0 ? close : undefined;
-
-  // The daemon's PATH probe runs once at boot, so a newly-installed CLI
-  // (Claude / Codex / Cursor) does not show up until the daemon is bounced.
-  // Both onboarding entries need this — creating a second workspace hits the
-  // same runtime step.
-  const restartDaemon = async () => {
-    await window.daemonAPI?.restart?.();
-  };
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col overflow-auto bg-background">
@@ -65,16 +53,12 @@ function WindowOverlayInner() {
         <OnboardingFlow
           mode="new_workspace"
           onCancel={onBack}
-          onRuntimeRefresh={restartDaemon}
-          runtimesPending={runtimesPending}
           onComplete={(ws, destination) => {
             close();
-            if (ws && destination?.kind === "chat") {
-              push(paths.workspace(ws.slug).chatSession(destination.sessionId));
-            } else if (ws && destination?.kind === "issue") {
+            if (ws && destination?.kind === "issue") {
               push(paths.workspace(ws.slug).issueDetail(destination.issueId));
             } else if (ws) {
-              push(paths.workspace(ws.slug).issues());
+              push(paths.workspace(ws.slug).dispatch());
             }
           }}
         />
@@ -90,23 +74,17 @@ function WindowOverlayInner() {
         <OnboardingFlow
           onComplete={(ws, destination) => {
             close();
-            if (ws && destination?.kind === "chat") {
-              push(
-                paths.workspace(ws.slug).chatSession(destination.sessionId),
-              );
-            } else if (ws && destination?.kind === "issue") {
+            if (ws && destination?.kind === "issue") {
               push(
                 paths.workspace(ws.slug).issueDetail(destination.issueId),
               );
             } else if (ws) {
-              push(paths.workspace(ws.slug).issues());
+              push(paths.workspace(ws.slug).dispatch());
             } else {
               push(paths.root());
             }
           }}
           // Restart the bundled daemon when the user hits Refresh on
-          onRuntimeRefresh={restartDaemon}
-          runtimesPending={runtimesPending}
         />
       )}
     </div>

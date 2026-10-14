@@ -18,6 +18,8 @@ import { ProjectsPage } from "@quickwork/views/projects/components";
 import { DashboardPage } from "@quickwork/views/dashboard";
 import { AutopilotsPage } from "@quickwork/views/autopilots/components";
 import { MyIssuesPage } from "@quickwork/views/my-issues";
+import { ControlTowerPage } from "@quickwork/views/home";
+import { TaskListPage } from "@quickwork/views/tasks";
 import { SkillsPage } from "@quickwork/views/skills";
 import { DesktopRuntimesPage } from "./components/desktop-runtimes-page";
 import { DesktopAgentsPage } from "./components/desktop-agents-page";
@@ -28,7 +30,6 @@ import {
 } from "@quickwork/views/agents";
 import { SquadsPage, SquadDetailPage as SquadDetailPageView } from "@quickwork/views/squads/components";
 import { InboxPage } from "@quickwork/views/inbox";
-import { ChatPage } from "@quickwork/views/chat";
 import { SettingsPage } from "@quickwork/views/settings";
 import { useT } from "@quickwork/views/i18n";
 import { Download, Server } from "lucide-react";
@@ -128,6 +129,16 @@ export const appRoutes: RouteObject[] = [
           // invariant 1: the router never self-navigates).
           { index: true, element: null },
           {
+            path: "dispatch",
+            element: <ControlTowerPage />,
+            handle: { title: "Dispatch" },
+          },
+          {
+            path: "tasks",
+            element: <TaskListPage />,
+            handle: { title: "Tasks" },
+          },
+          {
             path: "issues",
             element: <IssuesPage />,
             handle: { title: "Issues" },
@@ -221,7 +232,6 @@ export const appRoutes: RouteObject[] = [
             handle: { title: "Squad" },
           },
           { path: "inbox", element: <InboxPage />, handle: { title: "Inbox" } },
-          { path: "chat", element: <ChatPage />, handle: { title: "Chat" } },
           {
             path: "attachments/:id/preview",
             element: <AttachmentPreviewRoute />,

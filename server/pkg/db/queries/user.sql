@@ -63,6 +63,24 @@ UPDATE "user" SET
 WHERE id = sqlc.arg('id')
 RETURNING *;
 
+-- name: UpdateUserIdentity :one
+-- Sets the single `role` key inside the onboarding questionnaire, leaving every
+-- other answer alone.
+--
+-- Deliberately not PatchUserOnboarding: that one REPLACES the whole JSONB, so
+-- writing an identity through it would wipe the use-case and source answers a
+-- user gave during onboarding. jsonb_set with create_missing merges instead.
+UPDATE "user" SET
+    onboarding_questionnaire = jsonb_set(
+        COALESCE(onboarding_questionnaire, '{}'::jsonb),
+        '{role}',
+        to_jsonb($2::text),
+        true
+    ),
+    updated_at = now()
+WHERE id = $1
+RETURNING *;
+
 -- name: SetStarterContentState :one
 -- Atomically transition starter_content_state. The handler is
 -- responsible for checking the current value first (to decide between

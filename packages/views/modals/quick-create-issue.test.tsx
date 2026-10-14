@@ -16,7 +16,6 @@ const mockCreateCommentSubIssue = vi.hoisted(() => vi.fn());
 const mockSetLastActor = vi.hoisted(() => vi.fn());
 const mockSetQuickCreateFieldVisible = vi.hoisted(() => vi.fn());
 const mockSetKeepOpen = vi.hoisted(() => vi.fn());
-const mockSetLastMode = vi.hoisted(() => vi.fn());
 const mockToastSuccess = vi.hoisted(() => vi.fn());
 const mockShowIssueLimitUpgradePrompt = vi.hoisted(() => vi.fn());
 // Uploads flow through the module-level coordinator, which calls
@@ -143,7 +142,10 @@ vi.mock("@tanstack/react-query", () => ({
         return { data: [{ user_id: "user-1", role: "admin" }] };
       case "agents":
         return {
-          data: [{ id: "agent-1", name: "Bohan", archived_at: null, runtime_id: "runtime-1" }],
+          data: [
+            { id: "agent-1", name: "Bohan", archived_at: null, owner_id: "user-1", status: "idle", runtime_id: "runtime-1" },
+            { id: "agent-2", name: "Alice's bot", archived_at: null, owner_id: "user-2", status: "idle", runtime_id: "runtime-1" },
+          ],
         };
       case "runtimes":
         return { data: [{ id: "runtime-1", metadata: { cli_version: "1.2.3" } }] };
@@ -192,6 +194,7 @@ vi.mock("@quickwork/core/paths", () => ({
   useCurrentWorkspace: () => ({ name: "Test Workspace" }),
   useWorkspacePaths: () => ({
     settings: () => "/ws-test/settings",
+    agents: () => "/ws-test/agents",
   }),
 }));
 
@@ -230,11 +233,6 @@ vi.mock("@quickwork/core/issues/stores/issue-create-settings-store", () => ({
   useIssueCreateSettingsStore: (
     selector?: (state: typeof mockCreateSettingsStore) => unknown,
   ) => (selector ? selector(mockCreateSettingsStore) : mockCreateSettingsStore),
-}));
-
-vi.mock("@quickwork/core/issues/stores/create-mode-store", () => ({
-  useCreateModeStore: (selector?: (state: { setLastMode: typeof mockSetLastMode }) => unknown) =>
-    (selector ? selector({ setLastMode: mockSetLastMode }) : { setLastMode: mockSetLastMode }),
 }));
 
 vi.mock("@quickwork/core/auth", () => ({
@@ -557,9 +555,6 @@ describe("AgentCreatePanel", () => {
   });
 
   it("restores unfinished actor, project, priority, and due-date selections after remount", async () => {
-    mockSquadsData.list = [
-      { id: "squad-1", name: "Frontend Squad", leader_id: "agent-1", archived_at: null },
-    ];
     mockProjectsQuery.data = [{ id: "proj-1", title: "Web", icon: null }];
     mockCreateSettingsStore.quickCreateFields = ["project", "priority", "due_date"];
     const user = userEvent.setup();
@@ -570,13 +565,20 @@ describe("AgentCreatePanel", () => {
       setIsExpanded: vi.fn(),
     });
 
-    await user.click(screen.getByRole("button", { name: /Frontend Squad/ }));
+    // Re-pick the same own agent through the seat's popover. Both the seat
+    // trigger and the popover row carry "Bohan" in their accessible name, so
+    // the popover row is the later button in DOM order.
+    await user.click(screen.getByRole("button", { name: /Bohan/ }));
+    const bohanButtons = await screen.findAllByRole("button", { name: /Bohan/ });
+    const popoverRow = bohanButtons[bohanButtons.length - 1];
+    if (!popoverRow) throw new Error("seat popover row missing");
+    await user.click(popoverRow);
     await user.click(screen.getByTestId("project-picker"));
     await user.click(screen.getByTestId("priority-picker"));
     await user.click(screen.getByTestId("due-date-picker"));
 
     expect(mockIssueDraftStore.draft.agent).toEqual(
-      expect.objectContaining({ actorType: "squad", actorId: "squad-1" }),
+      expect.objectContaining({ actorType: "agent", actorId: "agent-1" }),
     );
     expect(mockIssueDraftStore.draft.shared).toEqual(
       expect.objectContaining({
@@ -589,10 +591,7 @@ describe("AgentCreatePanel", () => {
     firstOpen.unmount();
     renderPanel({ onClose: vi.fn(), isExpanded: false, setIsExpanded: vi.fn() });
 
-    expect(screen.getByRole("button", { name: /Frontend Squad/ })).toHaveAttribute(
-      "data-selected",
-      "true",
-    );
+    expect(screen.getByRole("button", { name: /Bohan/ })).toHaveTextContent("Idle");
     expect(screen.getByTestId("project-picker")).toHaveTextContent("Project proj-1");
     expect(screen.getByTestId("priority-picker")).toHaveTextContent("Priority high");
     expect(screen.getByTestId("due-date-picker")).toHaveTextContent("Due date 2026-08-01");
@@ -625,7 +624,6 @@ describe("AgentCreatePanel", () => {
     expect(mockSetLastActor).toHaveBeenCalledWith("agent", "agent-1");
     // A successful create ends the whole unified draft.
     expect(mockClearDraft).toHaveBeenCalled();
-    expect(mockSetLastMode).toHaveBeenCalledWith("agent");
     expect(onClose).toHaveBeenCalled();
   });
 
@@ -836,52 +834,46 @@ describe("AgentCreatePanel", () => {
     });
   });
 
-  // Picking a squad routes the submission through `squad_id` (not
-  // `agent_id`) so the backend can resolve the squad's leader agent and
-  // inject the squad-leader briefing on dispatch. The persisted preference
-  // remembers the actor type so the next open defaults back to the squad.
-  it("submits squad_id when the user picks a squad in the actor picker", async () => {
+  // Solo tasks run on the caller's OWN agents: the seat popover lists them
+  // and nothing else — no squads (squad relays live on the squad-tasks page)
+  // and no other members' agents (validateAssigneePair would allow some of
+  // them via grants, but the dialog's contract is own-agents-only).
+  it("lists only the caller's own agents in the seat picker", () => {
     mockSquadsData.list = [
       { id: "squad-1", name: "Frontend Squad", leader_id: "agent-1", archived_at: null },
-    ];
-    const user = userEvent.setup();
-    const onClose = vi.fn();
-
-    renderPanel({ onClose, isExpanded: false, setIsExpanded: vi.fn() });
-
-    // The picker mock renders both sections inline as buttons; click the
-    // squad row directly.
-    await user.click(screen.getByRole("button", { name: /Frontend Squad/ }));
-
-    const editor = screen.getByPlaceholderText(
-      'Tell the agent what to do, e.g. "let Bohan fix the inbox loading slowness in the Web project"',
-    );
-    await user.clear(editor);
-    await user.type(editor, "Investigate the regression");
-
-    await user.click(screen.getByRole("button", { name: /^Create$/i }));
-
-    await waitFor(() => {
-      expect(mockQuickCreateIssue).toHaveBeenCalledWith({
-        squad_id: "squad-1",
-        prompt: "Investigate the regression",
-        project_id: undefined,
-      });
-    });
-    expect(mockSetLastActor).toHaveBeenCalledWith("squad", "squad-1");
-  });
-
-  // Squads whose leader agent isn't visible (archived, private, etc.) must
-  // not appear in the picker — the backend would reject the pick on
-  // validateAssigneePair, and showing them invites a confusing dead path.
-  it("hides squads whose leader agent is not in the visible-agents list", () => {
-    mockSquadsData.list = [
-      { id: "squad-orphan", name: "Orphan Squad", leader_id: "agent-missing", archived_at: null },
     ];
 
     renderPanel({ onClose: vi.fn(), isExpanded: false, setIsExpanded: vi.fn() });
 
-    expect(screen.queryByRole("button", { name: /Orphan Squad/ })).toBeNull();
+    // The picker mock renders its rows inline, so the own agent's row is a
+    // button while the squad and another member's agent never render at all.
+    expect(screen.getByRole("button", { name: /Bohan/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Alice's bot/ })).toBeNull();
+    expect(screen.queryByText("Frontend Squad")).toBeNull();
+  });
+
+  it("ignores a remembered actor that is not one of the caller's own agents", async () => {
+    mockQuickCreateStore.lastActorType = "agent";
+    mockQuickCreateStore.lastActorId = "agent-2";
+    const user = userEvent.setup();
+
+    renderPanel({ onClose: vi.fn(), isExpanded: false, setIsExpanded: vi.fn() });
+
+    // Seeding fell through to the first own agent instead of Alice's bot —
+    // observable in the submission, which is the authoritative proof.
+    await user.type(
+      screen.getByPlaceholderText(
+        'Tell the agent what to do, e.g. "let Bohan fix the inbox loading slowness in the Web project"',
+      ),
+      "Ship it",
+    );
+    await user.click(screen.getByRole("button", { name: /^Create$/i }));
+
+    await waitFor(() => {
+      expect(mockQuickCreateIssue).toHaveBeenCalledWith(
+        expect.objectContaining({ agent_id: "agent-1" }),
+      );
+    });
   });
 
   // A successful create used to persist its project, so the NEXT open
@@ -1054,16 +1046,20 @@ describe("AgentCreatePanel", () => {
       data: sourceContextPanelData,
     });
 
-    const prompt = screen.getByPlaceholderText(
+    // The editor sits inside the 要什么 card; that card is the internal
+    // scroller, and the source-context card stays a sibling section below it.
+    const promptCard = screen.getByPlaceholderText(
       'Tell the agent what to do with this context, e.g. "continue investigating and fix the issue described here"',
     ).parentElement;
     const sourceContext = document.querySelector<HTMLElement>('[data-slot="source-context-preview"]');
 
-    expect(prompt).toHaveClass("flex-1", "min-h-[140px]", "overflow-y-auto");
+    expect(promptCard).toHaveClass("flex-1", "min-h-[132px]", "overflow-y-auto");
     expect(sourceContext).toHaveClass("shrink-0");
-    expect(prompt?.parentElement).toBe(sourceContext?.parentElement);
-    expect(prompt?.nextElementSibling).toBe(sourceContext);
-    expect(prompt).not.toContainElement(sourceContext);
+    // The card's section is the direct panel-root sibling of the context card.
+    const section = promptCard?.parentElement;
+    expect(section?.parentElement).toBe(sourceContext?.parentElement);
+    expect(section?.nextElementSibling).toBe(sourceContext);
+    expect(promptCard).not.toContainElement(sourceContext);
   });
 
   it("submits source-context agent create through the dedicated endpoint", async () => {
@@ -1112,20 +1108,6 @@ describe("AgentCreatePanel", () => {
       fireEvent.click(screen.getByRole("button", { name: "Mock editor upload" }));
       return { release: (result: unknown) => release(result) };
     }
-
-    it("blocks Switch to Manual while an upload is in flight", async () => {
-      const onSwitchMode = vi.fn();
-      renderPanel({ onClose: vi.fn(), onSwitchMode, isExpanded: false, setIsExpanded: vi.fn() });
-
-      startPendingUpload();
-
-      // The switch hands the serialized prompt to the manual panel — mid-upload
-      // that prompt has already lost the pending image.
-      const switchButton = screen.getByRole("button", { name: /Switch to Manual/i });
-      await waitFor(() => expect(switchButton).toBeDisabled());
-      fireEvent.click(switchButton);
-      expect(onSwitchMode).not.toHaveBeenCalled();
-    });
 
     it("keeps the attach-file button usable during an upload so files can queue", async () => {
       renderPanel({ onClose: vi.fn(), isExpanded: false, setIsExpanded: vi.fn() });
@@ -1186,12 +1168,13 @@ describe("AgentCreatePanel", () => {
     });
 
     it("keeps every footer control a direct child of the grid container", () => {
-      const switchToManual = screen.getByRole("button", { name: /Switch to Manual/i });
       const create = screen.getByRole("button", { name: /^Create$/i });
       const keepOpen = screen.getByRole("checkbox");
       const attach = screen.getByRole("button", { name: "Upload file" });
 
-      const footer = switchToManual.parentElement;
+      // Mode switching lives in the header strip now; the footer's direct
+      // grid children are attach group / keep-open / Create.
+      const footer = create.parentElement;
       expect(footer?.className).toContain("grid-cols-[auto_1fr]");
       // From `sm` up the same children lay out as the original single row.
       expect(footer?.className).toContain("sm:flex");
@@ -1200,7 +1183,6 @@ describe("AgentCreatePanel", () => {
       // a <div> collapses the 2x2 back to the jammed single row the bug
       // report showed. The attach button keeps its own wrapper because it can
       // gain a "N sent" badge — that wrapper is itself the first grid cell.
-      expect(create.parentElement).toBe(footer);
       expect(keepOpen.parentElement?.parentElement).toBe(footer);
       expect(attach.parentElement?.parentElement).toBe(footer);
       expect(attach).toHaveAttribute("data-size", "sm");

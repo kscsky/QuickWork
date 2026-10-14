@@ -415,6 +415,109 @@ html[data-dnd-dragging="true"] * {
     color 320ms cubic-bezier(0.23, 1, 0.32, 1);
 }
 
+/* The "name your space" step's pane: a deep field with one light source in the
+ * top-left corner, so the frosted surfaces on it have something to be frosted
+ * against. A flat dark background reads as "dark mode"; a gradient with a
+ * direction reads as glass, which is the difference between this step looking
+ * dimmed and looking lit from somewhere.
+ *
+ * The pane also carries `.dark`, so every token inside it — muted, border,
+ * foreground — resolves against a dark surface without any component needing to
+ * know. That is why the rest of this block is only the three surfaces that need
+ * to be translucent rather than token-coloured. */
+.onboarding-glass-pane {
+  background: radial-gradient(
+    120% 120% at 12% 0%,
+    oklch(0.32 0.12 268) 0%,
+    oklch(0.17 0.04 265) 55%,
+    oklch(0.13 0.02 265) 100%
+  );
+}
+
+/* Surfaces. Translucent white over the gradient rather than an opaque token, so
+ * the light source stays visible through them — an opaque panel on this
+ * background is just a dark rectangle again. */
+/* The glass panel's arrival, and the stagger its rows use. Short and upward:
+ * the panel is the thing the member is here to fill in, so it should feel
+ * handed to them rather than assembled in front of them. */
+@keyframes onboarding-glass-rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.onboarding-glass-rise {
+  animation: onboarding-glass-rise 620ms cubic-bezier(0.23, 1, 0.32, 1) both;
+}
+
+/* The field's own arrival, one row at a time. Carries a delay per row from the
+ * component so the panel fills top-down instead of appearing whole. */
+.onboarding-glass-row {
+  animation: onboarding-glass-rise 520ms cubic-bezier(0.23, 1, 0.32, 1) both;
+}
+
+/* Background and blur only. Deliberately not the border: these rules sit
+ * outside Tailwind's layers, so they beat every utility, and a component's own
+ * `border-foreground` selected state has to keep winning. */
+.onboarding-glass-card {
+  background: oklch(1 0 0 / 6%);
+  backdrop-filter: blur(12px);
+}
+
+/* The one action on the step. It carries the only saturated colour on the pane,
+ * and the glow — rather than a drop shadow — is what puts it in front of the
+ * frosted panel instead of on top of it. */
+.onboarding-glass-cta {
+  background: linear-gradient(
+    90deg,
+    oklch(0.68 0.15 272),
+    oklch(0.66 0.19 300)
+  );
+  color: oklch(0.16 0.03 265);
+  box-shadow: 0 6px 24px oklch(0.68 0.15 272 / 35%);
+}
+
+.onboarding-glass-cta:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+/* Onboarding's signal rail: the spark that descends it.
+ *
+ * The rail lists the four handoffs in the order they happen and is otherwise
+ * still, so this is the only moving part: a lit dot travelling from the first
+ * checkpoint to the last. It loops, because on this screen the descent is the
+ * product's resting state rather than an event worth announcing once.
+ *
+ * The rail's gradient does not animate — the spark rides it. One animated
+ * element, one thing to keep in step.
+ *
+ * The component gives the spark its resting `top` inline, at the checkpoint an
+ * agent is holding, which is where reduced motion leaves it. */
+@keyframes onboarding-signal-spark {
+  0% {
+    top: 0%;
+    opacity: 0;
+  }
+  12%,
+  80% {
+    opacity: 1;
+  }
+  100% {
+    top: 100%;
+    opacity: 0;
+  }
+}
+
+.onboarding-signal-spark {
+  animation: onboarding-signal-spark 5.6s cubic-bezier(0.45, 0, 0.55, 1)
+    infinite;
+}
+
 /* Sign-in column: three steps share this chrome (email, code, CLI authorize),
  * so everything below has to hold on all three.
  *
@@ -756,7 +859,10 @@ html[data-dnd-dragging="true"] * {
   .login-form-otp-complete,
   .login-form-otp-complete::after,
   .login-form-otp-invalid,
-  .login-cta-busy::after {
+  .login-cta-busy::after,
+  .onboarding-signal-spark,
+  .onboarding-glass-rise,
+  .onboarding-glass-row {
     animation: none;
   }
 
@@ -797,6 +903,21 @@ html[data-dnd-dragging="true"] * {
 
 [data-sonner-toast] [data-icon] {
   margin-top: 2.5px;
+}
+
+/* Blueprint skin: the micro role reads as an annotation label — a touch of
+   tracking (latin/digits visibly; CJK gains air, not width). */
+.text-micro {
+  letter-spacing: 0.05em;
+}
+
+/* Error toasts read as errors at a glance — red outline + a red-tinted
+   surface — while success/info toasts stay quiet. Sonner sets these vars
+   inline per toast, so the override needs !important to beat the inline
+   style (see packages/ui/components/ui/sonner.tsx). */
+[data-sonner-toast][data-type="error"] {
+  --normal-bg: color-mix(in oklab, var(--destructive) 4%, var(--popover)) !important;
+  --normal-border: color-mix(in oklab, var(--destructive) 36%, transparent) !important;
 }
 
 @layer base {
@@ -861,4 +982,76 @@ html[data-dnd-dragging="true"] * {
 ::highlight(quickwork-find-active) {
   background-color: var(--find-match-active);
   color: var(--find-match-foreground);
+}
+
+/* Agents page: the machine hue system + motion layer.
+ *
+ * Hue: one colour per machine paints the rail tile band, the card wash, the
+ * machine tag and the sparkline, so a colour reads as "this machine"
+ * everywhere on the page. `--mh` is the hue number set inline from the
+ * runtime id; everything else derives from it.
+ *
+ * Motion: all CSS — the only JS-driven motion on /agents is the KPI number
+ * roll in the cards. `prefers-reduced-motion` turns every one of these off,
+ * since none of them carry information the static frame does not already
+ * have. */
+.qw-mh {
+  --hue: oklch(0.55 0.15 var(--mh));
+  --wash: color-mix(in oklab, var(--hue) 9%, var(--surface));
+}
+.qw-band-hue { background: linear-gradient(90deg, var(--hue), color-mix(in oklab, var(--hue) 25%, transparent)); }
+.qw-wash { background: linear-gradient(180deg, var(--wash), transparent); }
+.qw-tag-hue {
+  background: color-mix(in oklab, var(--hue) 12%, transparent);
+  color: color-mix(in oklab, var(--hue) 70%, var(--foreground));
+}
+/* Status tones — the mixtures the mockup pins, so a state reads the same on
+ * every surface. Busy reuses `--inflight` directly (the one colour that means
+ * "something is running"). */
+.qw-st-ok { color: color-mix(in oklab, var(--success) 72%, var(--foreground)); }
+.qw-st-none { color: color-mix(in oklab, var(--warning) 75%, var(--foreground)); }
+@keyframes qw-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--inflight) 60%, transparent); }
+  50% { box-shadow: 0 0 0 5px transparent; }
+}
+/* The console's rack: one machine hue reaches every module — the left rail,
+   the header tint — and hovering a module lifts it on a hue-tinted hard
+   shadow, the same language the list cards speak. */
+.qw-module { position: relative; transition: transform .16s ease, box-shadow .16s ease, border-color .16s ease; }
+.qw-module::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 3px; background: var(--hue); opacity: .85; }
+.qw-module:hover {
+  transform: translateY(-1px);
+  border-color: color-mix(in oklab, var(--hue) 38%, var(--surface-border));
+  box-shadow: 3px 3px 0 color-mix(in oklab, var(--hue) 22%, oklch(0.9 0.014 244));
+}
+.qw-module-head { background: linear-gradient(90deg, color-mix(in oklab, var(--hue) 9%, var(--surface)), transparent 62%); }
+.qw-seat-band { background: linear-gradient(90deg, var(--hue), color-mix(in oklab, var(--hue) 25%, transparent)); }
+@keyframes qw-slide-rail { from { transform: scaleY(0); } }
+.qw-slide-rail { animation: qw-slide-rail .22s ease-out both; }
+@keyframes qw-breathe { 0%, 100% { opacity: 1; } 50% { opacity: .5; } }
+.qw-breathe { animation: qw-breathe 2.4s ease-in-out infinite; }
+@keyframes qw-dash-flow { to { stroke-dashoffset: -16; } }
+.qw-dash-flow { animation: qw-dash-flow 1.2s linear infinite; }
+@keyframes qw-draw { from { stroke-dashoffset: 140; } }
+@keyframes qw-grow { from { transform: scaleX(0); } }
+@keyframes qw-rise { from { opacity: 0; transform: translateY(4px); } }
+
+.qw-pulse { animation: qw-pulse 2.1s ease-out infinite; }
+.qw-spark polyline { stroke-dasharray: 140; animation: qw-draw 1.1s ease-out both; }
+.qw-ring-val { stroke-dasharray: 113; transform: rotate(-90deg); transform-origin: center; animation: qw-draw 1s ease-out both; }
+.qw-grow { transform-origin: left; animation: qw-grow .8s cubic-bezier(.2,.8,.2,1) both; }
+.qw-rise { animation: qw-rise .3s ease-out both; }
+.qw-shimmer { position: relative; overflow: hidden; }
+.qw-shimmer::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background-image: linear-gradient(90deg, transparent, color-mix(in oklab, white 55%, transparent), transparent);
+  background-size: 140px 100%;
+  animation: qw-shimmer 2.6s linear infinite;
+}
+@keyframes qw-shimmer { from { background-position: -140px 0; } to { background-position: 240px 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .qw-pulse, .qw-spark polyline, .qw-ring-val, .qw-grow, .qw-rise, .qw-shimmer::after, .qw-slide-rail, .qw-breathe, .qw-dash-flow { animation: none; }
+  .qw-module { transition: none; }
+  .qw-module:hover { transform: none; }
 }

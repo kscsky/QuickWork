@@ -169,6 +169,7 @@ export type {
 export type { StorageAdapter } from "./storage";
 export type {
   Project,
+  ProjectLocalDirectory,
   ProjectStatus,
   ProjectPriority,
   CreateProjectRequest,
@@ -298,4 +299,20 @@ export type {
   SquadActiveIssueBrief,
   SquadMemberStatus,
   SquadMemberStatusListResponse,
+  UpdateSquadMemberWorkRequest,
+  SquadMessageAuthorType,
+  SquadMessage,
+  SquadRoom,
+  CreateSquadMessageRequest,
 } from "./squad";
+
+export type {
+  IssueChainStepState,
+  IssueChainStep,
+  IssueChain,
+  IssueChainForIssue,
+  PlaybookStep,
+  SquadPlaybook,
+  DispatchStep,
+} from "./issue-chain";
+export { EMPTY_ISSUE_CHAIN } from "./issue-chain";

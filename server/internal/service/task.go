@@ -4416,6 +4416,12 @@ func (s *TaskService) CompleteTask(ctx context.Context, taskID pgtype.UUID, resu
 	// Broadcast
 	s.broadcastTaskEvent(ctx, protocol.EventTaskCompleted, task)
 
+	// A squad task is a relay. The run that just finished may have handed the
+	// work on — or reached someone with no agent, in which case the task parks
+	// rather than failing. After the broadcast, so the completion is visible
+	// either way.
+	s.advanceIssueChain(ctx, task)
+
 	return &task, nil
 }
 

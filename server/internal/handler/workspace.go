@@ -489,6 +489,11 @@ type MemberWithUserResponse struct {
 	Name        string  `json:"name"`
 	Email       string  `json:"email"`
 	AvatarURL   *string `json:"avatar_url"`
+	// The identity this person registered under, so a room can show what
+	// someone does without a second round trip per member. Empty means they
+	// have not declared one.
+	Identity      string `json:"identity"`
+	IdentityOther string `json:"identity_other"`
 }
 
 func (h *Handler) ListMembersWithUser(w http.ResponseWriter, r *http.Request) {
@@ -507,14 +512,16 @@ func (h *Handler) ListMembersWithUser(w http.ResponseWriter, r *http.Request) {
 	resp := make([]MemberWithUserResponse, len(members))
 	for i, m := range members {
 		resp[i] = MemberWithUserResponse{
-			ID:          uuidToString(m.ID),
-			WorkspaceID: uuidToString(m.WorkspaceID),
-			UserID:      uuidToString(m.UserID),
-			Role:        m.Role,
-			CreatedAt:   timestampToString(m.CreatedAt),
-			Name:        m.UserName,
-			Email:       m.UserEmail,
-			AvatarURL:   h.resolveAvatarURLPtr(textToPtr(m.UserAvatarUrl)),
+			ID:            uuidToString(m.ID),
+			WorkspaceID:   uuidToString(m.WorkspaceID),
+			UserID:        uuidToString(m.UserID),
+			Role:          m.Role,
+			CreatedAt:     timestampToString(m.CreatedAt),
+			Name:          m.UserName,
+			Email:         m.UserEmail,
+			AvatarURL:     h.resolveAvatarURLPtr(textToPtr(m.UserAvatarUrl)),
+			Identity:      m.Identity,
+			IdentityOther: m.IdentityOther,
 		}
 	}
 

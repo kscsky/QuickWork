@@ -1,0 +1,113 @@
+{
+  "tower": {
+    "title": "调度塔",
+    "squads": {
+      "title": "小队",
+      "new": "新建",
+      "load_of": "{{total}} 个智能体，{{working}} 个在跑",
+      "load": {
+        "none": "无智能体",
+        "idle": "空闲",
+        "partial": "有余量",
+        "full": "满载"
+      },
+      "holding_other": "在编 {{count}} 项",
+      "nothing_held": "没有在编任务",
+      "members_other": "{{count}} 名成员"
+    },
+    "queue": {
+      "title": "待编排",
+      "empty": "没有无人认领的任务",
+      "waiting_for": "已等 {{duration}}",
+      "dispatched": "已派发",
+      "dispatch_failed": "派发失败"
+    },
+    "agents": {
+      "title": "智能体",
+      "empty": "还没有智能体",
+      "busy": "在跑",
+      "idle": "空闲",
+      "idle_short": "待命",
+      "queued_only_other": "队列 {{count}} 项，还没开始",
+      "queue_depth_other": "队列 {{count}}",
+      "holding_unnamed": "正在处理一个任务"
+    }
+  },
+  "summary": {
+    "running": "在跑",
+    "unassigned": "待编排",
+    "agents_busy": "智能体在忙",
+    "agents_idle_other": "{{count}} 个空闲"
+  },
+  "composer": {
+    "squad_label": "小队",
+    "squad_placeholder": "选择小队",
+    "squad_search_placeholder": "搜索小队...",
+    "squad_empty": "没有匹配的小队",
+    "new_squad": "新建小队",
+    "prompt_placeholder": "想让这个小队做什么？",
+    "submit": "开始编排",
+    "submitting": "启动中...",
+    "linking": "正在创建任务...",
+    "hint": "按 Enter 开始，Shift + Enter 换行",
+    "no_squad_selected": "请先选择一个小队"
+  },
+  "compose": {
+    "title": "编排",
+    "pick_squad": "选择小队",
+    "start": "开始编排",
+    "starting": "创建中…",
+    "start_hint": "⌘↵ 开始",
+    "from": "从交接流程开始",
+    "blank_route": "空流程",
+    "edited_other": "已改 {{count}} 处",
+    "playbook_note": "交接流程记的是「谁做哪一步」，人换了改绑定就行",
+    "drag_hint": "拖到节点上换人",
+    "save_as": "另存",
+    "playbook_name_placeholder": "交接流程名字",
+    "save": "保存",
+    "task_node": "要做什么",
+    "leader_locked": "队长 · 固定第一步",
+    "no_agent": "还没有智能体",
+    "remove_step": "移除这一步",
+    "unknown_holder": "未知的人",
+    "parked_step": "停在这一步",
+    "empty_route": "还没排步骤。拖左边的人进来，或者直接开始——不给路线就按小队的默认顺序走。",
+    "playbook_count": "交接流程",
+    "parked_warning_other": "{{count}} 步会停下等人绑定智能体",
+    "step_placeholder": "这一步做什么",
+    "playbook_saved": "已存为交接流程",
+    "playbook_save_failed": "存交接流程失败",
+    "ask": "想让小队做什么？",
+    "ask_sub": "写清楚你要的结果。剩下的事小队自己排。",
+    "route_label": "会这样走",
+    "route_edit": "改路线",
+    "route_done": "收起",
+    "parked_notice": "{{name}} 还没有绑定智能体，任务会走到这一步停下等人——不跳过，也不算失败。",
+    "from_blank": "来自：小队默认顺序",
+    "from_squad_order": "小队默认顺序",
+    "leader_tag": "队长 · 固定第一步",
+    "squad_default": "{{agent}} · 小队默认",
+    "add_step": "加一步",
+    "agent_rule": "只能选他本人创建的智能体",
+    "squad_default_none": "小队还没设默认（会停在这一步）"
+  },
+  "empty": {
+    "title": "还没有小队",
+    "description": "小队是一组智能体和成员，由一位队长带领。创建一个小队来编排你的第一个工作流。",
+    "cta": "新建小队"
+  },
+  "toasts": {
+    "started": "工作流已启动",
+    "failed": "启动工作流失败",
+    "pending": "智能体还在启动，任务稍后会出现在列表里。",
+    "chain_failed": "任务已创建，但接力路线没写成功",
+    "agent_offline": "负责执行的智能体离线了——在那台机器上启动守护进程，再开始编排。",
+    "agent_no_runtime": "这个智能体还没绑定运行时的机器——绑定后重新开始编排。",
+    "agent_cli_unusable": "智能体所在机器上的 CLI 装好了但无法执行——重装 CLI 后再开始编排。",
+    "agent_archived": "负责执行的智能体已归档——换一个智能体或小队再开始编排。",
+    "agent_unavailable": "智能体暂时不可用——等它的机器恢复，或换一个智能体再开始编排。",
+    "daemon_version": "该智能体的守护进程版本过低（当前 {{current}}，需要 ≥ {{min}}）——升级后再开始编排。",
+    "version_unknown": "未知"
+  }
+}

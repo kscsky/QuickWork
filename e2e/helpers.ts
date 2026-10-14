@@ -8,8 +8,8 @@ const DEFAULT_E2E_EMAIL = `e2e-${E2E_WORKER}-${E2E_RUN_ID}@quickwork.ai`;
 const DEFAULT_E2E_WORKSPACE = `e2e-workspace-${E2E_WORKER}-${E2E_RUN_ID}`;
 
 async function waitForIssuesPage(page: Page) {
-  await waitForPageText(page, "New Issue");
-  await expect(page.getByRole("button", { name: "New Issue" })).toBeVisible({
+  await waitForPageText(page, "Solo task");
+  await expect(page.getByRole("button", { name: "Solo task" })).toBeVisible({
     timeout: 15000,
   });
 }

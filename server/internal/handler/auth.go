@@ -472,6 +472,18 @@ type UpdateMeRequest struct {
 	ProfileDescription *string `json:"profile_description"`
 	// IANA tz to pin; "" clears back to NULL; nil leaves untouched.
 	Timezone *string `json:"timezone"`
+	// The identity this person works under. Merged into the onboarding
+	// questionnaire's `role` key rather than replacing it, so answering this
+	// never discards the rest of what onboarding collected.
+	Identity *string `json:"identity"`
+}
+
+// Identities a user may declare. The values match the onboarding
+// questionnaire's `role` answers — this is the same field, written later.
+var userIdentityValues = map[string]bool{
+	"engineer": true, "product": true, "designer": true, "founder": true,
+	"marketing": true, "writer": true, "research": true, "ops": true,
+	"student": true, "other": true,
 }
 
 type GoogleLoginRequest struct {
@@ -762,10 +774,33 @@ func (h *Handler) UpdateMe(w http.ResponseWriter, r *http.Request) {
 		params.Timezone = pgtype.Text{String: tz, Valid: true}
 	}
 
+	identity := ""
+	if req.Identity != nil {
+		identity = strings.TrimSpace(*req.Identity)
+		if !userIdentityValues[identity] {
+			writeError(w, http.StatusBadRequest, "unsupported identity")
+			return
+		}
+	}
+
 	updatedUser, err := h.Queries.UpdateUser(r.Context(), params)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to update user")
 		return
+	}
+
+	// A second statement, not part of UpdateUser: it writes a JSONB key rather
+	// than a column, and keeping it separate is what lets a rejected identity
+	// leave the rest of the profile patch intact.
+	if req.Identity != nil {
+		updatedUser, err = h.Queries.UpdateUserIdentity(r.Context(), db.UpdateUserIdentityParams{
+			ID:      currentUser.ID,
+			Column2: identity,
+		})
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "failed to update identity")
+			return
+		}
 	}
 
 	writeJSON(w, http.StatusOK, h.userToResponse(updatedUser))

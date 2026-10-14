@@ -1,8 +1,7 @@
 "use client";
 
 import { useMemo, useState, useCallback, useRef, useEffect } from "react";
-import { useDefaultLayout, usePanelRef } from "react-resizable-panels";
-import { Check, ChevronRight, Link2, MoreHorizontal, PanelRight, Pin, PinOff, Trash2, UserMinus } from "lucide-react";
+import { Check, ChevronRight, Link2, MoreHorizontal, Pin, PinOff, Trash2, UserMinus } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { cn } from "@quickwork/ui/lib/utils";
 import { copyText } from "@quickwork/ui/lib/clipboard";
@@ -15,7 +14,6 @@ import { pinListOptions } from "@quickwork/core/pins";
 import { useCreatePin, useDeletePin } from "@quickwork/core/pins";
 import { memberListOptions, agentListOptions } from "@quickwork/core/workspace/queries";
 import { useWorkspaceId } from "@quickwork/core/hooks";
-import { useIssuesScope } from "@quickwork/core/issues/stores";
 import { useRecentContextStore } from "@quickwork/core/chat";
 import { useWorkspacePaths } from "@quickwork/core/paths";
 import { useActorName } from "@quickwork/core/workspace/hooks";
@@ -28,12 +26,9 @@ import { PriorityIcon } from "../../issues/components/priority-icon";
 import { ProjectResourcesSection } from "./project-resources-section";
 import { ProjectStartDatePicker } from "./project-start-date-picker";
 import { ProjectDueDatePicker } from "./project-due-date-picker";
-import { IssueSurface } from "../../issues/surface/issue-surface";
+import { ProjectTaskList } from "./project-task-list";
 import { Skeleton } from "@quickwork/ui/components/ui/skeleton";
 import { Button } from "@quickwork/ui/components/ui/button";
-import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@quickwork/ui/components/ui/resizable";
-import { Sheet, SheetContent } from "@quickwork/ui/components/ui/sheet";
-import { useIsMobile } from "@quickwork/ui/hooks/use-mobile";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -46,20 +41,8 @@ import {
   PopoverTrigger,
   PopoverContent,
 } from "@quickwork/ui/components/ui/popover";
-import {
-  Tooltip,
-  TooltipTrigger,
-  TooltipContent,
-} from "@quickwork/ui/components/ui/tooltip";
 import { EmojiPicker } from "@quickwork/ui/components/common/emoji-picker";
 import { BreadcrumbHeader } from "../../layout/breadcrumb-header";
-import {
-  AnimatedRightSidebar,
-  getAnimatedRightSidebarInitialOpen,
-  rightSidebarPanelMotionProps,
-  useAnimatedRightSidebarState,
-  useRightSidebarShortcut,
-} from "../../layout/animated-right-sidebar";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -121,11 +104,6 @@ export function ProjectDetail({ projectId }: { projectId: string }) {
       });
     }
   }, [project?.id, project?.title, project?.description, project?.icon, project?.status, recordRecentContext, wsId]);
-  const issueTab = useIssuesScope(`project:${projectId}`);
-  const issueScope = useMemo(
-    () => ({ type: "project" as const, projectId, actorKind: issueTab }),
-    [projectId, issueTab],
-  );
   const { data: members = [] } = useQuery(memberListOptions(wsId));
   const { data: agents = [] } = useQuery(agentListOptions(wsId));
   const { getActorName } = useActorName();
@@ -144,60 +122,11 @@ export function ProjectDetail({ projectId }: { projectId: string }) {
   const createPin = useCreatePin();
   const deletePinMut = useDeletePin();
   const descEditorRef = useRef<ContentEditorRef>(null);
-  const isMobile = useIsMobile();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [iconPickerOpen, setIconPickerOpen] = useState(false);
   const [propertiesOpen, setPropertiesOpen] = useState(true);
   const [progressOpen, setProgressOpen] = useState(true);
   const [descriptionOpen, setDescriptionOpen] = useState(true);
-
-  // Sidebar panel
-  const { defaultLayout, onLayoutChanged } = useDefaultLayout({
-    id: "quickwork_project_detail_layout",
-  });
-  const sidebarRef = usePanelRef();
-  const rightSidebarShortcutTargetRef = useRef<HTMLDivElement | null>(null);
-  const desktopSidebarInitialOpen = getAnimatedRightSidebarInitialOpen(
-    true,
-    defaultLayout,
-  );
-  // Desktop and mobile sidebar state must be separate. A single state defaulting
-  // to `true` made the mobile <Sheet> mount in the open position on first render
-  // (after `useIsMobile()` flipped from false→true), briefly covering the page
-  // with its modal backdrop and locking scroll — leaving the page unresponsive.
-  const {
-    open: desktopSidebarOpen,
-    visualOpen: desktopSidebarVisualOpen,
-    motionEnabled: desktopSidebarMotionEnabled,
-    beginToggle: beginDesktopSidebarToggle,
-    handleResize: handleDesktopSidebarResize,
-  } = useAnimatedRightSidebarState(desktopSidebarInitialOpen);
-  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
-  const sidebarOpen = isMobile ? mobileSidebarOpen : desktopSidebarOpen;
-
-  useEffect(() => {
-    if (isMobile) {
-      setMobileSidebarOpen(false);
-    }
-  }, [isMobile]);
-
-  const handleToggleSidebar = useCallback(() => {
-    if (isMobile) {
-      setMobileSidebarOpen((open) => !open);
-      return;
-    }
-
-    const panel = sidebarRef.current;
-    if (!panel) return;
-    const nextOpen = panel.isCollapsed();
-    beginDesktopSidebarToggle(nextOpen);
-    window.requestAnimationFrame(() => {
-      if (nextOpen) panel.expand();
-      else panel.collapse();
-    });
-  }, [beginDesktopSidebarToggle, isMobile, sidebarRef]);
-
-  useRightSidebarShortcut(rightSidebarShortcutTargetRef, handleToggleSidebar);
 
   // Lead popover
   const [leadOpen, setLeadOpen] = useState(false);
@@ -242,7 +171,7 @@ export function ProjectDetail({ projectId }: { projectId: string }) {
   const issueMetrics = getProjectIssueMetrics(project);
   const statusCfg = PROJECT_STATUS_CONFIG[project.status];
 
-  const sidebarContent = (
+  const detailsColumn = (
     <div className="space-y-5">
       {/* Icon + Title */}
       <div>
@@ -278,6 +207,11 @@ export function ProjectDetail({ projectId }: { projectId: string }) {
           }}
         />
       </div>
+
+      {/* Resources sit directly under the title: the directory is what decides
+          whether this project can run at all, so it outranks status and dates
+          rather than trailing them in a narrow rail. */}
+      <ProjectResourcesSection projectId={projectId} />
 
       {/* Properties */}
       <div>
@@ -468,21 +402,17 @@ export function ProjectDetail({ projectId }: { projectId: string }) {
         </div>}
       </div>
 
-      {/* Resources */}
-      <ProjectResourcesSection projectId={projectId} />
     </div>
   );
 
   return (
     <>
-    <ResizablePanelGroup orientation="horizontal" className="flex-1 min-h-0" defaultLayout={defaultLayout} onLayoutChanged={onLayoutChanged}>
-      <ResizablePanel id="content" minSize="50%">
-        <div ref={rightSidebarShortcutTargetRef} className="flex h-full flex-col">
-          <BreadcrumbHeader
-            segments={[{ href: wsPaths.projects(), label: t(($) => $.detail.breadcrumb_fallback) }]}
-            leaf={<span className="truncate font-medium text-foreground">{project.title}</span>}
-            actions={
-              <>
+      <div className="flex flex-1 min-h-0 flex-col">
+        <BreadcrumbHeader
+          segments={[{ href: wsPaths.projects(), label: t(($) => $.detail.breadcrumb_fallback) }]}
+          leaf={<span className="truncate font-medium text-foreground">{project.title}</span>}
+          actions={
+            <>
               <Button
                 variant="ghost"
                 size="icon-sm"
@@ -529,58 +459,34 @@ export function ProjectDetail({ projectId }: { projectId: string }) {
                   )}
                 </DropdownMenuContent>
               </DropdownMenu>
-              <Tooltip>
-                <TooltipTrigger
-                  render={
-                    <Button
-                      variant={sidebarOpen ? "secondary" : "ghost"}
-                      size="icon-sm"
-                      className={sidebarOpen ? "" : "text-muted-foreground"}
-                      onClick={handleToggleSidebar}
-                    >
-                      <PanelRight />
-                    </Button>
-                  }
-                />
-                <TooltipContent side="bottom">{t(($) => $.detail.sidebar_tooltip)}</TooltipContent>
-              </Tooltip>
-              </>
-            }
-          />
+            </>
+          }
+        />
 
-          <IssueSurface
-            scope={issueScope}
-            modes={["board", "list", "table", "gantt"]}
-          />
+        {/* Two columns: where the project runs on the left, what is running on
+            the right. A fixed left width rather than a split, because the
+            column holds one directory card — stretching it to half the page
+            only buys whitespace, and the task list is what benefits from room. */}
+        <div className="flex flex-1 min-h-0">
+          <div className="w-[400px] shrink-0 overflow-y-auto border-r p-4">
+            {detailsColumn}
           </div>
-        </ResizablePanel>
-        {!isMobile && <ResizableHandle />}
-        {!isMobile && (
-        <ResizablePanel
-          id="sidebar"
-          {...rightSidebarPanelMotionProps}
-          data-right-sidebar-motion={desktopSidebarMotionEnabled ? "enabled" : undefined}
-          defaultSize={desktopSidebarOpen ? 320 : 0}
-          minSize={260}
-          maxSize={420}
-          collapsible
-          groupResizeBehavior="preserve-pixel-size"
-          panelRef={sidebarRef}
-          onResize={handleDesktopSidebarResize}
-        >
-          <AnimatedRightSidebar open={desktopSidebarVisualOpen} motionEnabled={desktopSidebarMotionEnabled}>
-            {sidebarContent}
-          </AnimatedRightSidebar>
-        </ResizablePanel>
-        )}
-        {isMobile && (
-          <Sheet open={mobileSidebarOpen} onOpenChange={setMobileSidebarOpen}>
-            <SheetContent side="right" showCloseButton={false} className="w-[320px] overflow-y-auto p-4">
-              {sidebarContent}
-            </SheetContent>
-          </Sheet>
-        )}
-      </ResizablePanelGroup>
+          <div className="flex flex-1 min-w-0 flex-col">
+            <div className="flex flex-none items-center gap-2 px-4 pt-3 pb-1">
+              <span className="text-caption font-medium">
+                {t(($) => $.detail.section_issues)}
+              </span>
+              <span className="text-caption tabular-nums text-muted-foreground">
+                {issueMetrics.completedCount} / {issueMetrics.totalCount}
+              </span>
+            </div>
+            {/* A flat list of what is on this project — not the issue surface.
+                The surface groups by status and prints every empty group, so a
+                four-task project reads as a page of "no issues". */}
+            <ProjectTaskList projectId={projectId} />
+          </div>
+        </div>
+      </div>
 
       {/* Delete confirmation */}
       {isWorkspaceAdmin && (

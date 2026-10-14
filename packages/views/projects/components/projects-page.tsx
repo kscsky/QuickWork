@@ -7,7 +7,9 @@ import {
   ChevronDown,
   ExternalLink,
   Filter,
+  FolderGit,
   FolderKanban,
+  FolderOpen,
   LayoutGrid,
   MoreHorizontal,
   Pin,
@@ -44,6 +46,9 @@ import { useModalStore } from "@quickwork/core/modals";
 import { AppLink, useIntentNavigate, useRowLink } from "../../navigation";
 import { ActorAvatar } from "../../common/actor-avatar";
 import { FILTER_ITEM_CLASS, HoverCheck } from "../../common/hover-check";
+import { githubShortLabel } from "../../common/github-url";
+import { useLocalDaemonStatus } from "../../platform";
+import { Badge } from "@quickwork/ui/components/ui/badge";
 import { Skeleton } from "@quickwork/ui/components/ui/skeleton";
 import { Button } from "@quickwork/ui/components/ui/button";
 import { Checkbox } from "@quickwork/ui/components/ui/checkbox";
@@ -576,6 +581,9 @@ function ProjectTableHeader({
 // Card (comfortable) view — kept from the prior page.
 // ---------------------------------------------------------------------------
 
+// The directory is this card's headline: a project's local directory is the
+// only thing on the list that says whether it can actually run right now, and
+// on which machine. Everything else — title, status, progress — is context.
 function ProjectCard({
   project,
   pinned,
@@ -589,6 +597,7 @@ function ProjectCard({
   const wsPaths = useWorkspacePaths();
   const formatRelativeDate = useFormatRelativeDate();
   const updateProject = useUpdateProject();
+  const { daemonId } = useLocalDaemonStatus();
   const handleUpdate = useCallback(
     (data: UpdateProjectRequest) => updateProject.mutate({ id: project.id, ...data }),
     [project.id, updateProject],
@@ -598,8 +607,60 @@ function ProjectCard({
       ? Math.round((project.done_count / project.issue_count) * 100)
       : 0;
 
+  const dir = project.local_directory ?? null;
+  const activeCount = project.active_task_count ?? 0;
+  // Green only when the daemon that owns the directory is the one this client
+  // talks to. A directory on another machine is still worth showing, but it
+  // must not read as "runnable from here".
+  const isLocal = dir !== null && daemonId !== null && dir.daemon_id === daemonId;
+  const isWorktree = dir?.execution_mode === "worktree";
+  // A renamed directory shows its label; the path is what answers "where does
+  // this run", so it stays the fallback and the tooltip.
+  const dirText = dir
+    ? dir.label && dir.label !== dir.local_path
+      ? dir.label
+      : dir.local_path
+    : "";
+
   return (
-    <div className="group/card group/row flex flex-col rounded-md border bg-card transition-colors hover:border-primary/50">
+    <div className="group/card group/row flex flex-col overflow-hidden rounded-md border bg-card transition-colors hover:border-primary/50">
+      {dir ? (
+        <div className="flex min-w-0 items-center gap-2 border-b bg-muted/50 px-3 py-2">
+          <span
+            aria-hidden="true"
+            title={isLocal ? t(($) => $.card.machine_local) : t(($) => $.resources.local_other_machine_tooltip)}
+            className={cn(
+              "size-1.5 shrink-0 rounded-full",
+              isLocal ? "bg-emerald-500" : "bg-muted-foreground/40",
+            )}
+          />
+          <span className="min-w-0 flex-1 truncate font-mono text-micro" title={dir.local_path}>
+            {dirText}
+          </span>
+          <Badge variant="secondary" className="shrink-0 px-1.5 py-0 text-micro font-medium">
+            {isWorktree
+              ? t(($) => $.resources.mode_badge_worktree)
+              : t(($) => $.resources.mode_badge_in_place)}
+          </Badge>
+          {activeCount > 0 ? (
+            <span
+              className="inline-flex shrink-0 items-center gap-1 text-micro font-medium tabular-nums text-inflight"
+              title={t(($) => $.card.active_tasks, { count: activeCount })}
+            >
+              <span aria-hidden="true" className="size-1.5 animate-pulse rounded-full bg-inflight" />
+              {activeCount}
+            </span>
+          ) : null}
+        </div>
+      ) : (
+        <div className="flex min-w-0 items-center gap-2 border-b border-dashed px-3 py-2 text-muted-foreground">
+          <FolderOpen aria-hidden="true" className="size-3.5 shrink-0" />
+          <span className="min-w-0 flex-1 truncate text-micro">
+            {t(($) => $.card.no_directory)}
+          </span>
+        </div>
+      )}
+
       <div className="p-3 pb-2">
         <div className="flex items-center gap-2">
           <AppLink
@@ -612,6 +673,18 @@ function ProjectCard({
           <ProjectRowActions project={project} pinned={pinned} canDelete={canDelete} />
           <ProjectStatusBadge project={project} handleUpdate={handleUpdate} triggerClassName="shrink-0" />
         </div>
+
+        {project.repo_url ? (
+          <a
+            href={project.repo_url}
+            target="_blank"
+            rel="noreferrer"
+            className="mt-2 flex min-w-0 items-center gap-1.5 text-micro text-muted-foreground hover:text-foreground"
+          >
+            <FolderGit aria-hidden="true" className="size-3 shrink-0" />
+            <span className="min-w-0 truncate font-mono">{githubShortLabel(project.repo_url)}</span>
+          </a>
+        ) : null}
 
         {project.issue_count > 0 ? (
           <div className="flex items-center justify-end gap-1.5 pt-2">
@@ -1267,8 +1340,10 @@ export function ProjectsPage() {
             </div>
           ) : (
             <div className={cn("min-h-0 flex-1 overflow-y-auto pt-4", PAGE_GUTTER)}>
+              {/* Three columns, not four: the card's headline is a monospace
+                  path, and at four columns even a short one truncates. */}
               <div
-                className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4"
+                className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3"
                 style={{ paddingBottom: LIST_GRID_BOTTOM_CLEARANCE }}
               >
                 {visible.map((project) => (
@@ -1308,7 +1383,7 @@ function LoadingState({ isCompact }: { isCompact: boolean }) {
     );
   }
   return (
-    <div className={cn("grid grid-cols-1 gap-3 pt-4 sm:grid-cols-2 lg:grid-cols-4", PAGE_GUTTER)}>
+    <div className={cn("grid grid-cols-1 gap-3 pt-4 sm:grid-cols-2 lg:grid-cols-3", PAGE_GUTTER)}>
       {Array.from({ length: 8 }).map((_, i) => (
         <div key={i} className="flex flex-col gap-2 rounded-md border p-3">
           <div className="flex items-center gap-2">

@@ -18,6 +18,11 @@
     "selected_other": "已选 {{count}} 项",
     "clear_selection": "清除选择"
   },
+  "card": {
+    "no_directory": "未绑定目录 — 智能体还没有落点",
+    "machine_local": "在这台电脑上运行",
+    "active_tasks_other": "{{count}} 条在跑"
+  },
   "table": {
     "name": "名称",
     "priority": "优先级",
@@ -55,6 +60,7 @@
     "months_ago": "{{count}} 个月前"
   },
   "detail": {
+    "section_issues": "任务",
     "not_found": "未找到该项目",
     "breadcrumb_fallback": "项目",
     "title_placeholder": "项目标题",
@@ -97,6 +103,7 @@
     "toast_removed": "已移除资源",
     "toast_remove_failed": "移除资源失败",
     "add_local_directory_button": "添加本地目录",
+    "local_daemon_running": "守护进程运行中",
     "local_daemon_offline_hint": "启动本地守护进程后才能添加本机目录。",
     "local_daemon_already_attached_hint": "本机已经关联了一个本地目录到该项目，先移除现有目录再添加新目录。",
     "local_rename_tooltip": "重命名",
@@ -122,9 +129,9 @@
     "mode_dialog_title": "任务如何使用这个文件夹？",
     "mode_dialog_description": "这决定了你如何拿到智能体的工作成果，以及这个文件夹上的任务能否同时运行。",
     "mode_in_place_title": "直接修改这个文件夹",
-    "mode_in_place_description": "一次只跑一条任务。智能体的改动会直接出现在你的工作区里，你可以接着改。",
+    "mode_in_place_description": "一次只跑一条任务。智能体的改动会直接出现在你的空间里，你可以接着改。",
     "mode_worktree_title": "并行隔离运行",
-    "mode_worktree_description": "任务可以同时跑，互不干扰，也不碰你的工作区。每条任务的结果是这个仓库里的一个 agent/… 分支，由你 review 后合并。",
+    "mode_worktree_description": "任务可以同时跑，互不干扰，也不碰你的空间。每条任务的结果是这个仓库里的一个 agent/… 分支，由你 review 后合并。",
     "mode_worktree_needs_git": "这个文件夹不是 git 仓库，分支无处可放。请选择一个仓库，或者继续直接修改这个文件夹。",
     "mode_worktree_needs_server_upgrade": "当前 QuickWork 服务端版本过旧，无法支持并行运行——它会把任务直接跑在这个文件夹里。升级服务端后即可开启。",
     "mode_cancel": "取消",
@@ -132,7 +139,7 @@
     "mode_add": "添加文件夹",
     "mode_edit_tooltip": "修改任务使用这个文件夹的方式",
     "mode_badge_worktree": "并行",
-    "mode_badge_worktree_tooltip": "任务在各自的 git worktree 中同时运行，并以分支形式交付结果。你的工作区不会被改动。",
+    "mode_badge_worktree_tooltip": "任务在各自的 git worktree 中同时运行，并以分支形式交付结果。你的空间不会被改动。",
     "toast_local_mode_updated": "已更新执行方式",
     "toast_local_mode_update_failed": "无法更新执行方式",
     "mode_badge_in_place": "原地"

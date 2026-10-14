@@ -1,25 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import {
-  AlertCircle,
-  ArrowLeft,
-  Bot,
-  Clock3,
-  Lock,
-  MessageSquare,
-  MoreHorizontal,
-  Plus,
-  Server,
-  Trash2,
-} from "lucide-react";
+import { AlertCircle, ArrowLeft, Lock, Server } from "lucide-react";
 import { toast } from "sonner";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import type {
-  Agent,
-  AgentRuntime,
-  UpdateAgentRequest,
-} from "@quickwork/core/types";
+import type { Agent, UpdateAgentRequest } from "@quickwork/core/types";
 import {
   type AgentPresenceDetail,
   isAgentRuntimeBound,
@@ -37,7 +22,7 @@ import {
   memberListOptions,
   workspaceKeys,
 } from "@quickwork/core/workspace/queries";
-import { runtimeDisplayLabel, runtimeListOptions } from "@quickwork/core/runtimes";
+import { runtimeListOptions } from "@quickwork/core/runtimes";
 import { useAgentPermissions } from "@quickwork/core/permissions";
 import { Button } from "@quickwork/ui/components/ui/button";
 import { CapabilityBanner } from "@quickwork/ui/components/common/capability-banner";
@@ -49,21 +34,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@quickwork/ui/components/ui/dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@quickwork/ui/components/ui/dropdown-menu";
 import { Skeleton } from "@quickwork/ui/components/ui/skeleton";
 import { AppLink, useNavigation } from "../../navigation";
 import { PageHeader } from "../../layout/page-header";
-import { ActorAvatar } from "../../common/actor-avatar";
-import { AgentPresenceIndicator } from "./agent-presence-indicator";
-import { VisibilityBadge } from "./visibility-badge";
 import { AgentOverviewPane, type DetailTab } from "./agent-overview-pane";
-import { ExpandableDescription } from "../../common/expandable-description";
-import { useT, useTimeAgo } from "../../i18n";
+import { AgentSeatStrip } from "./agent-seat-strip";
+import { useT } from "../../i18n";
 
 interface AgentDetailPageProps {
   agentId: string;
@@ -121,7 +97,6 @@ export function AgentDetailPage({ agentId }: AgentDetailPageProps) {
   const {
     canAssign,
     canEdit,
-    isLoading: permissionsLoading,
   } = useAgentPermissions(agent, wsId);
 
   const [confirmArchive, setConfirmArchive] = useState(false);
@@ -305,29 +280,6 @@ export function AgentDetailPage({ agentId }: AgentDetailPageProps) {
     ? members.find((m) => m.user_id === agent.owner_id) ?? null
     : null;
 
-  // Chat shares the invocation gate with assignment (MUL-3963): starting a
-  // chat triggers agent runs. The button stays visible either way — a denied
-  // click explains itself instead of the affordance silently missing. While
-  // membership is still resolving the decision is undetermined, so the button
-  // is disabled rather than toasting a false "no access" at a real member.
-  //
-  // The control is a real link, so a failed gate has to cancel the navigation
-  // AppLink would otherwise perform — preventDefault is that cancel.
-  const handleDm = (e: React.MouseEvent<HTMLAnchorElement>) => {
-    if (permissionsLoading) {
-      e.preventDefault();
-      return;
-    }
-    if (!canAssign.allowed) {
-      e.preventDefault();
-      toast.error(t(($) => $.detail.dm_no_permission_toast));
-      return;
-    }
-    if (!runtimeBound) {
-      e.preventDefault();
-      toast.error(t(($) => $.detail.runtime_required_toast));
-    }
-  };
   const handleAssign = () => {
     if (!runtimeBound) {
       toast.error(t(($) => $.detail.runtime_required_toast));
@@ -340,16 +292,13 @@ export function AgentDetailPage({ agentId }: AgentDetailPageProps) {
 
   return (
     <div className="flex flex-1 min-h-0 flex-col">
-      <DetailHeader
+      <AgentSeatStrip
         agent={agent}
         runtime={runtime}
         presence={presence}
         backHref={paths.agents()}
+        backLabel={t(($) => $.page.title)}
         canAssign={canAssign.allowed}
-        canArchive={canEdit.allowed}
-        dmPending={permissionsLoading}
-        dmHref={`${paths.chat()}?agent=${agent.id}`}
-        onDm={handleDm}
         onAssign={handleAssign}
         onArchive={
           agent.system_key ? undefined : () => setConfirmArchive(true)
@@ -416,6 +365,9 @@ export function AgentDetailPage({ agentId }: AgentDetailPageProps) {
           canEdit={canEdit.allowed}
           navIntent={tabNavIntent}
           onNavIntentHandled={() => setTabNavIntent(null)}
+          onArchive={
+            agent.system_key ? undefined : () => setConfirmArchive(true)
+          }
         />
       </div>
 
@@ -462,147 +414,6 @@ export function AgentDetailPage({ agentId }: AgentDetailPageProps) {
         </Dialog>
       )}
     </div>
-  );
-}
-
-function DetailHeader({
-  agent,
-  runtime,
-  presence,
-  backHref,
-  canAssign,
-  canArchive,
-  dmPending,
-  dmHref,
-  onDm,
-  onAssign,
-  onArchive,
-}: {
-  agent: Agent;
-  runtime: AgentRuntime | null;
-  presence: AgentPresenceDetail | null;
-  backHref: string;
-  canAssign: boolean;
-  canArchive: boolean;
-  dmPending: boolean;
-  dmHref: string;
-  /** Runs before the link navigates; calls preventDefault when a gate denies
-   *  the chat, which is what stops AppLink from pushing. */
-  onDm: (e: React.MouseEvent<HTMLAnchorElement>) => void;
-  onAssign: () => void;
-  /** Absent for QuickWork's built-in agents, which the server refuses to
-   *  archive — the menu hides the action rather than offering a failure. */
-  onArchive?: () => void;
-}) {
-  const { t } = useT("agents");
-  const timeAgo = useTimeAgo();
-  const isArchived = !!agent.archived_at;
-  const hasMoreActions = !!onArchive;
-
-  return (
-    <header className="shrink-0 border-b bg-background px-4 pb-5 pt-3 sm:px-6">
-      <div className="mx-auto max-w-[1440px]">
-        <div className="flex min-w-0 items-center gap-1.5 text-caption text-muted-foreground">
-          <AppLink
-            href={backHref}
-            className="rounded-sm transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            {t(($) => $.page.title)}
-          </AppLink>
-          <span aria-hidden="true">/</span>
-          <span className="truncate text-foreground">{agent.name}</span>
-        </div>
-
-        <div className="mt-4 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div className="flex min-w-0 items-start gap-4">
-            <ActorAvatar
-              actorType="agent"
-              actorId={agent.id}
-              size="2xl"
-              profileLink={false}
-              className="ring-1 ring-border"
-            />
-            <div className="min-w-0 pt-0.5">
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-                <h1 className="min-w-0 text-balance text-title-lg font-semibold tracking-tight sm:text-display-sm">
-                  {agent.name}
-                </h1>
-                <AgentPresenceIndicator detail={presence} />
-              </div>
-              <ExpandableDescription>
-                {agent.description ||
-                  t(($) => $.inspector.no_description_placeholder)}
-              </ExpandableDescription>
-              <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-caption text-muted-foreground">
-                <span className="inline-flex min-w-0 items-center gap-1.5">
-                  <Bot className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                  <span className="truncate">{agent.model || t(($) => $.pickers.model_default)}</span>
-                </span>
-                <span className="inline-flex min-w-0 items-center gap-1.5">
-                  <Server className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-                  <span className="truncate">
-                    {runtime
-                      ? runtimeDisplayLabel(runtime)
-                      : t(($) => $.pickers.runtime_none)}
-                  </span>
-                </span>
-                <VisibilityBadge value={agent.visibility} />
-                <span className="inline-flex items-center gap-1.5">
-                  <Clock3 className="h-3.5 w-3.5" aria-hidden="true" />
-                  {t(($) => $.detail.updated, { when: timeAgo(agent.updated_at) })}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex shrink-0 items-center gap-2 self-end lg:self-start">
-            {!isArchived && (
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={dmPending}
-                // An anchor never matches `:disabled`, so the base variant's
-                // `disabled:` rules never fire here — Base UI's data-disabled
-                // is what carries the dimmed, inert look.
-                className="data-disabled:pointer-events-none data-disabled:opacity-50"
-                render={<AppLink href={dmHref} onClick={onDm} />}
-                nativeButton={false}
-              >
-                <MessageSquare className="h-4 w-4" aria-hidden="true" />
-                {t(($) => $.detail.dm)}
-              </Button>
-            )}
-            {!isArchived && canAssign && (
-              <Button type="button" size="sm" onClick={onAssign}>
-                <Plus className="h-4 w-4" aria-hidden="true" />
-                {t(($) => $.detail.assign_work)}
-              </Button>
-            )}
-            {!isArchived && canArchive && hasMoreActions ? (
-              <DropdownMenu>
-                <DropdownMenuTrigger
-                  render={<Button variant="ghost" size="icon-sm" />}
-                  aria-label={t(($) => $.detail.more_actions_aria)}
-                >
-                  <MoreHorizontal
-                    className="h-4 w-4 text-muted-foreground"
-                    aria-hidden="true"
-                  />
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-auto">
-                  {onArchive && (
-                    <DropdownMenuItem variant="destructive" onClick={onArchive}>
-                      <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
-                      {t(($) => $.detail.more_archive)}
-                    </DropdownMenuItem>
-                  )}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            ) : null}
-          </div>
-        </div>
-      </div>
-    </header>
   );
 }
 

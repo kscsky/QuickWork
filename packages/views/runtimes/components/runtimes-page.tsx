@@ -256,14 +256,16 @@ function MikaSetupCard({
     if (!runtimeId || bootstrapMika.isPending) return;
     const lang = pickContentLang(i18n.language);
     try {
-      const result = await bootstrapMika.mutateAsync({
+      await bootstrapMika.mutateAsync({
         workspaceSlug: wsSlug,
         runtimeId,
         model: value.model || undefined,
         ...getMikaOnboarding(lang),
       });
       setOpen(false);
-      navigation.push(paths.chatSession(result.chatSession.id));
+      // The greeting run now shows up as work in flight rather than opening
+      // a chat window.
+      navigation.push(paths.root());
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : t(($) => $.mika_setup.failed),

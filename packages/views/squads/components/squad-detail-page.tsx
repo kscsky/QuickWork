@@ -15,7 +15,7 @@ import { useNavigation } from "../../navigation";
 import { AppLink } from "../../navigation";
 import { BreadcrumbHeader } from "../../layout/breadcrumb-header";
 import { PageHeader } from "../../layout/page-header";
-import { Users, Plus, Trash2, ArrowUpRight, Crown, Loader2, Pencil, FileText, Save } from "lucide-react";
+import { Users, Plus, Trash2, ArrowUpRight, Crown, Loader2, Pencil, FileText, Save, MessagesSquare, Bot } from "lucide-react";
 import { Button } from "@quickwork/ui/components/ui/button";
 import { Input } from "@quickwork/ui/components/ui/input";
 import { Label } from "@quickwork/ui/components/ui/label";
@@ -58,6 +58,7 @@ import {
   PickerEmpty,
 } from "../../issues/components/pickers/property-picker";
 import { ChevronDown, UserPlus } from "lucide-react";
+import { SquadRoomTab } from "./squad-room-tab";
 import { toast } from "sonner";
 import type { Squad, SquadMember, SquadMemberStatus, SquadMemberStatusValue, Agent, MemberWithUser } from "@quickwork/core/types";
 import { useT } from "../../i18n";
@@ -158,6 +159,25 @@ export function SquadDetailPage() {
       toast.error(err instanceof Error && err.message ? err.message : t(($) => $.toasts.role_update_failed)),
   });
 
+  const updateAgentMut = useMutation({
+    mutationFn: (input: { member: SquadMember; agentId: string }) =>
+      api.updateSquadMemberAgent(squadId, {
+        member_type: input.member.member_type,
+        member_id: input.member.member_id,
+        agent_id: input.agentId,
+      }),
+    onSuccess: () => {
+      refetchMembers();
+      // The leader's choice also re-points the squad's routing agent, which is
+      // squad-level state.
+      refetchSquad();
+      queryClient.invalidateQueries({ queryKey: workspaceKeys.squads(wsId) });
+      toast.success(t(($) => $.toasts.agent_updated));
+    },
+    onError: (err) =>
+      toast.error(err instanceof Error && err.message ? err.message : t(($) => $.toasts.agent_update_failed)),
+  });
+
   const setLeaderMut = useMutation({
     mutationFn: (agentId: string) => api.updateSquad(squadId, { leader_id: agentId }),
     onSuccess: () => {
@@ -177,6 +197,21 @@ export function SquadDetailPage() {
       toast.error(err instanceof Error && err.message ? err.message : t(($) => $.toasts.archive_failed)),
   });
 
+  // An agent belongs to whoever owns it; that is the only link between a person
+  // and the agents they can lend.
+  const agentsByOwner = useMemo(() => {
+    const map = new Map<string, typeof agents>();
+    for (const agent of agents) {
+      if (agent.archived_at) continue;
+      const owner = agent.owner_id ?? "";
+      if (!owner) continue;
+      const list = map.get(owner) ?? [];
+      list.push(agent);
+      map.set(owner, list);
+    }
+    return map;
+  }, [agents]);
+
   const getEntityName = (type: string, id: string) => {
     if (type === "agent") return agents.find((a: Agent) => a.id === id)?.name ?? id.slice(0, 8);
     return wsMembers.find((m) => m.user_id === id)?.name ?? id.slice(0, 8);
@@ -188,7 +223,7 @@ export function SquadDetailPage() {
 
   const availableAgents = agents.filter((a: Agent) => !a.archived_at && !members.some((m) => m.member_type === "agent" && m.member_id === a.id));
   const availableMembers = wsMembers.filter((m) => !members.some((sm) => sm.member_type === "member" && sm.member_id === m.user_id));
-  const isLeader = (m: SquadMember) => m.member_type === "agent" && squad.leader_id === m.member_id;
+  const isLeader = (m: SquadMember) => m.member_type === "member" && m.role === "leader";
   const isArchived = (m: SquadMember) =>
     m.member_type === "agent" && !!agents.find((a: Agent) => a.id === m.member_id)?.archived_at;
 
@@ -242,6 +277,8 @@ export function SquadDetailPage() {
           isLeader={isLeader}
           isArchived={isArchived}
           getEntityName={getEntityName}
+          agentsByOwner={agentsByOwner}
+          onUpdateAgent={async (m, agentId) => { await updateAgentMut.mutateAsync({ member: m, agentId }); }}
           onAddMemberClick={() => setShowAddMember(true)}
           createAgentHref={canManage ? `${p.newAgent()}?squad=${encodeURIComponent(squadId)}` : undefined}
           onSetLeader={(id) => setLeaderMut.mutate(id)}
@@ -936,9 +973,12 @@ function SquadDescriptionEditorBody({
 // Mirrors AgentOverviewPane: dirty-guard via AlertDialog when switching tabs
 // with unsaved Instructions.
 // ---------------------------------------------------------------------------
-type SquadDetailTab = "members" | "instructions";
+type SquadDetailTab = "room" | "members" | "instructions";
 
+// The room leads: a squad is a group of accounts that talk to each other, and
+// the roster/instructions below it are configuration of that room.
 const squadDetailTabs: { id: SquadDetailTab; icon: typeof FileText }[] = [
+  { id: "room", icon: MessagesSquare },
   { id: "members", icon: Users },
   { id: "instructions", icon: FileText },
 ];
@@ -951,6 +991,8 @@ function SquadOverviewPane({
   isLeader,
   isArchived,
   getEntityName,
+  agentsByOwner,
+  onUpdateAgent,
   onAddMemberClick,
   createAgentHref,
   onSetLeader,
@@ -969,6 +1011,8 @@ function SquadOverviewPane({
   isLeader: (m: SquadMember) => boolean;
   isArchived: (m: SquadMember) => boolean;
   getEntityName: (type: string, id: string) => string;
+  agentsByOwner: Map<string, Agent[]>;
+  onUpdateAgent: (m: SquadMember, agentId: string) => Promise<void>;
   onAddMemberClick: () => void;
   // Optional — only passed when the current user can manage the squad
   // (workspace owner/admin or the creator). Hidden otherwise so viewers
@@ -981,7 +1025,7 @@ function SquadOverviewPane({
   setLeaderPending: boolean;
 }) {
   const { t } = useT("squads");
-  const [activeTab, setActiveTab] = useState<SquadDetailTab>("members");
+  const [activeTab, setActiveTab] = useState<SquadDetailTab>("room");
   const [activeDirty, setActiveDirty] = useState(false);
   const [pendingTab, setPendingTab] = useState<SquadDetailTab | null>(null);
 
@@ -1019,8 +1063,19 @@ function SquadOverviewPane({
         ))}
       </div>
 
-      <div className="flex-1 min-h-0 overflow-y-auto">
+      <div className="flex flex-1 min-h-0 flex-col overflow-hidden">
+        {activeTab === "room" && (
+          // The room scrolls internally and pins its composer, so it must not
+          // sit inside the page-level scroll container the other tabs use.
+          <SquadRoomTab
+            squad={squad}
+            members={members}
+            memberStatusById={memberStatusById}
+            canManage={canManage}
+          />
+        )}
         {activeTab === "members" && (
+          <div className="flex-1 min-h-0 overflow-y-auto">
           <div className="flex h-full flex-col p-4 md:p-6">
             <SquadMembersTab
               members={members}
@@ -1029,6 +1084,8 @@ function SquadOverviewPane({
               isLeader={isLeader}
               isArchived={isArchived}
               getEntityName={getEntityName}
+              agentsByOwner={agentsByOwner}
+              onUpdateAgent={onUpdateAgent}
               onAddMemberClick={onAddMemberClick}
               createAgentHref={createAgentHref}
               onSetLeader={onSetLeader}
@@ -1037,8 +1094,10 @@ function SquadOverviewPane({
               setLeaderPending={setLeaderPending}
             />
           </div>
+          </div>
         )}
         {activeTab === "instructions" && (
+          <div className="flex-1 min-h-0 overflow-y-auto">
           <div className="flex h-full flex-col p-4 md:p-6">
             <SquadInstructionsTab
               squad={squad}
@@ -1046,6 +1105,7 @@ function SquadOverviewPane({
               onSave={onSaveInstructions}
               onDirtyChange={setActiveDirty}
             />
+          </div>
           </div>
         )}
       </div>
@@ -1094,6 +1154,8 @@ function SquadMembersTab({
   isLeader,
   isArchived,
   getEntityName,
+  agentsByOwner,
+  onUpdateAgent,
   onAddMemberClick,
   createAgentHref,
   onSetLeader,
@@ -1109,6 +1171,8 @@ function SquadMembersTab({
   isLeader: (m: SquadMember) => boolean;
   isArchived: (m: SquadMember) => boolean;
   getEntityName: (type: string, id: string) => string;
+  agentsByOwner: Map<string, Agent[]>;
+  onUpdateAgent: (m: SquadMember, agentId: string) => Promise<void>;
   onAddMemberClick: () => void;
   // Hidden for viewers who can't manage — see SquadOverviewPane.
   createAgentHref?: string;
@@ -1120,13 +1184,17 @@ function SquadMembersTab({
   const { t } = useT("squads");
   const timeAgo = useTimeAgo();
   const p = useWorkspacePaths();
+  const currentUserId = useAuthStore((s) => s.user?.id ?? null);
+  // Agents are not members. They reach the room through whoever owns them, and
+  // a row of their own would read as a peer of the people.
+  const people = members.filter((m) => m.member_type === "member");
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-body font-medium">{t(($) => $.members_tab.section_title)}</h3>
           <p className="text-caption text-muted-foreground mt-0.5">
-            {t(($) => $.members_tab.section_count, { count: members.length })}
+            {t(($) => $.members_tab.section_count, { count: people.length })}
           </p>
         </div>
         {canManage && (
@@ -1151,7 +1219,7 @@ function SquadMembersTab({
       </div>
 
       <div className="space-y-2">
-        {members.map((m) => {
+        {people.map((m) => {
           const status = memberStatusById.get(m.member_id);
           const statusValue = status?.status ?? null;
           const dotClass =
@@ -1210,6 +1278,14 @@ function SquadMembersTab({
                 ) : m.role ? (
                   <div className="mt-0.5 text-caption text-muted-foreground">{m.role}</div>
                 ) : null}
+                <LentAgentPicker
+                  member={m}
+                  name={getEntityName(m.member_type, m.member_id)}
+                  agents={agentsByOwner.get(m.member_id) ?? []}
+                  canEdit={canManage || m.member_id === currentUserId}
+                  createAgentHref={createAgentHref}
+                  onChange={async (agentId) => { await onUpdateAgent(m, agentId); }}
+                />
                 {primaryIssue && (
                   <div className="mt-1 flex items-center gap-1 text-caption text-muted-foreground min-w-0">
                     <AppLink
@@ -1394,5 +1470,78 @@ function SquadInstructionsTab({
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * Which of their own agents a member lends to the room.
+ *
+ * A picker over what they already own, never a way to make one: the agents are
+ * theirs, bound on their own account, and a squad that could conjure an agent
+ * for someone would be inventing capability rather than recording it. Members
+ * with none get pointed at the agent-creating flow instead of an empty menu.
+ */
+function LentAgentPicker({
+  member,
+  name,
+  agents,
+  canEdit,
+  createAgentHref,
+  onChange,
+}: {
+  member: SquadMember;
+  name: string;
+  agents: Agent[];
+  canEdit: boolean;
+  createAgentHref?: string;
+  onChange: (agentId: string) => Promise<void>;
+}) {
+  const { t } = useT("squads");
+  const lent = member.agent_id ?? "";
+  const named = agents.find((a) => a.id === lent) ?? null;
+
+  if (agents.length === 0) {
+    return (
+      <div className="mt-1.5 flex items-center gap-1.5 text-caption text-faint-foreground">
+        <Bot className="size-3.5 shrink-0" />
+        {t(($) => $.members_tab.lends_none)}
+        {canEdit && createAgentHref ? (
+          <AppLink
+            href={createAgentHref}
+            className="text-brand underline-offset-2 hover:underline"
+          >
+            {t(($) => $.members_tab.lends_create)}
+          </AppLink>
+        ) : null}
+      </div>
+    );
+  }
+
+  if (!canEdit) {
+    return (
+      <div className="mt-1.5 flex items-center gap-1.5 text-caption text-muted-foreground">
+        <Bot className="size-3.5 shrink-0" />
+        {named ? named.name : t(($) => $.members_tab.lends_none)}
+      </div>
+    );
+  }
+
+  return (
+    <label className="mt-1.5 flex items-center gap-1.5 text-caption text-muted-foreground">
+      <Bot className="size-3.5 shrink-0" />
+      <select
+        value={named ? lent : ""}
+        aria-label={t(($) => $.members_tab.lends_aria, { name })}
+        onChange={(e) => void onChange(e.target.value)}
+        className="max-w-[220px] truncate rounded-md border bg-background px-1.5 py-0.5 text-caption"
+      >
+        <option value="">{t(($) => $.members_tab.lends_opt_out)}</option>
+        {agents.map((a) => (
+          <option key={a.id} value={a.id}>
+            {a.name}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }

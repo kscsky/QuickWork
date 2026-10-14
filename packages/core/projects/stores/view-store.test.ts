@@ -24,9 +24,13 @@ beforeAll(() => {
   }
 });
 
+// The current persist version. Rehydration tests write this so they exercise
+// rehydration rather than the one-time migration below.
+const CURRENT_VERSION = 1;
+
 beforeEach(() => {
   localStorage.clear();
-  useProjectViewStore.setState({ viewMode: "compact" });
+  useProjectViewStore.setState({ viewMode: "comfortable" });
   setCurrentWorkspace(null, null);
 });
 
@@ -35,19 +39,19 @@ afterEach(() => {
 });
 
 describe("useProjectViewStore", () => {
-  it("defaults to 'compact'", () => {
-    expect(useProjectViewStore.getState().viewMode).toBe("compact");
+  it("defaults to 'comfortable' — the card view leads with the directory", () => {
+    expect(useProjectViewStore.getState().viewMode).toBe("comfortable");
   });
 
   it("setViewMode mutates the store", () => {
-    useProjectViewStore.getState().setViewMode("comfortable");
-    expect(useProjectViewStore.getState().viewMode).toBe("comfortable");
+    useProjectViewStore.getState().setViewMode("compact");
+    expect(useProjectViewStore.getState().viewMode).toBe("compact");
   });
 
   it("partialize persists view prefs (no actions) under the workspace-namespaced key", async () => {
     setCurrentWorkspace("acme", "ws_a");
     await flush();
-    useProjectViewStore.getState().setViewMode("comfortable");
+    useProjectViewStore.getState().setViewMode("compact");
 
     const raw = localStorage.getItem("quickwork_projects_view:acme");
     expect(raw).not.toBeNull();
@@ -59,45 +63,68 @@ describe("useProjectViewStore", () => {
       "sortField",
       "viewMode",
     ]);
-    expect(parsed.state.viewMode).toBe("comfortable");
+    expect(parsed.state.viewMode).toBe("compact");
   });
 
   it("rehydrates a different saved viewMode on workspace switch", async () => {
     localStorage.setItem(
       "quickwork_projects_view:acme",
-      JSON.stringify({ state: { viewMode: "comfortable" }, version: 0 }),
+      JSON.stringify({ state: { viewMode: "compact" }, version: CURRENT_VERSION }),
     );
     localStorage.setItem(
       "quickwork_projects_view:beta",
-      JSON.stringify({ state: { viewMode: "compact" }, version: 0 }),
+      JSON.stringify({ state: { viewMode: "comfortable" }, version: CURRENT_VERSION }),
     );
 
     setCurrentWorkspace("acme", "ws_a");
     await flush();
     await flush();
-    expect(useProjectViewStore.getState().viewMode).toBe("comfortable");
+    expect(useProjectViewStore.getState().viewMode).toBe("compact");
 
     setCurrentWorkspace("beta", "ws_b");
     await flush();
     await flush();
-    expect(useProjectViewStore.getState().viewMode).toBe("compact");
+    expect(useProjectViewStore.getState().viewMode).toBe("comfortable");
   });
 
-  it("resets to 'compact' when switching to a workspace with no persisted value", async () => {
+  it("falls back to the default when a workspace has no persisted value", async () => {
     localStorage.setItem(
       "quickwork_projects_view:acme",
-      JSON.stringify({ state: { viewMode: "comfortable" }, version: 0 }),
+      JSON.stringify({ state: { viewMode: "compact" }, version: CURRENT_VERSION }),
     );
 
     setCurrentWorkspace("acme", "ws_a");
     await flush();
     await flush();
-    expect(useProjectViewStore.getState().viewMode).toBe("comfortable");
+    expect(useProjectViewStore.getState().viewMode).toBe("compact");
 
     setCurrentWorkspace("beta", "ws_b");
     await flush();
     await flush();
-    expect(useProjectViewStore.getState().viewMode).toBe("compact");
+    expect(useProjectViewStore.getState().viewMode).toBe("comfortable");
     expect(localStorage.getItem("quickwork_projects_view:acme")).not.toBeNull();
+  });
+
+  // Before the card redesign the table was the default, and the store writes
+  // its whole state on any sort or filter change — so a user who never opened
+  // the view menu still has "compact" on disk. The migration has to move them
+  // off it, without discarding settings they did choose.
+  it("migrates a pre-redesign payload to the card view but keeps other prefs", async () => {
+    localStorage.setItem(
+      "quickwork_projects_view:acme",
+      JSON.stringify({
+        state: { viewMode: "compact", sortField: "priority", sortDirection: "desc" },
+        version: 0,
+      }),
+    );
+
+    setCurrentWorkspace("acme", "ws_a");
+    await flush();
+    await flush();
+
+    const state = useProjectViewStore.getState();
+    expect(state.viewMode).toBe("comfortable");
+    expect(state.sortField).toBe("priority");
+    expect(state.sortDirection).toBe("desc");
   });
 });

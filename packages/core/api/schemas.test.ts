@@ -14,6 +14,8 @@ import {
   EMPTY_LIST_TELEGRAM_INSTALLATIONS_RESPONSE,
   EMPTY_REDEEM_TELEGRAM_BINDING_TOKEN_RESPONSE,
   AgentTaskListSchema,
+  TaskIssueResponseSchema,
+  EMPTY_TASK_ISSUE,
   AutopilotQuotaUsageSchema,
   AutopilotRunSchema,
   FALLBACK_AUTOPILOT_RUN,
@@ -38,12 +40,14 @@ import {
   EMPTY_CREATE_FEEDBACK_RESPONSE,
   EMPTY_INBOX_ITEMS,
   EMPTY_INBOX_UNREAD_SUMMARY,
+  EMPTY_LIST_PROJECTS_RESPONSE,
   EMPTY_SEARCH_PROJECTS_RESPONSE,
   EMPTY_USER,
   InboxItemListSchema,
   InboxUnreadSummarySchema,
   IssueTriggerPreviewSchema,
   ListIssuesResponseSchema,
+  ListProjectsResponseSchema,
   ListPropertiesResponseSchema,
   MALFORMED_RUNTIME_MODEL_LIST_REQUEST,
   RuntimeModelListRequestSchema,
@@ -537,6 +541,47 @@ describe("IssueTriggerPreviewSchema", () => {
   it("parseWithFallback returns the fallback for null / non-object bodies", () => {
     expect(parseWithFallback(null, IssueTriggerPreviewSchema, PREVIEW_FALLBACK, PREVIEW_ENDPOINT)).toEqual(PREVIEW_FALLBACK);
     expect(parseWithFallback("oops", IssueTriggerPreviewSchema, PREVIEW_FALLBACK, PREVIEW_ENDPOINT)).toEqual(PREVIEW_FALLBACK);
+  });
+});
+
+// GET /api/tasks/:taskId/issue feeds this schema through parseWithFallback in
+// client.getTaskIssue. Its EMPTY answer is load-bearing rather than a degraded
+// one: the home page polls it and reads an empty issue_id as "the run has not
+// created the issue yet", so drift must land on "" — never on a thrown error,
+// which would look like a transport failure and stall the poll.
+const TASK_ISSUE_ENDPOINT = { endpoint: "GET /api/tasks/:taskId/issue" };
+
+describe("TaskIssueResponseSchema", () => {
+  it("parses a linked task", () => {
+    const parsed = TaskIssueResponseSchema.parse({ issue_id: "i1" });
+    expect(parsed.issue_id).toBe("i1");
+  });
+
+  it("parses an unlinked task as an empty id, not an error", () => {
+    expect(TaskIssueResponseSchema.parse({ issue_id: "" }).issue_id).toBe("");
+  });
+
+  it("defaults a missing issue_id to empty (older backend without the field)", () => {
+    expect(TaskIssueResponseSchema.parse({}).issue_id).toBe("");
+  });
+
+  it("parseWithFallback returns the empty id when the field is wrong-typed", () => {
+    const parsed = parseWithFallback(
+      { issue_id: 42 },
+      TaskIssueResponseSchema,
+      EMPTY_TASK_ISSUE,
+      TASK_ISSUE_ENDPOINT,
+    );
+    expect(parsed).toEqual(EMPTY_TASK_ISSUE);
+  });
+
+  it("parseWithFallback returns the empty id for null / non-object bodies", () => {
+    expect(
+      parseWithFallback(null, TaskIssueResponseSchema, EMPTY_TASK_ISSUE, TASK_ISSUE_ENDPOINT),
+    ).toEqual(EMPTY_TASK_ISSUE);
+    expect(
+      parseWithFallback("oops", TaskIssueResponseSchema, EMPTY_TASK_ISSUE, TASK_ISSUE_ENDPOINT),
+    ).toEqual(EMPTY_TASK_ISSUE);
   });
 });
 
@@ -1395,6 +1440,99 @@ describe("SearchProjectsResponseSchema date drift", () => {
     expect(parsed.projects).toHaveLength(1);
     expect(parsed.projects[0]?.start_date).toBeNull();
     expect(parsed.projects[0]?.due_date).toBeNull();
+  });
+});
+
+// The projects list gained local_directory / repo_url / active_task_count. The
+// list is what the projects page renders, so a drift here blanks the whole
+// page rather than one card — the failure mode these cases guard.
+describe("ListProjectsResponseSchema execution-summary drift", () => {
+  const ENDPOINT = { endpoint: "GET /api/projects" };
+
+  const baseProject = {
+    id: "p-1",
+    workspace_id: "ws-1",
+    title: "Launch",
+    description: null,
+    icon: null,
+    status: "in_progress",
+    priority: "high",
+    lead_type: null,
+    lead_id: null,
+    created_at: "2026-01-01T00:00:00Z",
+    updated_at: "2026-01-01T00:00:00Z",
+    issue_count: 0,
+    done_count: 0,
+    resource_count: 0,
+  };
+
+  it("parses the local directory summary", () => {
+    const parsed = parseWithFallback(
+      {
+        projects: [{
+          ...baseProject,
+          local_directory: {
+            label: "quickwork",
+            local_path: "D:\\IdeaProjects\\quickwork",
+            daemon_id: "daemon-1",
+            execution_mode: "worktree",
+          },
+          repo_url: "https://github.com/example/quickwork",
+          active_task_count: 2,
+        }],
+        total: 1,
+      },
+      ListProjectsResponseSchema,
+      EMPTY_LIST_PROJECTS_RESPONSE,
+      ENDPOINT,
+    );
+    expect(parsed.projects[0]?.local_directory?.execution_mode).toBe("worktree");
+    expect(parsed.projects[0]?.local_directory?.local_path).toBe("D:\\IdeaProjects\\quickwork");
+    expect(parsed.projects[0]?.active_task_count).toBe(2);
+  });
+
+  // Frontend deploys before backend: an older backend omits all three keys. The
+  // list must still render, minus the execution summary.
+  it("keeps the row when an older backend omits the summary", () => {
+    const parsed = parseWithFallback(
+      { projects: [baseProject], total: 1 },
+      ListProjectsResponseSchema,
+      EMPTY_LIST_PROJECTS_RESPONSE,
+      ENDPOINT,
+    );
+    expect(parsed).not.toBe(EMPTY_LIST_PROJECTS_RESPONSE);
+    expect(parsed.projects).toHaveLength(1);
+    expect(parsed.projects[0]?.local_directory).toBeUndefined();
+    expect(parsed.projects[0]?.active_task_count).toBe(0);
+  });
+
+  // A malformed directory must cost the card its hero, not the whole list.
+  it("drops a malformed local_directory without dropping the project", () => {
+    const parsed = parseWithFallback(
+      { projects: [{ ...baseProject, local_directory: "not-an-object", active_task_count: 1 }], total: 1 },
+      ListProjectsResponseSchema,
+      EMPTY_LIST_PROJECTS_RESPONSE,
+      ENDPOINT,
+    );
+    expect(parsed.projects).toHaveLength(1);
+    expect(parsed.projects[0]?.local_directory).toBeUndefined();
+    expect(parsed.projects[0]?.active_task_count).toBe(1);
+  });
+
+  it("defaults an unrecognised execution_mode to in_place", () => {
+    const parsed = parseWithFallback(
+      {
+        projects: [{
+          ...baseProject,
+          local_directory: { label: "x", local_path: "/x", daemon_id: "d", execution_mode: "something-new" },
+        }],
+        total: 1,
+      },
+      ListProjectsResponseSchema,
+      EMPTY_LIST_PROJECTS_RESPONSE,
+      ENDPOINT,
+    );
+    expect(parsed.projects[0]?.local_directory?.execution_mode).toBe("in_place");
   });
 });
 

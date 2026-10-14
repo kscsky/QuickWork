@@ -92,6 +92,53 @@ func (q *Queries) DeleteProject(ctx context.Context, arg DeleteProjectParams) er
 	return err
 }
 
+const getProjectActiveTaskCounts = `-- name: GetProjectActiveTaskCounts :many
+SELECT i.project_id,
+       count(*)::bigint AS active_count
+FROM agent_task_queue atq
+JOIN issue i ON i.id = atq.issue_id
+WHERE i.workspace_id = $1::uuid
+  AND i.project_id = ANY($2::uuid[])
+  AND atq.status IN ('queued', 'dispatched', 'running', 'waiting_local_directory')
+GROUP BY i.project_id
+`
+
+type GetProjectActiveTaskCountsParams struct {
+	WorkspaceID pgtype.UUID   `json:"workspace_id"`
+	ProjectIds  []pgtype.UUID `json:"project_ids"`
+}
+
+type GetProjectActiveTaskCountsRow struct {
+	ProjectID   pgtype.UUID `json:"project_id"`
+	ActiveCount int64       `json:"active_count"`
+}
+
+// In-flight work per project, for the projects list. agent_task_queue carries no
+// project_id, so the count comes through the issue it runs against.
+// waiting_local_directory counts as active: the task holds its slot while it
+// waits for the directory lock, so excluding it would under-report load.
+// Chat-spawned tasks have an empty issue_id and are therefore not attributed to
+// any project.
+func (q *Queries) GetProjectActiveTaskCounts(ctx context.Context, arg GetProjectActiveTaskCountsParams) ([]GetProjectActiveTaskCountsRow, error) {
+	rows, err := q.db.Query(ctx, getProjectActiveTaskCounts, arg.WorkspaceID, arg.ProjectIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetProjectActiveTaskCountsRow{}
+	for rows.Next() {
+		var i GetProjectActiveTaskCountsRow
+		if err := rows.Scan(&i.ProjectID, &i.ActiveCount); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getProjectInWorkspace = `-- name: GetProjectInWorkspace :one
 SELECT id, workspace_id, title, description, icon, status, lead_type, lead_id, created_at, updated_at, priority, start_date, due_date FROM project
 WHERE id = $1 AND workspace_id = $2

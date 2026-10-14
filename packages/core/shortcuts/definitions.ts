@@ -9,16 +9,16 @@ export type ShortcutActionId =
   | "openSearch"
   | "createIssue"
   | "toggleSidebar"
-  | "toggleRightSidebar"
   | "toggleChat"
+  | "toggleRightSidebar"
   | "findInIssue"
   | "openThreadNav"
   | "archiveInboxItem"
   | "send"
   | "goBack"
   | "goForward"
-  | "goInbox"
   | "goChat"
+  | "goInbox"
   | "goMyIssues"
   | "goIssues"
   | "goProjects"
@@ -81,6 +81,7 @@ export const SHORTCUT_ACTIONS: readonly ShortcutActionDefinition[] = [
   { id: "openSearch", category: "general", defaultShortcut: primary("K"), allowInEditable: true },
   { id: "createIssue", category: "general", defaultShortcut: createShortcutChord("C"), allowInEditable: false },
   { id: "toggleSidebar", category: "general", defaultShortcut: primary("B"), allowInEditable: false },
+  { id: "toggleChat", category: "general", defaultShortcut: primary("J"), allowInEditable: true },
   {
     id: "toggleRightSidebar",
     category: "general",
@@ -93,7 +94,6 @@ export const SHORTCUT_ACTIONS: readonly ShortcutActionDefinition[] = [
   // (BROWSER_ONLY_PRIMARY_RESERVED_KEYS). `allowInEditable` because the point of
   // the binding is reaching — and dismissing — chat without a mouse, which has
   // to keep working while the caret sits in the chat composer itself.
-  { id: "toggleChat", category: "general", defaultShortcut: primary("J"), allowInEditable: true },
   { id: "findInIssue", category: "general", defaultShortcut: primary("F"), allowInEditable: true },
   // Mod+Shift+O mirrors "go to symbol in file" in code editors: jump to a
   // section of the document you already have open, as opposed to Mod+F, which
@@ -124,8 +124,8 @@ export const SHORTCUT_ACTIONS: readonly ShortcutActionDefinition[] = [
   // away from the page while the caret sits in an input, textarea, or editor.
   { id: "goBack", category: "navigation", defaultShortcut: primary("["), allowInEditable: false },
   { id: "goForward", category: "navigation", defaultShortcut: primary("]"), allowInEditable: false },
-  { id: "goInbox", category: "navigation", defaultShortcut: null, allowInEditable: false },
   { id: "goChat", category: "navigation", defaultShortcut: null, allowInEditable: false },
+  { id: "goInbox", category: "navigation", defaultShortcut: null, allowInEditable: false },
   { id: "goMyIssues", category: "navigation", defaultShortcut: null, allowInEditable: false },
   { id: "goIssues", category: "navigation", defaultShortcut: null, allowInEditable: false },
   { id: "goProjects", category: "navigation", defaultShortcut: null, allowInEditable: false },

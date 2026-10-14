@@ -30,7 +30,7 @@ import type {
 import { api } from "@quickwork/core/api";
 import { partitionAggregatedSearchResults } from "@quickwork/core/search/cancelled-rank";
 import {
-  openCreateIssueWithPreference,
+  openCreateIssue,
   selectRecentIssues,
   useCommentCollapseStore,
   useRecentIssuesStore,
@@ -90,7 +90,8 @@ import { useSearchStore } from "./search-store";
 // keywords are filled in.
 const PAGE_KEYWORDS: Record<WorkspacePageKey, string[]> = {
   inbox: ["inbox", "notifications", "收件箱", "通知"],
-  chat: ["chat", "messages", "conversation", "聊天", "消息", "对话"],
+  dispatch: ["dispatch", "tower", "orchestrate", "queue", "调度", "编排", "派发"],
+  tasks: ["tasks", "relay", "chain", "handoff", "任务", "链路", "交接"],
   myIssues: ["my", "issues", "assigned", "mine", "我的", "任务"],
   issues: ["issues", "tasks", "bugs", "任务"],
   projects: ["projects", "kanban", "项目"],
@@ -408,7 +409,7 @@ export function SearchCommand() {
         icon: Plus,
         keywords: ["new", "issue", "create", "add"],
         onSelect: () => {
-          openCreateIssueWithPreference();
+          openCreateIssue();
           setOpen(false);
         },
       },

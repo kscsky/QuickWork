@@ -2,7 +2,6 @@ import type { ReactNode } from "react";
 import { beforeEach, describe, it, expect, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 
-const mockSetLastMode = vi.hoisted(() => vi.fn());
 const mockBeginIsolatedDraft = vi.hoisted(() => vi.fn());
 const mockEndIsolatedDraft = vi.hoisted(() => vi.fn());
 const mockRefetchSourceContext = vi.hoisted(() => vi.fn());
@@ -37,19 +36,6 @@ vi.mock("@quickwork/core/issues/stores/draft-store", () => ({
   },
 }));
 
-const mockCreateModeStore = {
-  lastMode: "agent" as "agent" | "manual",
-  setLastMode: mockSetLastMode,
-};
-
-vi.mock("@quickwork/core/issues/stores/create-mode-store", () => ({
-  useCreateModeStore: Object.assign(
-    (selector: (s: typeof mockCreateModeStore) => unknown) =>
-      selector(mockCreateModeStore),
-    { getState: () => mockCreateModeStore },
-  ),
-}));
-
 vi.mock("@quickwork/ui/components/ui/dialog", () => ({
   Dialog: ({ children }: { children: ReactNode }) => <div>{children}</div>,
   DialogContent: ({
@@ -68,16 +54,11 @@ vi.mock("@quickwork/ui/components/ui/dialog", () => ({
 vi.mock("./quick-create-issue", () => ({
   AgentCreatePanel: ({
     data,
-    onSwitchMode,
   }: {
     data?: Record<string, unknown> | null;
-    onSwitchMode?: (carry?: Record<string, unknown> | null) => void;
   }) => (
     <div>
       agent panel · {String(data?.anchor_comment_id ?? "ordinary")} · {data?.source_context_expanded ? "expanded" : "collapsed"}
-      <button type="button" onClick={() => onSwitchMode?.({ parent_issue_id: data?.parent_issue_id })}>
-        switch manual
-      </button>
       <button
         type="button"
         onClick={() => (data?.source_context_on_expanded_change as ((expanded: boolean) => void) | undefined)?.(!data?.source_context_expanded)}
@@ -91,16 +72,11 @@ vi.mock("./quick-create-issue", () => ({
 vi.mock("./create-issue", () => ({
   ManualCreatePanel: ({
     data,
-    onSwitchMode,
   }: {
     data?: Record<string, unknown> | null;
-    onSwitchMode?: (carry?: Record<string, unknown> | null) => void;
   }) => (
     <div>
       manual panel · {String(data?.anchor_comment_id ?? "ordinary")} · {data?.source_context_expanded ? "expanded" : "collapsed"}
-      <button type="button" onClick={() => onSwitchMode?.({ parent_issue_id: data?.parent_issue_id })}>
-        switch agent
-      </button>
       <button
         type="button"
         onClick={() => (data?.source_context_on_expanded_change as ((expanded: boolean) => void) | undefined)?.(!data?.source_context_expanded)}
@@ -133,7 +109,9 @@ describe("CreateIssueDialog sizing", () => {
     render(<CreateIssueDialog onClose={vi.fn()} initialMode="agent" />);
 
     expect(contentClass()).toContain("!max-w-[calc(100vw-1.5rem)]");
-    expect(contentClass()).toContain("sm:!max-w-xl");
+    // Wider since the docket restructure: the seat card + labeled field rows
+    // need the room (was max-w-xl).
+    expect(contentClass()).toContain("sm:!max-w-2xl");
   });
 
   it("keeps the ordinary agent dialog content-driven", () => {
@@ -160,11 +138,9 @@ describe("CreateIssueDialog sizing", () => {
 
     expect(screen.getByText(/agent panel · ordinary/)).toBeInTheDocument();
     expect(mockBeginIsolatedDraft).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("button", { name: "switch manual" }));
-    expect(screen.getByText(/manual panel · ordinary/)).toBeInTheDocument();
   });
 
-  it("isolates source-context drafts and preserves source identity across mode switches", () => {
+  it("isolates source-context drafts and expands the agent dialog", () => {
     const view = render(
       <CreateIssueDialog
         onClose={vi.fn()}
@@ -182,14 +158,27 @@ describe("CreateIssueDialog sizing", () => {
     expect(contentClass()).toContain("!h-5/6");
     expect(contentClass()).toContain("sm:!max-w-2xl");
     expect(contentClass()).not.toContain("!h-96");
-    fireEvent.click(screen.getByRole("button", { name: "switch manual" }));
-    expect(screen.getByText(/manual panel · comment-source · expanded/)).toBeInTheDocument();
-    expect(contentClass()).toContain("manual-dialog-class");
-    expect(contentClass()).toContain("!h-5/6");
-    fireEvent.click(screen.getByRole("button", { name: "switch agent" }));
-    expect(screen.getByText(/agent panel · comment-source/)).toBeInTheDocument();
 
     view.unmount();
     expect(mockEndIsolatedDraft).toHaveBeenCalledTimes(1);
+  });
+
+  // The manual form can still carry a source-context anchor when a surface
+  // opens it directly; the shell must merge the preview data and drive its
+  // sizing the same way the agent path does.
+  it("hands source-context data to a directly-opened manual dialog", () => {
+    render(
+      <CreateIssueDialog
+        onClose={vi.fn()}
+        initialMode="manual"
+        data={{ anchor_comment_id: "comment-source" }}
+      />,
+    );
+
+    expect(screen.getByText(/manual panel · comment-source/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "toggle source context" }));
+    expect(screen.getByText(/manual panel · comment-source · expanded/)).toBeInTheDocument();
+    expect(contentClass()).toContain("manual-dialog-class");
+    expect(contentClass()).toContain("!h-5/6");
   });
 });

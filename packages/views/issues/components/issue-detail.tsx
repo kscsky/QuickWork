@@ -65,7 +65,7 @@ import type { Attachment, Issue, IssueProperty, IssueStatus, IssueStatusCategory
 import { contentReferencesAttachment } from "@quickwork/core/types";
 import { STATUS_CONFIG } from "@quickwork/core/issues/config";
 import { formatDateOnly, isPastDateOnly } from "@quickwork/core/issues/date";
-import { useUpdateIssue } from "@quickwork/core/issues/mutations";
+import { useSkipChainStep, useUpdateIssue } from "@quickwork/core/issues/mutations";
 import { toast } from "sonner";
 import { errorCode } from "@quickwork/core/api";
 import { StatusIcon, PriorityIcon, StatusPicker, PriorityPicker, StagePicker, StartDatePicker, DueDatePicker, AssigneePicker, LabelPicker } from ".";
@@ -79,6 +79,12 @@ import { SubIssuesAgentWorkingChip } from "./sub-issues-agent-working-chip";
 import { ProjectPicker } from "../../projects/components/project-picker";
 import { LocalDirectoryHint } from "../../projects/components/local-directory-hint";
 import { CommentCard } from "./comment-card";
+import {
+  ChainParkedBar,
+  ChainStepsStrip,
+  RoomMembersCard,
+  RoomMessage,
+} from "./squad-room";
 import { SourceContextBadge } from "./source-context-viewer";
 import { RevisionConflictCompare } from "./revision-conflict-compare";
 import { CommentInput } from "./comment-input";
@@ -102,12 +108,13 @@ import { useActorName } from "@quickwork/core/workspace/hooks";
 import { useWorkspaceId } from "@quickwork/core/hooks";
 import { useRecentContextStore } from "@quickwork/core/chat";
 import { useModalStore } from "@quickwork/core/modals";
-import { issueListOptions, issueDetailOptions, childIssuesOptions, childIssueProgressOptions, issueAttachmentsOptions } from "@quickwork/core/issues/queries";
+import { issueListOptions, issueDetailOptions, childIssuesOptions, childIssueProgressOptions, issueAttachmentsOptions, issueChainOptions } from "@quickwork/core/issues/queries";
 import { projectDetailOptions } from "@quickwork/core/projects/queries";
 import { ProjectIcon } from "../../projects/components/project-icon";
 import { issueLabelsOptions } from "@quickwork/core/labels";
 import { propertyListOptions } from "@quickwork/core/properties";
 import { memberListOptions, agentListOptions } from "@quickwork/core/workspace/queries";
+import { agentTaskSnapshotOptions } from "@quickwork/core/agents/queries";
 import {
   selectExpandedResolved,
   useRecentIssuesStore,
@@ -1141,7 +1148,27 @@ export function IssueDetail({ issueId, onDelete, onDone, defaultSidebarOpen = tr
   const canModerateComments =
     currentUserRole === "owner" || currentUserRole === "admin";
   const { data: allIssues = [] } = useQuery(issueListOptions(wsId));
-  const { getActorName } = useActorName();
+  const { getActorName, getMemberName, getAgentName } = useActorName();
+  // A task handed to a squad runs as a relay. When it has a chain, the page
+  // becomes the room it runs in: the strip says whose turn it is, the parked
+  // bar owns the actions, and the stream speaks in bubbles and agent cards.
+  const { data: chain } = useQuery(issueChainOptions(id));
+  // The relay's run states (waiting for pickup vs executing on whose machine)
+  // are read from the task rows the chain's dispatch created.
+  const { data: relayTasks = [] } = useQuery(agentTaskSnapshotOptions(wsId));
+  const isRoom = !!chain && chain.steps.length > 0;
+  const parkedStep = chain?.steps.find((s) => s.state === "parked");
+  const skipChainStep = useSkipChainStep(id);
+  const playerNames = useMemo(() => {
+    const byUserId = new Map(members.map((m) => [m.user_id, m.identity ?? ""]));
+    return {
+      nameOf: (userId: string) => getMemberName(userId),
+      identityOf: (userId: string) => {
+        const identity = byUserId.get(userId);
+        return identity ? identity : undefined;
+      },
+    };
+  }, [members, getMemberName]);
   const resolveStatusLabel = useStatusLabel(wsId);
   // The glyph set is per CATEGORY (MUL-6243), so a status-change entry for a
   // custom status drew the same icon as the built-in it sits beside — an
@@ -2313,6 +2340,16 @@ export function IssueDetail({ issueId, onDelete, onDone, defaultSidebarOpen = tr
 
   const sidebarContent = (
     <div className="space-y-5">
+      {/* The room's roster leads the rail on a relay task: who is in it and
+          whether each of them can actually run their turn. */}
+      {isRoom && chain ? (
+        <RoomMembersCard
+          chain={chain}
+          nameOf={playerNames.nameOf}
+          identityOf={playerNames.identityOf}
+          agentNameOf={getAgentName}
+        />
+      ) : null}
       {/* Properties */}
       <div>
         <button
@@ -2661,6 +2698,25 @@ export function IssueDetail({ issueId, onDelete, onDone, defaultSidebarOpen = tr
       );
     }
     if (item.kind === "comment") {
+      // On a relay task the stream is the room: people speak in bubbles and
+      // agents report in their own cards, in one chronological flow. The full
+      // CommentCard (edit, resolve, thread folds) stays for plain issues —
+      // the room trades those affordances for reading like the conversation
+      // it actually is.
+      if (isRoom) {
+        return (
+          <div className="pb-2 pt-2" id={`comment-${item.id}`}>
+            <RoomMessage
+              entry={item.entry}
+              replies={timelineView.threadReplies.get(item.id) ?? EMPTY_REPLIES}
+              currentUserId={user?.id}
+              identityOf={playerNames.identityOf}
+              getActorName={getActorName}
+              onToggleReaction={handleToggleReaction}
+            />
+          </div>
+        );
+      }
       const isResolved = !!item.entry.resolved_at;
       return (
         <div className="pb-3" id={`comment-${item.id}`}>
@@ -3413,6 +3469,32 @@ export function IssueDetail({ issueId, onDelete, onDone, defaultSidebarOpen = tr
 
             <LocalDirectoryHint projectId={issue?.project_id} />
 
+            {/* The relay, above the room: whose turn it is, and — when it has
+                stopped — the bar that says on whom and what can be done. */}
+            {isRoom && chain ? (
+              <div className="mt-3 flex flex-col gap-1.5">
+                {parkedStep && issue.assignee_id ? (
+                  <ChainParkedBar
+                    step={parkedStep}
+                    nameOf={playerNames.nameOf}
+                    bindHref={paths.squadDetail(issue.assignee_id)}
+                    onSkip={() =>
+                      skipChainStep.mutate(undefined, {
+                        onError: () => toast.error(t(($) => $.room.skip_failed)),
+                      })
+                    }
+                    skipPending={skipChainStep.isPending}
+                  />
+                ) : null}
+                <ChainStepsStrip
+                  chain={chain}
+                  issueId={id}
+                  tasks={relayTasks}
+                  nameOf={playerNames.nameOf}
+                />
+              </div>
+            ) : null}
+
             {/* The "agent is working" live signal now lives in the header
                 (IssueAgentHeaderChip) so it stays in one fixed place and
                 doesn't compete with sticky banners in this content column.
@@ -3520,6 +3602,7 @@ export function IssueDetail({ issueId, onDelete, onDone, defaultSidebarOpen = tr
               issueId={id}
               onSubmit={submitComment}
               onAccepted={scrollToTimelineBottom}
+              placeholder={isRoom ? t(($) => $.room.composer_placeholder) : undefined}
             />
           </div>
         </div>

@@ -539,6 +539,12 @@ export interface UpdateMeRequest {
   profile_description?: string;
   /** IANA tz to pin; "" clears back to browser-tz; undefined leaves untouched. */
   timezone?: string;
+  /**
+   * The identity you work under (engineer / product / designer …). Written into
+   * the onboarding questionnaire's `role` key, so declaring one here never
+   * discards the rest of what onboarding collected.
+   */
+  identity?: string;
 }
 
 export interface CreateMemberRequest {

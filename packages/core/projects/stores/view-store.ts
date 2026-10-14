@@ -67,7 +67,10 @@ export interface ProjectViewState {
 }
 
 const DEFAULTS = {
-  viewMode: "compact" as ProjectViewMode,
+  // Cards, not the table. A project's local directory is what distinguishes it
+  // from every other project, and the card is the layout that shows it — the
+  // table answers "what is this project", which is the secondary question.
+  viewMode: "comfortable" as ProjectViewMode,
   sortField: "created" as ProjectSortField,
   sortDirection: PROJECT_SORT_DEFAULT_DIRECTION.created,
   hiddenColumns: PROJECT_DEFAULT_HIDDEN_COLUMNS,
@@ -136,6 +139,16 @@ export const useProjectViewStore = create<ProjectViewState>()(
           filters: { ...EMPTY_PROJECT_FILTERS, ...(p.filters ?? {}) },
         };
       },
+      // The card view became this page's primary layout in the same release
+      // the cards were redesigned for it. Anyone still persisted on "compact"
+      // almost certainly never picked it: the store writes its whole state on
+      // any sort or filter change, so the old default stuck to people who
+      // never opened the view menu. Reset the mode once; keep their choices.
+      version: 1,
+      migrate: (persisted) => ({
+        ...(persisted as Partial<ProjectViewState>),
+        viewMode: DEFAULTS.viewMode,
+      }),
     }
   )
 );

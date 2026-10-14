@@ -16,7 +16,7 @@ test.describe("Authentication", () => {
     const workspaceSlug = await loginAsDefault(page);
 
     await expect(page).toHaveURL(new RegExp(`/${workspaceSlug}/issues$`));
-    await expect(page.getByRole("button", { name: "New Issue" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Solo task" })).toBeVisible();
   });
 
   test("unauthenticated user is redirected to /login", async ({ page }) => {
