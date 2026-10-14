@@ -69,6 +69,12 @@ export function createJaDict(allowSignup: boolean): LandingDict {
       ],
     },
     
+    demo: {
+      title: "75秒でわかるリレー",
+      description:
+        "スクワッドタスクを組み、チェーンをたどる——エージェント未接続の人の番で、作業は目に見える形で止まって待ちます。",
+    },
+
     band: {
       title: "エージェントは手持ちのものを。ボードは自分のものを。",
       description:

@@ -78,6 +78,11 @@ export type LandingDict = {
   pillars: {
     items: { title: string; description: string }[];
   };
+  /** The 75-second product demo section (real UI footage, rendered with Remotion). */
+  demo: {
+    title: string;
+    description: string;
+  };
   band: {
     title: string;
     description: string;

@@ -69,6 +69,12 @@ export function createKoDict(allowSignup: boolean): LandingDict {
       ],
     },
     
+    demo: {
+      title: "75초로 보는 릴레이",
+      description:
+        "스쿼드 작업을 구성하고 체인을 따라가 보세요 — 에이전트가 연결되지 않은 사람 차례에서 작업은 보이는 그대로 멈춰 기다립니다.",
+    },
+
     band: {
       title: "에이전트는 있는 걸로, 보드는 내 것으로.",
       description:

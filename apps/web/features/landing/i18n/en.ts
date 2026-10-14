@@ -66,6 +66,12 @@ export function createEnDict(allowSignup: boolean): LandingDict {
     ],
   },
   
+  demo: {
+    title: "The relay, in 75 seconds",
+    description:
+      "Compose a squad task, follow the chain, and watch a step stop — visibly — when nobody has an agent bound yet.",
+  },
+
   band: {
     title: "Bring your own agents. Keep your own board.",
     description:

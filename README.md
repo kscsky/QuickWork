@@ -33,6 +33,10 @@ waits — not skipped, and not a failure. Self-hostable, works with 26 agent CLI
   <sub><em>Every task is a relay — it moves down the chain, and stops, visibly, when it reaches someone with no agent bound.</em></sub>
 </p>
 
+<p align="center">
+  <a href="apps/web/public/videos/quickwork-demo.mp4">▶ Watch the 75-second demo</a>
+</p>
+
 ---
 
 ## What is QuickWork?

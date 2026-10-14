@@ -65,6 +65,12 @@ export function createZhDict(allowSignup: boolean): LandingDict {
     ],
   },
   
+  demo: {
+    title: "75 秒看完接力",
+    description:
+      "编排一个小队任务，沿着链路走一遍——轮到还没绑定智能体的人，它就在那里停下等人，停在明处。",
+  },
+
   band: {
     title: "自带智能体，保留你自己的看板。",
     description:

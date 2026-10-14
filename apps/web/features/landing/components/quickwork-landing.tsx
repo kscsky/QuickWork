@@ -3,11 +3,12 @@
 import { LandingHeader } from "./landing-header";
 import { LandingHero } from "./landing-hero";
 import { LandingPillars } from "./landing-pillars";
+import { LandingDemo } from "./landing-demo";
 import { LandingBand } from "./landing-band";
 import { LandingFooter } from "./landing-footer";
 
 /**
- * Header → hero → three numbered pillars → call-to-action band → footer.
+ * Header → hero → three numbered pillars → demo video → call-to-action band → footer.
  *
  * Deliberately short. The longer sections this page used to carry
  * (how-it-works, open-source, FAQ) are still in the tree but no longer
@@ -20,6 +21,7 @@ export function QuickWorkLanding() {
       <LandingHeader variant="light" />
       <LandingHero />
       <LandingPillars />
+      <LandingDemo />
       <LandingBand />
       <LandingFooter />
     </>

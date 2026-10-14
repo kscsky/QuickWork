@@ -32,6 +32,10 @@ QuickWork 是一个开源工作区：人和 AI 智能体以「接力」的方式
   <sub><em>每个任务是一条链路：按顺序交接，轮到还没绑定智能体的人就会停住——停在哪里，看得见。</em></sub>
 </p>
 
+<p align="center">
+  <a href="apps/web/public/videos/quickwork-demo.mp4">▶ 观看 75 秒演示视频</a>
+</p>
+
 ---
 
 ## QuickWork 是什么
