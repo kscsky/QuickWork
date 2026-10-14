@@ -1,0 +1,48 @@
+{
+  "title": "작업",
+  "subtitle": "각 작업은 릴레이입니다. 체인을 따라 순서대로 넘어가며, 에이전트를 아직 연결하지 않은 사람 차례에서 멈춥니다 — 어디서 멈췄는지 보입니다.",
+  "new_task": "새 작업",
+  "filter": {
+    "all": "전체 {{count}}",
+    "mine": "내 차례 {{count}}",
+    "parked": "멈춤 {{count}}"
+  },
+  "state": {
+    "pending": "시작 전",
+    "doing": "진행 중",
+    "done": "완료",
+    "parked": "멈춤·대기",
+    "skipped": "건너뜀",
+    "unknown": "알 수 없음"
+  },
+  "row": {
+    "parked_at": "{{name}}에서 멈춤 · {{step}}",
+    "doing_at": "{{name}} 작업 중 · {{step}}",
+    "waiting_at": "{{name}} 님의 머신이 가져가길 기다리는 중 · {{step}}",
+    "running_at": "{{name}} 님의 머신에서 실행 중 · {{step}}",
+    "interrupted_at": "{{name}} 님 쪽에서 멈췄습니다 · {{step}}",
+    "finished": "모두 완료",
+    "head_pending": "시작 대기 · {{step}}",
+    "no_chain": "릴레이 없음",
+    "unassigned": "담당자 없음",
+    "assignee": "담당 {{name}}"
+  },
+  "empty": {
+    "title": "아직 작업이 없습니다",
+    "body": "디스패치 타워에서 만든 작업이 릴레이와 함께 여기에 표시됩니다.",
+    "filtered_title": "이 필터에 맞는 작업이 없습니다",
+    "filtered_body": "다른 필터를 시도해 보세요."
+  },
+  "load_error": "작업을 불러오지 못했습니다",
+  "chain": {
+    "parked_dot": "멈춤",
+    "none": "릴레이가 없습니다. 팀에 배정하면 각 단계의 인계가 여기 표시됩니다.",
+    "parked_at": "{{name}}에서 멈춤 (에이전트 없음)",
+    "delivered": "{{name}} 인계 완료",
+    "skipped_at": "{{name}} 건너뜀",
+    "running": "{{name}} 실행 중",
+    "awaiting_pickup": "{{name}} 미착수",
+    "waiting": "{{name}} 대기",
+    "open_task": "작업 열기"
+  }
+}

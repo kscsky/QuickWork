@@ -1,0 +1,48 @@
+{
+  "title": "タスク",
+  "subtitle": "各タスクはリレーです。チェーンを順に受け渡し、エージェントをまだ紐づけていない人の番で停まります——どこで停まったかは見えます。",
+  "new_task": "タスクを作成",
+  "filter": {
+    "all": "すべて {{count}}",
+    "mine": "自分の番 {{count}}",
+    "parked": "停止中 {{count}}"
+  },
+  "state": {
+    "pending": "未開始",
+    "doing": "進行中",
+    "done": "完了",
+    "parked": "停止·待機",
+    "skipped": "スキップ",
+    "unknown": "不明"
+  },
+  "row": {
+    "parked_at": "{{name}} で停まっています · {{step}}",
+    "doing_at": "{{name}} が作業中 · {{step}}",
+    "waiting_at": "{{name}} のマシンの引き取り待ち · {{step}}",
+    "running_at": "{{name}} のマシンで実行中 · {{step}}",
+    "interrupted_at": "{{name}} 側で止まりました · {{step}}",
+    "finished": "すべて完了",
+    "head_pending": "開始待ち · {{step}}",
+    "no_chain": "リレーなし",
+    "unassigned": "未割り当て",
+    "assignee": "担当 {{name}}"
+  },
+  "empty": {
+    "title": "タスクはまだありません",
+    "body": "ディスパッチタワーで作成したタスクが、リレーとともにここに並びます。",
+    "filtered_title": "このフィルターに一致するタスクはありません",
+    "filtered_body": "別のフィルターを試してください。"
+  },
+  "load_error": "タスクを読み込めませんでした",
+  "chain": {
+    "parked_dot": "停止中",
+    "none": "リレー未設定。チームに割り当てると、ここに各工程の引き継ぎが出ます。",
+    "parked_at": "{{name}} で停止（エージェント未設定）",
+    "delivered": "{{name}} が納品",
+    "skipped_at": "{{name}} をスキップ",
+    "running": "{{name}} が実行中",
+    "awaiting_pickup": "{{name}} が未着手",
+    "waiting": "{{name}} 待機中",
+    "open_task": "タスクを開く"
+  }
+}

@@ -1,0 +1,48 @@
+{
+  "title": "Tasks",
+  "subtitle": "Every task is a relay. It moves down the chain, and stops — visibly — when it reaches someone who has not bound an agent.",
+  "new_task": "New task",
+  "filter": {
+    "all": "All {{count}}",
+    "mine": "My turn {{count}}",
+    "parked": "Stuck {{count}}"
+  },
+  "state": {
+    "pending": "Not started",
+    "doing": "In progress",
+    "done": "Done",
+    "parked": "Stuck · waiting",
+    "skipped": "Skipped",
+    "unknown": "Unknown"
+  },
+  "row": {
+    "parked_at": "Stuck on {{name}} · {{step}}",
+    "doing_at": "{{name}} is working · {{step}}",
+    "waiting_at": "Waiting for {{name}}'s machine to pick it up · {{step}}",
+    "running_at": "Running on {{name}}'s machine · {{step}}",
+    "interrupted_at": "{{name}}'s side stopped · {{step}}",
+    "finished": "All steps done",
+    "head_pending": "Waiting to start · {{step}}",
+    "no_chain": "No relay",
+    "unassigned": "Unassigned",
+    "assignee": "Assigned to {{name}}"
+  },
+  "empty": {
+    "title": "No tasks yet",
+    "body": "Tasks you create in the dispatch tower land here, with their relay.",
+    "filtered_title": "Nothing matches this filter",
+    "filtered_body": "Try another filter."
+  },
+  "load_error": "Could not load tasks",
+  "chain": {
+    "parked_dot": "Stuck",
+    "none": "No relay yet. Assign it to a squad and every handoff shows up here.",
+    "parked_at": "Stopped at {{name}} — no agent bound",
+    "delivered": "{{name}} delivered",
+    "skipped_at": "{{name}} skipped",
+    "running": "{{name}} is running",
+    "awaiting_pickup": "{{name}} hasn't picked it up",
+    "waiting": "{{name}} waiting",
+    "open_task": "Open task"
+  }
+}
