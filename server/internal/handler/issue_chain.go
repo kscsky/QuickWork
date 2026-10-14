@@ -1,0 +1,530 @@
+package handler
+
+import (
+	"encoding/json"
+	"errors"
+	"net/http"
+
+	"github.com/go-chi/chi/v5"
+
+	"github.com/kscsky/quickwork/server/internal/service"
+	"github.com/kscsky/quickwork/server/internal/util"
+	db "github.com/kscsky/quickwork/server/pkg/db/generated"
+	"github.com/kscsky/quickwork/server/pkg/protocol"
+)
+
+// A task's chain, and the playbooks a squad walks again.
+//
+// The chain is the relay a squad task runs: ordered steps, each naming the
+// person whose turn it is and the agent they lend. The interesting state is
+// `parked` — the relay reached someone who has not bound an agent, so nothing
+// runs and the task waits. That is not an error and not a skip.
+
+type IssueChainStepResponse struct {
+	ID       string `json:"id"`
+	Position int32  `json:"position"`
+	// The person whose turn this is.
+	HolderUserID string `json:"holder_user_id"`
+	// Empty when they lend no agent, which is what parks the step.
+	AgentID string `json:"agent_id,omitempty"`
+	Title   string `json:"title"`
+	State   string `json:"state"`
+	// "pending" | "doing" | "done" | "parked" | "skipped"
+	StartedAt   string `json:"started_at,omitempty"`
+	CompletedAt string `json:"completed_at,omitempty"`
+}
+
+type IssueChainResponse struct {
+	Steps []IssueChainStepResponse `json:"steps"`
+	// True when the relay is waiting on someone. The list and detail pages
+	// both key their warning treatment off this rather than scanning states.
+	Parked bool `json:"parked"`
+}
+
+func chainStepToResponse(s db.IssueChainStep) IssueChainStepResponse {
+	out := IssueChainStepResponse{
+		ID:           uuidToString(s.ID),
+		Position:     s.Position,
+		HolderUserID: uuidToString(s.HolderUserID),
+		Title:        s.Title,
+		State:        s.State,
+	}
+	if s.AgentID.Valid {
+		out.AgentID = uuidToString(s.AgentID)
+	}
+	if s.StartedAt.Valid {
+		out.StartedAt = timestampToString(s.StartedAt)
+	}
+	if s.CompletedAt.Valid {
+		out.CompletedAt = timestampToString(s.CompletedAt)
+	}
+	return out
+}
+
+func chainToResponse(steps []db.IssueChainStep) IssueChainResponse {
+	resp := IssueChainResponse{Steps: make([]IssueChainStepResponse, 0, len(steps))}
+	for _, s := range steps {
+		resp.Steps = append(resp.Steps, chainStepToResponse(s))
+		if s.State == service.ChainStateParked {
+			resp.Parked = true
+		}
+	}
+	return resp
+}
+
+// ListIssueChain returns a task's relay, oldest step first.
+//
+// Read by any workspace member: the chain is how the squad's work is visible
+// to the squad, and hiding it would make a parked task look simply idle.
+func (h *Handler) ListIssueChain(w http.ResponseWriter, r *http.Request) {
+	issue, ok := h.loadIssueForUser(w, r, chi.URLParam(r, "id"))
+	if !ok {
+		return
+	}
+	steps, err := h.Queries.ListIssueChainSteps(r.Context(), issue.ID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to load the task's chain")
+		return
+	}
+	writeJSON(w, http.StatusOK, chainToResponse(steps))
+}
+
+// SkipIssueChainStep moves the relay past the step it is parked on.
+//
+// The parked bar's second button: the squad goes around someone who has no
+// agent instead of waiting for them to bind one. Only a parked step can be
+// skipped — a running step is advanced by its own agent finishing, and
+// jumping it would race that run.
+func (h *Handler) SkipIssueChainStep(w http.ResponseWriter, r *http.Request) {
+	workspaceID := workspaceIDFromURL(r, "workspaceId")
+	if _, ok := h.requireWorkspaceMember(w, r, workspaceID, "workspace not found"); !ok {
+		return
+	}
+	issue, ok := h.loadIssueForUser(w, r, chi.URLParam(r, "id"))
+	if !ok {
+		return
+	}
+	if _, err := h.TaskService.SkipParkedStep(r.Context(), h.Queries, issue); err != nil {
+		switch {
+		case errors.Is(err, service.ErrNoChain):
+			writeError(w, http.StatusBadRequest, "this task has no chain")
+		case errors.Is(err, service.ErrNoParkedStep):
+			writeError(w, http.StatusConflict, "nothing is parked on this task")
+		default:
+			writeError(w, http.StatusInternalServerError, "failed to skip the step")
+		}
+		return
+	}
+	steps, err := h.Queries.ListIssueChainSteps(r.Context(), issue.ID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "the step was skipped but the chain could not be read back")
+		return
+	}
+	writeJSON(w, http.StatusOK, chainToResponse(steps))
+}
+
+type ListIssueChainsRequest struct {
+	IssueIDs []string `json:"issue_ids"`
+}
+
+// ListIssueChains returns relays for a whole page of tasks at once.
+//
+// The task list draws a chain strip per row; asking per issue would turn one
+// list view into N requests. Only issues that actually have a chain appear in
+// the response — absence is the answer for a plain task.
+func (h *Handler) ListIssueChains(w http.ResponseWriter, r *http.Request) {
+	workspaceID := workspaceIDFromURL(r, "workspaceId")
+	if _, ok := h.requireWorkspaceMember(w, r, workspaceID, "workspace not found"); !ok {
+		return
+	}
+	var req ListIssueChainsRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	wsUUID, ok := parseUUIDOrBadRequest(w, workspaceID, "workspace_id")
+	if !ok {
+		return
+	}
+	if len(req.IssueIDs) == 0 {
+		// "Exists but empty" is an empty answer, matching the by-ids issue
+		// list: the caller asked about no tasks, so none exist to describe.
+		writeJSON(w, http.StatusOK, map[string]any{"chains": []any{}})
+		return
+	}
+	ids, ok := parseUUIDSliceOrBadRequest(w, req.IssueIDs, "issue_ids")
+	if !ok {
+		return
+	}
+	steps, err := h.Queries.ListIssueChainStepsByIssues(r.Context(), db.ListIssueChainStepsByIssuesParams{
+		WorkspaceID: wsUUID,
+		IssueIds:    ids,
+	})
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to load the tasks' chains")
+		return
+	}
+	chains := groupChainSteps(steps)
+	writeJSON(w, http.StatusOK, map[string]any{"chains": chains})
+}
+
+// groupChainSteps folds the flat joined rows back into one chain per issue,
+// preserving the position order the query already sorts by.
+func groupChainSteps(steps []db.IssueChainStep) []IssueChainForIssueResponse {
+	byIssue := make(map[string]*IssueChainForIssueResponse)
+	order := make([]string, 0)
+	for _, s := range steps {
+		issueID := uuidToString(s.IssueID)
+		chain, seen := byIssue[issueID]
+		if !seen {
+			chain = &IssueChainForIssueResponse{IssueID: issueID}
+			byIssue[issueID] = chain
+			order = append(order, issueID)
+		}
+		chain.Steps = append(chain.Steps, chainStepToResponse(s))
+		if s.State == service.ChainStateParked {
+			chain.Parked = true
+		}
+	}
+	out := make([]IssueChainForIssueResponse, 0, len(order))
+	for _, issueID := range order {
+		out = append(out, *byIssue[issueID])
+	}
+	return out
+}
+
+type IssueChainForIssueResponse struct {
+	IssueID string                   `json:"issue_id"`
+	Steps   []IssueChainStepResponse `json:"steps"`
+	Parked  bool                     `json:"parked"`
+}
+
+type CreateIssueChainRequest struct {
+	// Start from a saved playbook.
+	PlaybookID string `json:"playbook_id"`
+	// The relay as arranged on the compose canvas, for a route that was edited
+	// there and never saved as a playbook. Ignored when PlaybookID is set: a
+	// named playbook is the record of what was agreed.
+	//
+	// When both are absent the squad's own order is used — its members in the
+	// order they joined, which is the arrangement the squad already has.
+	Steps []service.ChainStepSpec `json:"steps"`
+}
+
+// CreateIssueChain writes a relay onto an existing task and starts its head.
+//
+// Separate from creating the task because the two are genuinely separate
+// decisions: a task can exist for a while before anyone decides to run it as a
+// relay. Idempotent in the sense that matters — a task that already has a
+// chain is rejected rather than given a second one, since two relays on one
+// task would leave the advance logic guessing which it is driving.
+func (h *Handler) CreateIssueChain(w http.ResponseWriter, r *http.Request) {
+	workspaceID := workspaceIDFromURL(r, "workspaceId")
+	if _, ok := h.requireWorkspaceMember(w, r, workspaceID, "workspace not found"); !ok {
+		return
+	}
+	issue, ok := h.loadIssueForUser(w, r, chi.URLParam(r, "id"))
+	if !ok {
+		return
+	}
+	if issue.AssigneeType.String != "squad" || !issue.AssigneeID.Valid {
+		writeError(w, http.StatusBadRequest, "only a task assigned to a squad can run as a chain")
+		return
+	}
+
+	existing, err := h.Queries.ListIssueChainSteps(r.Context(), issue.ID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to read the task's chain")
+		return
+	}
+	if len(existing) > 0 {
+		writeError(w, http.StatusConflict, "this task already has a chain")
+		return
+	}
+
+	var req CreateIssueChainRequest
+	// A body is optional: the bare POST means "the squad's own order".
+	_ = json.NewDecoder(r.Body).Decode(&req)
+
+	squad, err := h.Queries.GetSquadInWorkspace(r.Context(), db.GetSquadInWorkspaceParams{
+		ID:          issue.AssigneeID,
+		WorkspaceID: issue.WorkspaceID,
+	})
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "the squad this task is assigned to no longer exists")
+		return
+	}
+
+	extra, ok := h.chainSpecsFrom(w, r, workspaceID, squad, req.PlaybookID, req.Steps)
+	if !ok {
+		return
+	}
+
+	// One transaction for the whole relay. InstantiateChain writes the leader's
+	// step before it reaches the rest, so a route rejected part-way (a bad
+	// holder id) would otherwise leave a leader-only chain behind — and the
+	// 409 above would then refuse every retry, stranding the task on a relay
+	// that can never advance.
+	tx, err := h.TxStarter.Begin(r.Context())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to write the chain")
+		return
+	}
+	defer tx.Rollback(r.Context())
+
+	steps, err := h.TaskService.InstantiateChain(r.Context(), h.Queries.WithTx(tx), issue, squad, extra)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to write the chain")
+		return
+	}
+	if err := tx.Commit(r.Context()); err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to write the chain")
+		return
+	}
+
+	h.publish(protocol.EventIssueChainChanged, workspaceID, "member", requestUserID(r), map[string]any{
+		"issue_id": uuidToString(issue.ID),
+	})
+	writeJSON(w, http.StatusCreated, chainToResponse(steps))
+}
+
+// chainSpecsFrom resolves the relay after the leader.
+//
+// Three sources, in precedence order: a named playbook (the record of what was
+// agreed), the route handed in with the request (edited on the compose canvas,
+// never saved), and last the squad's own order — whoever joined first is next
+// in line, which is the arrangement a squad already has rather than a second
+// one the user has to maintain.
+func (h *Handler) chainSpecsFrom(
+	w http.ResponseWriter,
+	r *http.Request,
+	workspaceID string,
+	squad db.Squad,
+	playbookID string,
+	inline []service.ChainStepSpec,
+) ([]service.ChainStepSpec, bool) {
+	if playbookID != "" {
+		pbUUID, ok := parseUUIDOrBadRequest(w, playbookID, "playbook_id")
+		if !ok {
+			return nil, false
+		}
+		wsUUID, ok := parseUUIDOrBadRequest(w, workspaceID, "workspace_id")
+		if !ok {
+			return nil, false
+		}
+		pb, err := h.Queries.GetSquadPlaybookInWorkspace(r.Context(), db.GetSquadPlaybookInWorkspaceParams{
+			ID:          pbUUID,
+			WorkspaceID: wsUUID,
+		})
+		if err != nil {
+			writeError(w, http.StatusBadRequest, "playbook not found")
+			return nil, false
+		}
+		return service.UnmarshalChainSteps(pb.Steps), true
+	}
+
+	if len(inline) > 0 {
+		for i := range inline {
+			if inline[i].AgentID == "" {
+				continue
+			}
+			holder, err := util.ParseUUID(inline[i].HolderUserID)
+			if err != nil {
+				writeError(w, http.StatusBadRequest, "chain step has an unreadable holder")
+				return nil, false
+			}
+			// Same rule as binding: a member lends an agent they own. Without
+			// this a dispatcher could route work onto someone else's machine.
+			if _, ok := h.resolveLentAgent(w, r, "member", holder, inline[i].AgentID); !ok {
+				return nil, false
+			}
+		}
+		return inline, true
+	}
+
+	members, err := h.Queries.ListSquadMembers(r.Context(), squad.ID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to read the squad's members")
+		return nil, false
+	}
+	specs := make([]service.ChainStepSpec, 0, len(members))
+	for _, m := range members {
+		if m.MemberType != "member" {
+			continue
+		}
+		specs = append(specs, service.ChainStepSpec{
+			HolderUserID: uuidToString(m.MemberID),
+			Title:        m.Role,
+		})
+	}
+	return specs, true
+}
+
+// ── Playbooks ───────────────────────────────────────────────────────────────
+
+type PlaybookStepResponse struct {
+	HolderUserID string `json:"holder_user_id"`
+	Title        string `json:"title"`
+}
+
+type SquadPlaybookResponse struct {
+	ID          string                 `json:"id"`
+	WorkspaceID string                 `json:"workspace_id"`
+	SquadID     string                 `json:"squad_id"`
+	Name        string                 `json:"name"`
+	Description string                 `json:"description"`
+	Steps       []PlaybookStepResponse `json:"steps"`
+	CreatedBy   string                 `json:"created_by"`
+	CreatedAt   string                 `json:"created_at"`
+	UpdatedAt   string                 `json:"updated_at"`
+}
+
+func playbookToResponse(p db.SquadPlaybook) SquadPlaybookResponse {
+	specs := service.UnmarshalChainSteps(p.Steps)
+	steps := make([]PlaybookStepResponse, 0, len(specs))
+	for _, s := range specs {
+		steps = append(steps, PlaybookStepResponse{HolderUserID: s.HolderUserID, Title: s.Title})
+	}
+	return SquadPlaybookResponse{
+		ID:          uuidToString(p.ID),
+		WorkspaceID: uuidToString(p.WorkspaceID),
+		SquadID:     uuidToString(p.SquadID),
+		Name:        p.Name,
+		Description: p.Description,
+		Steps:       steps,
+		CreatedBy:   uuidToString(p.CreatedBy),
+		CreatedAt:   timestampToString(p.CreatedAt),
+		UpdatedAt:   timestampToString(p.UpdatedAt),
+	}
+}
+
+// ListSquadPlaybooks returns the chains a squad has saved.
+func (h *Handler) ListSquadPlaybooks(w http.ResponseWriter, r *http.Request) {
+	workspaceID := workspaceIDFromURL(r, "workspaceId")
+	if _, ok := h.requireWorkspaceMember(w, r, workspaceID, "workspace not found"); !ok {
+		return
+	}
+	squad, _, ok := h.loadSquadInWorkspace(w, r)
+	if !ok {
+		return
+	}
+	rows, err := h.Queries.ListSquadPlaybooks(r.Context(), squad.ID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to list playbooks")
+		return
+	}
+	resp := make([]SquadPlaybookResponse, 0, len(rows))
+	for _, p := range rows {
+		resp = append(resp, playbookToResponse(p))
+	}
+	writeJSON(w, http.StatusOK, resp)
+}
+
+type SaveSquadPlaybookRequest struct {
+	Name        string                  `json:"name"`
+	Description string                  `json:"description"`
+	Steps       []service.ChainStepSpec `json:"steps"`
+	ID          string                  `json:"id"`
+}
+
+// SaveSquadPlaybook creates a playbook, or replaces one when an id is given.
+//
+// Steps name people, never agents: a person's binding changes, and a playbook
+// that stored the agent would route next month's task to whichever machine
+// they happened to be on today.
+func (h *Handler) SaveSquadPlaybook(w http.ResponseWriter, r *http.Request) {
+	workspaceID := workspaceIDFromURL(r, "workspaceId")
+	member, ok := h.requireWorkspaceMember(w, r, workspaceID, "workspace not found")
+	if !ok {
+		return
+	}
+	squad, _, ok := h.loadSquadInWorkspace(w, r)
+	if !ok {
+		return
+	}
+
+	var req SaveSquadPlaybookRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if req.Name == "" {
+		writeError(w, http.StatusBadRequest, "name is required")
+		return
+	}
+	raw, err := service.MarshalChainSteps(req.Steps)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid steps")
+		return
+	}
+
+	wsUUID, ok := parseUUIDOrBadRequest(w, workspaceID, "workspace_id")
+	if !ok {
+		return
+	}
+
+	if req.ID != "" {
+		pbUUID, ok := parseUUIDOrBadRequest(w, req.ID, "id")
+		if !ok {
+			return
+		}
+		pb, err := h.Queries.UpdateSquadPlaybook(r.Context(), db.UpdateSquadPlaybookParams{
+			ID:          pbUUID,
+			WorkspaceID: wsUUID,
+			Name:        req.Name,
+			Description: req.Description,
+			Steps:       raw,
+		})
+		if err != nil {
+			writeError(w, http.StatusNotFound, "playbook not found")
+			return
+		}
+		writeJSON(w, http.StatusOK, playbookToResponse(pb))
+		return
+	}
+
+	pb, err := h.Queries.CreateSquadPlaybook(r.Context(), db.CreateSquadPlaybookParams{
+		WorkspaceID: wsUUID,
+		SquadID:     squad.ID,
+		Name:        req.Name,
+		Description: req.Description,
+		Steps:       raw,
+		CreatedBy:   member.UserID,
+	})
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to save the playbook")
+		return
+	}
+	writeJSON(w, http.StatusCreated, playbookToResponse(pb))
+}
+
+// DeleteSquadPlaybook removes a saved chain. Tasks already running on it keep
+// their steps — the chain was copied onto the task when it started.
+func (h *Handler) DeleteSquadPlaybook(w http.ResponseWriter, r *http.Request) {
+	workspaceID := workspaceIDFromURL(r, "workspaceId")
+	if _, ok := h.requireWorkspaceMember(w, r, workspaceID, "workspace not found"); !ok {
+		return
+	}
+	wsUUID, ok := parseUUIDOrBadRequest(w, workspaceID, "workspace_id")
+	if !ok {
+		return
+	}
+	id := chi.URLParam(r, "playbookId")
+	pbUUID, ok := parseUUIDOrBadRequest(w, id, "playbook_id")
+	if !ok {
+		return
+	}
+	affected, err := h.Queries.DeleteSquadPlaybook(r.Context(), db.DeleteSquadPlaybookParams{
+		ID:          pbUUID,
+		WorkspaceID: wsUUID,
+	})
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to delete the playbook")
+		return
+	}
+	if affected == 0 {
+		writeError(w, http.StatusNotFound, "playbook not found")
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}

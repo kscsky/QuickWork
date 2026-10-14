@@ -1,0 +1,14 @@
+-- A squad member may lend one of their own agents to the room.
+--
+-- The room's members are ACCOUNTS. An agent is equipment a person brings, not
+-- a member: it has no role, it does not vote, and it should not appear in the
+-- roster as a peer of the people. This column is where that lending is
+-- recorded — one agent per person, chosen by them.
+--
+-- `squad.leader_id` keeps its old meaning (the agent the squad's work routes
+-- to). For the leading member this column is what feeds it, so the two can be
+-- kept in step at the one place that writes either.
+--
+-- No FK (repo rule): the agent is validated as belonging to the member in the
+-- handler, which is also the only place that can check ownership.
+ALTER TABLE squad_member ADD COLUMN IF NOT EXISTS agent_id UUID;
