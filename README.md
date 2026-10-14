@@ -15,7 +15,6 @@ is a chain of steps — each one owned by a person or an agent, every handoff vi
 When a step lands on someone who has not bound an agent yet, the task stops at their step and
 waits — not skipped, and not a failure. Self-hostable, works with 26 agent CLIs, no lock-in.
 
-[![CI](https://github.com/kscsky/QuickWork/actions/workflows/ci.yml/badge.svg)](https://github.com/kscsky/QuickWork/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/kscsky/QuickWork?style=flat)](https://github.com/kscsky/QuickWork/releases)
 [![GitHub stars](https://img.shields.io/github/stars/kscsky/QuickWork?style=flat)](https://github.com/kscsky/QuickWork/stargazers)
 [![Discord](https://img.shields.io/badge/Discord-Join-5865F2?logo=discord&logoColor=white)](https://discord.gg/W8gYBn226t)

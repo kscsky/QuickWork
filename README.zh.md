@@ -14,7 +14,6 @@ QuickWork 是一个开源工作区：人和 AI 智能体以「接力」的方式
 步属于一个人或一个智能体，每一次交接都发生在看板上。轮到还没绑定智能体的人，任务就停在那一步等人
 ——不跳过，也不算失败。可自部署，支持 26 种智能体 CLI，不绑定任何厂商。
 
-[![CI](https://github.com/kscsky/QuickWork/actions/workflows/ci.yml/badge.svg)](https://github.com/kscsky/QuickWork/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/kscsky/QuickWork?style=flat)](https://github.com/kscsky/QuickWork/releases)
 [![GitHub stars](https://img.shields.io/github/stars/kscsky/QuickWork?style=flat)](https://github.com/kscsky/QuickWork/stargazers)
 [![Discord](https://img.shields.io/badge/Discord-Join-5865F2?logo=discord&logoColor=white)](https://discord.gg/W8gYBn226t)
