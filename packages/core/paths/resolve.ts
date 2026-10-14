@@ -36,7 +36,10 @@ export function resolvePostAuthDestination(
   }
   const first = workspaces[0];
   if (first) {
-    return paths.workspace(first.slug).issues();
+    // The workspace home is the control tower (小队任务), not the retired
+    // flat issue list — landing users on /issues opened a page that is no
+    // longer in the nav.
+    return paths.workspace(first.slug).dispatch();
   }
   return paths.newWorkspace();
 }

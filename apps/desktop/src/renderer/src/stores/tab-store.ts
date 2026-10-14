@@ -332,7 +332,7 @@ export function resourceKeyForUrl(url: string): string {
  *     was constructed without the workspace prefix. The router would
  *     interpret `issues` as a workspace slug → NoAccessPage.
  *
- * Normalizes: a bare `/{slug}` (no route segment) becomes `/{slug}/issues` —
+ * Normalizes: a bare `/{slug}` (no route segment) becomes `/{slug}/dispatch` —
  * the workspace's default surface. This replaces the old in-router
  * `<Navigate to="issues">` index redirect (MUL-4741 invariant 1: the router
  * never self-navigates; URLs are normalized before they become sessions).
@@ -358,7 +358,9 @@ export function sanitizeTabPath(path: string): string | null {
     return null;
   }
   if (segments.length === 1) {
-    return `/${firstSegment}/issues${suffix}`;
+    // Bare `/{slug}` lands on the workspace home (control tower) — the same
+    // surface the web's `/{slug}` index renders.
+    return `/${firstSegment}/dispatch${suffix}`;
   }
   return path;
 }
@@ -390,14 +392,14 @@ function pinnedBoundary(tabs: TabSession[]): number {
   return i;
 }
 
-/** Default entry point for a workspace — its issues list. */
+/** Default entry point for a workspace — its control tower (小队任务). */
 function defaultPathFor(slug: string): string {
-  return `/${slug}/issues`;
+  return `/${slug}/dispatch`;
 }
 
 function defaultTabFor(slug: string): TabSession {
   const path = defaultPathFor(slug);
-  return makeSession(path, "Issues");
+  return makeSession(path, "Dispatch");
 }
 
 // ---------------------------------------------------------------------------
@@ -513,7 +515,7 @@ export const useTabStore = create<TabStore>()(
           // First time entering this workspace — create the group.
           const cleanDesired = desiredPath ? sanitizeTabPath(desiredPath) : null;
           const seedPath = cleanDesired ?? defaultPathFor(slug);
-          const tab = makeSession(seedPath, "Issues");
+          const tab = makeSession(seedPath, "Dispatch");
           set({
             activeWorkspaceSlug: slug,
             byWorkspace: {
