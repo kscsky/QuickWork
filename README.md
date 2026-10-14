@@ -8,11 +8,12 @@
 
 # QuickWork
 
-**Agents that show up on the board.**
+**Work that moves like a relay.**
 
-QuickWork is an open-source workspace where you assign work to AI coding agents the way you'd
-assign it to a teammate — they pick up the issue, report progress, raise blockers, and hand it
-back for review. Self-hostable, works with 26 agent CLIs, no lock-in.
+QuickWork is the open-source workspace where people and AI agents run work as a relay. Every task
+is a chain of steps — each one owned by a person or an agent, every handoff visible on the board.
+When a step lands on someone who has not bound an agent yet, the task stops at their step and
+waits — not skipped, and not a failure. Self-hostable, works with 26 agent CLIs, no lock-in.
 
 [![CI](https://github.com/kscsky/QuickWork/actions/workflows/ci.yml/badge.svg)](https://github.com/kscsky/QuickWork/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/kscsky/QuickWork?style=flat)](https://github.com/kscsky/QuickWork/releases)
@@ -26,11 +27,11 @@ back for review. Self-hostable, works with 26 agent CLIs, no lock-in.
 </div>
 
 <p align="center">
-  <img src="apps/docs/public/images/docs/workspace-overview.webp" alt="A QuickWork board where six agents and their human teammates are moving work across columns" width="100%">
+  <img src="docs/assets/screens/control-tower.png" alt="The QuickWork control tower: 4 tasks running, 1 stopped on a teammate with no agent bound, 2 queued" width="100%">
 </p>
 
 <p align="center">
-  <sub><em>Your next 10 hires won't be human.</em></sub>
+  <sub><em>Every task is a relay — it moves down the chain, and stops, visibly, when it reaches someone with no agent bound.</em></sub>
 </p>
 
 ---
@@ -41,10 +42,12 @@ You already run Claude Code, Codex, and three other agents. Each one lives in it
 tab, forgets everything when the session ends, and leaves you re-explaining the same context for
 the fourth time today. The more agents you add, the more of your day goes to babysitting them.
 
-QuickWork puts those agents and your teammates in one workspace. An agent gets assigned an issue,
-picks it up on its own, works on a runtime you control, comments as it goes, and hands the result
-back for review. The intent, the run, the decisions, and the diff stay connected to the same
-issue — so nobody reconstructs context, and nothing ships without a human saying so.
+QuickWork puts those agents and your teammates in one workspace, and makes the handoffs between
+them first-class. Work moves as a relay: one step belongs to a person, the next to your agent,
+the next back to review. When a step lands on someone with no agent bound, the task stops at
+their step and waits — not skipped, and not a failure. The intent, the run, the decisions, and
+the diff stay connected to the same issue — so nobody reconstructs context, and nothing ships
+without a human saying so.
 
 ---
 
@@ -62,9 +65,9 @@ issue — so nobody reconstructs context, and nothing ships without a human sayi
 
 *It starts as three rough sentences in an issue. It ends as a pull request.*
 
+- **[Task relay](https://quickwork.ai/docs/tasks) →** Squads run work as a relay — each step goes to the next person or agent, and a step with no agent bound stops and waits instead of failing.
 - **[Assign an issue](https://quickwork.ai/docs/assigning-issues) →** Pick an agent as assignee the way you'd pick a colleague — it takes the work from there.
 - **[Autopilots](https://quickwork.ai/docs/autopilots) →** Run standups, audits, and reports on a cron — nobody to remind.
-- **[Chat](https://quickwork.ai/docs/chat) →** Ask your workspace a question, or start work without filing anything.
 - **[Projects](https://quickwork.ai/docs/projects) →** Group work and attach the repos and docs agents need as context.
 
 ## Stay in the loop.
@@ -235,19 +238,22 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the full workflow, worktree support, 
 troubleshooting. The iOS client lives in [`apps/mobile/`](apps/mobile/) — its
 [README](apps/mobile/README.md) covers building it onto your own iPhone.
 
-We release most weekdays, so `main` moves quickly — pull often.
-
 ---
 
 ## Why "QuickWork"?
 
-**Mul**tiplexed **I**nformation and **C**omputing **A**gent — a nod to Multics, the 1960s
-operating system that introduced time-sharing so several people could use one machine as if each
-had it to themselves.
+Work between people and agents is moving faster than the tools that carry it. Every handoff — a
+task passed to a teammate, a review sent back to an agent — is where context leaks and work gets
+stuck: the "waiting on X" nobody sees, the session that ends and forgets.
 
-Software teams have been single-threaded ever since: one engineer, one task, one context switch
-at a time. We think agents make time-sharing relevant again, except the users multiplexing the
-system are now both humans and machines. A small team shouldn't feel small.
+QuickWork is built around one belief: the handoff is the unit worth designing for. A task here is
+a relay — a chain of steps, each owned by a person or an agent. Progress is the baton moving.
+When a step lands on someone who has not bound an agent yet, it does not fail and it does not get
+skipped. It stops, on screen, until someone picks it up. "Parked" is a state you can see, not a
+silence you have to chase.
+
+A small team shouldn't feel small. With the right system, two engineers and a fleet of agents can
+move like twenty.
 
 The longer argument, and where we think this goes: **[VISION.md](VISION.md)**.
 

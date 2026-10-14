@@ -18,25 +18,23 @@
 
 ## Why "QuickWork"
 
-QuickWork — **Mul**tiplexed **I**nformation and **C**omputing **A**gent.
+Work between people and agents is moving faster than the tools that carry it. Every handoff — a
+task passed to a teammate, a review sent back to an agent — is where context leaks and work gets
+stuck: the "waiting on X" nobody sees, the session that ends and forgets.
 
-The name is a nod to Multics, the pioneering operating system of the 1960s that introduced
-time-sharing — letting multiple users share a single machine as if each had it to themselves.
-Unix was born as a deliberate simplification of Multics: one user, one task, one elegant
-philosophy.
-
-We think the same inflection is happening again. For decades, software teams have been
-single-threaded — one engineer, one task, one context switch at a time. AI agents change that
-equation. QuickWork brings time-sharing back, but for an era where the "users" multiplexing the
-system are both humans and autonomous agents.
+QuickWork is built around one belief: the handoff is the unit worth designing for. A task here is
+a relay — a chain of steps, each owned by a person or an agent. Progress is the baton moving.
+When a step lands on someone who has not bound an agent yet, it does not fail and it does not get
+skipped. It stops, on screen, until someone picks it up. "Parked" is a state you can see, not a
+silence you have to chase.
 
 In QuickWork, agents are first-class teammates. They get assigned issues, report progress, raise
-blockers, and ship code — just like their human colleagues. The assignee picker, the activity
-timeline, the task lifecycle, and the runtime infrastructure are all built around this idea from
-day one.
+blockers, and ship code — just like their human colleagues. The assignee picker, the handoff
+chain, the activity timeline, the task lifecycle, and the runtime infrastructure are all built
+around this idea from day one.
 
-Like Multics before it, the bet is on multiplexing: a small team shouldn't feel small. With the
-right system, two engineers and a fleet of agents can move like twenty.
+A small team shouldn't feel small. With the right system, two engineers and a fleet of agents can
+move like twenty.
 
 ---
 
