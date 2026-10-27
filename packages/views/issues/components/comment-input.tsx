@@ -2,9 +2,13 @@
 
 import { useRef, useState, useCallback, useEffect } from "react";
 import { cn } from "@quickwork/ui/lib/utils";
-import { ContentEditor, type ContentEditorRef, useFileDropZone, FileDropOverlay, useLazyEditor, useUploadGate, useComposerSubmit } from "../../editor";
+import { ContentEditor, type ContentEditorRef, ReadonlyContent, useFileDropZone, FileDropOverlay, useLazyEditor, useUploadGate, useComposerSubmit } from "../../editor";
 import { FileUploadButton } from "@quickwork/ui/components/common/file-upload-button";
 import { SubmitButton } from "@quickwork/ui/components/common/submit-button";
+import { Button } from "@quickwork/ui/components/ui/button";
+import { useAuthStore } from "@quickwork/core/auth";
+import { Loader2, Paperclip } from "lucide-react";
+import { ActorAvatar } from "../../common/actor-avatar";
 import { contentReferencesAttachment } from "@quickwork/core/types";
 import { formatShortcut, useShortcut } from "@quickwork/core/shortcuts";
 import { useCommentDraftStore } from "@quickwork/core/issues/stores";
@@ -20,7 +24,12 @@ interface CommentInputProps {
   /** Resolves true on success, false on failure. The composer keeps the text
    *  (editor locked + button spinning) until this settles, then clears only on
    *  success — a failed send must not silently discard the user's draft. */
-  onSubmit: (content: string, attachmentIds?: string[], suppressAgentIds?: string[]) => Promise<string | boolean>;
+  onSubmit: (
+    content: string,
+    attachmentIds?: string[],
+    suppressAgentIds?: string[],
+    chainStepId?: string,
+  ) => Promise<string | boolean>;
   /** Called after the server accepts the comment and the composer is cleared. */
   onAccepted?: (commentId: string) => void;
   /**
@@ -29,13 +38,27 @@ interface CommentInputProps {
    * behavior, one different prompt.
    */
   placeholder?: string;
+  /**
+   * When set, this composer posts INTO that chain step's leg (单流分界):
+   * the comment reads back only for the leg's holder. Unset = the room.
+   */
+  chainStepId?: string;
+  /**
+   * `solo` is the single-person task composer: attachments are promoted to a
+   * labelled button, the editor has no placeholder, and the send action is
+   * "Publish". Every other surface keeps the default shell.
+   */
+  variant?: "default" | "solo";
 }
 
-function CommentInput({ issueId, onSubmit, onAccepted, placeholder }: CommentInputProps) {
+function CommentInput({ issueId, onSubmit, onAccepted, placeholder, chainStepId, variant = "default" }: CommentInputProps) {
   const { t } = useT("issues");
   const { t: tEditor } = useT("editor");
   const sendShortcut = useShortcut("send");
+  const user = useAuthStore((s) => s.user);
   const editorRef = useRef<ContentEditorRef>(null);
+  const soloFileRef = useRef<HTMLInputElement>(null);
+  const [previewing, setPreviewing] = useState(false);
   // Sending mid-upload would strip the pending image's blob URL out of the
   // markdown and bind no attachment id — the comment posts without the file.
   const uploadGate = useUploadGate(editorRef);
@@ -71,6 +94,7 @@ function CommentInput({ issueId, onSubmit, onAccepted, placeholder }: CommentInp
   // visible and editable, exactly like the pre-lazy behavior.
   const lazy = useLazyEditor({
     initialActive:
+      variant === "solo" ||
       !!initialDraft?.trim() ||
       useCommentDraftStore.getState().getUploads(draftKey).length > 0,
     editorRef,
@@ -173,6 +197,7 @@ function CommentInput({ issueId, onSubmit, onAccepted, placeholder }: CommentInp
         content,
         activeIds.length > 0 ? activeIds : undefined,
         suppressAgentIds.length > 0 ? suppressAgentIds : undefined,
+        chainStepId,
       ).then((commentId) => {
         acceptedCommentIdRef.current = typeof commentId === "string" ? commentId : null;
         return !!commentId;
@@ -199,6 +224,150 @@ function CommentInput({ issueId, onSubmit, onAccepted, placeholder }: CommentInp
       if (acceptedCommentIdRef.current) onAccepted?.(acceptedCommentIdRef.current);
     },
   });
+
+  const soloFiles = (files: File[]) => {
+    for (const file of files) lazy.uploadOrQueue([file]);
+  };
+
+  const togglePreview = () => {
+    if (!previewing) {
+      const md = editorRef.current?.getMarkdown();
+      if (md != null) setContent(md);
+    }
+    setPreviewing((value) => !value);
+  };
+
+  if (variant === "solo") {
+    const publishHint = sendShortcut
+      ? `${t(($) => $.comment.send_tooltip)} · ${formatShortcut(sendShortcut)}`
+      : t(($) => $.comment.send_tooltip);
+    return (
+      <div
+        {...dropZoneProps}
+        className={cn(
+          "relative flex flex-col qw-solo-composer-card",
+          submitting && "pointer-events-none opacity-60",
+        )}
+        aria-busy={submitting || undefined}
+      >
+        <div className="qw-solo-cmp-top">
+          <button
+            type="button"
+            className="qw-solo-cmp-attach"
+            onClick={() => soloFileRef.current?.click()}
+            disabled={submitting}
+          >
+            <Paperclip className="size-[15px]" />
+            {t(($) => $.comment.attach_action)}
+          </button>
+          <input
+            ref={soloFileRef}
+            type="file"
+            multiple
+            className="hidden"
+            onChange={(event) => {
+              const files = Array.from(event.target.files ?? []);
+              event.target.value = "";
+              soloFiles(files);
+            }}
+          />
+          <span className="qw-solo-cmp-hint">
+            {t(($) => $.comment.attach_hint)}
+          </span>
+          <span className="flex-1" />
+          <button
+            type="button"
+            className="qw-solo-cmp-preview"
+            onClick={togglePreview}
+          >
+            {previewing
+              ? t(($) => $.comment.back_to_edit)
+              : t(($) => $.comment.preview_action)}
+          </button>
+        </div>
+
+        <div className={cn("qw-solo-cmp-editor", sticky && "max-h-[40vh] overflow-y-auto")}>
+          <div className={cn("qw-solo-cmp-editor-inner", previewing && "hidden")}>
+            <ContentEditor
+              ref={editorRef}
+              defaultValue={initialDraft}
+              onReady={lazy.onReady}
+              placeholder=""
+              onUpdate={(md) => {
+                setContent(md);
+                setIsEmpty(!md.trim());
+                setDraft(draftKey, md);
+              }}
+              onSubmit={submit}
+              onUploadFile={handleUpload}
+              onUploadingChange={uploadGate.onUploadingChange}
+              debounceMs={100}
+              currentIssueId={issueId}
+              attachments={pendingAttachments}
+              enableSlashCommands
+              slashCommandMode="command"
+              quickActionMenu={quickActionMenu}
+            />
+          </div>
+          {previewing ? (
+            <div className="qw-solo-cmp-preview-body">
+              {content.trim() ? (
+                <ReadonlyContent content={content} />
+              ) : (
+                <p className="qw-solo-cmp-preview-empty">
+                  {t(($) => $.comment.empty_preview)}
+                </p>
+              )}
+            </div>
+          ) : null}
+        </div>
+
+        <div className="qw-solo-cmp-triggers">
+          <CommentTriggerChips
+            agents={triggerPreview.agents}
+            blocked={triggerPreview.blocked}
+            draftContent={content}
+            suppressedAgentIds={suppressedAgentIds}
+            onToggle={toggleSuppressedAgent}
+          />
+        </div>
+
+        <div className="qw-solo-cmp-foot">
+          {user?.id ? (
+            <ActorAvatar
+              actorType="member"
+              actorId={user.id}
+              size="sm"
+              profileLink={false}
+            />
+          ) : null}
+          {user?.name ? (
+            <span className="qw-solo-cmp-who">
+              {t(($) => $.comment.posting_as, { name: user.name })}
+            </span>
+          ) : null}
+          <span className="flex-1" />
+          <Button
+            type="button"
+            size="sm"
+            className="qw-solo-cmp-publish"
+            onClick={submit}
+            disabled={isEmpty || gate.uploading || submitting}
+            aria-busy={submitting || gate.uploading || undefined}
+            title={publishHint}
+          >
+            {submitting || gate.uploading ? (
+              <Loader2 className="size-3.5 animate-spin" />
+            ) : null}
+            {submitting
+              ? t(($) => $.comment.publishing)
+              : t(($) => $.comment.publish_action)}
+          </Button>
+        </div>
+        {isDragOver && <FileDropOverlay />}
+      </div>
+    );
+  }
 
   return (
     <div

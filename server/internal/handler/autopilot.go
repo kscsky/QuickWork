@@ -59,6 +59,13 @@ type AutopilotResponse struct {
 	TriggerKinds  []string `json:"trigger_kinds,omitempty"`
 	NextRunAt     *string  `json:"next_run_at,omitempty"`
 	LastRunStatus *string  `json:"last_run_status,omitempty"`
+	// RecentRunStatuses is the newest-first outcome strip for the list's
+	// timeline dots (at most 7). ScheduleCron/ScheduleTimezone describe the
+	// enabled schedule trigger behind NextRunAt. All three are list-only and
+	// omitted when there is nothing to derive.
+	RecentRunStatuses []string `json:"recent_run_statuses,omitempty"`
+	ScheduleCron      *string  `json:"schedule_cron,omitempty"`
+	ScheduleTimezone  *string  `json:"schedule_timezone,omitempty"`
 
 	// Always non-nil (empty slice when no subscribers configured) so
 	// frontend optional-chain rules can treat the field as authoritative.
@@ -462,6 +469,17 @@ func (h *Handler) ListAutopilots(w http.ResponseWriter, r *http.Request) {
 		if row.LastRunStatus != "" {
 			s := row.LastRunStatus
 			r.LastRunStatus = &s
+		}
+		if len(row.RecentRunStatuses) > 0 {
+			r.RecentRunStatuses = row.RecentRunStatuses
+		}
+		if row.ScheduleCron != "" {
+			s := row.ScheduleCron
+			r.ScheduleCron = &s
+		}
+		if row.ScheduleTimezone != "" {
+			s := row.ScheduleTimezone
+			r.ScheduleTimezone = &s
 		}
 		if callerErr == nil {
 			_, isCollaborator := collabSet[uuidToString(row.Autopilot.ID)]
@@ -1626,6 +1644,15 @@ func (h *Handler) validateAutopilotAssigneeForSave(
 		}
 		if requireRuntime && !agent.RuntimeID.Valid {
 			writeError(w, http.StatusUnprocessableEntity, "assignee agent needs a runtime before this autopilot can be active")
+			return false
+		}
+		// Same invocation gate the squad leader path below applies: a member
+		// who cannot invoke an agent must not be able to point an autopilot at
+		// it. Without this, the picker could hand an autopilot to another
+		// member's private agent and every run would be rejected at claim time.
+		actorType, actorID := h.resolveActor(r, requestUserID(r), util.UUIDToString(workspaceID))
+		if !h.canInvokeAgent(r.Context(), agent, actorType, actorID, h.invokeOriginatorFromRequest(r, actorType, actorID), util.UUIDToString(workspaceID)) {
+			writeError(w, http.StatusForbidden, "cannot assign autopilot to an agent you cannot invoke")
 			return false
 		}
 		return true

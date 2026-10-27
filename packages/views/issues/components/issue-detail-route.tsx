@@ -92,6 +92,7 @@ export function IssueDetailRoute({ routeId, onDelete }: IssueDetailRouteProps) {
   return (
     <IssueDetail
       issueId={canonicalId}
+      layout="refresh"
       onDelete={onDelete}
       highlightCommentId={highlight.commentId}
     />

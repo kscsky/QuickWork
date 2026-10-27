@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
@@ -1315,6 +1316,94 @@ func (h *Handler) GetAttachmentContent(w http.ResponseWriter, r *http.Request) {
 	if _, err := w.Write(body); err != nil {
 		slog.Error("failed to write attachment preview body", "id", attachmentID, "error", err)
 	}
+}
+
+// UpdateAttachmentContent — PUT /api/attachments/{id}/content
+//
+// Replaces the bytes of a text-previewable attachment (markdown / text /
+// html). Delivered documents evolve: a checklist handed over by one leg is
+// worked on by the next, and the only way to keep it current used to be
+// download → edit locally → re-upload as a new file, which breaks the
+// handoff package's reference to it. The object is re-uploaded under a
+// fresh storage key and the row's url is swapped, so a CDN cache keyed by
+// path can never serve the previous revision; the attachment id stays
+// stable, which is what handoff packages and comments reference.
+//
+// Gate: workspace membership via loadAttachmentForRequest — the same gate
+// that governs preview and download. Only text kinds are editable (binary
+// bytes cannot round-trip through a JSON body), capped at the preview size,
+// which is also the size at which the client can render it.
+func (h *Handler) UpdateAttachmentContent(w http.ResponseWriter, r *http.Request) {
+	att, ok := h.loadAttachmentForRequest(w, r)
+	if !ok {
+		return
+	}
+	if !isTextPreviewable(att.ContentType, att.Filename) {
+		writeError(w, http.StatusUnsupportedMediaType, "editing is only supported for text files")
+		return
+	}
+	if h.Storage == nil {
+		writeError(w, http.StatusServiceUnavailable, "storage not configured")
+		return
+	}
+	userID, ok := requireUserID(w, r)
+	if !ok {
+		return
+	}
+
+	r.Body = http.MaxBytesReader(w, r.Body, maxPreviewTextSize+1024)
+	var body struct {
+		Content string `json:"content"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if len(body.Content) > maxPreviewTextSize {
+		writeError(w, http.StatusRequestEntityTooLarge, "content too large for editing")
+		return
+	}
+
+	// Fresh key in the same directory: same attachment, new object. The old
+	// object is left in place — URLs already handed out stay valid, and the
+	// storage layer's own lifecycle policy owns cleanup.
+	newID, err := uuid.NewV7()
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+	key := path.Join(path.Dir(h.Storage.KeyFromURL(att.Url)), newID.String()+path.Ext(att.Filename))
+	link, err := h.Storage.Upload(r.Context(), key, []byte(body.Content), att.ContentType, att.Filename)
+	if err != nil {
+		slog.Error("attachment content upload failed", "id", uuidToString(att.ID), "error", err)
+		writeError(w, http.StatusInternalServerError, "upload failed")
+		return
+	}
+
+	updated, err := h.Queries.UpdateAttachmentContent(r.Context(), db.UpdateAttachmentContentParams{
+		NewUrl:       link,
+		NewSize:      int64(len(body.Content)),
+		AttachmentID: att.ID,
+		WsID:         att.WorkspaceID,
+	})
+	if err != nil {
+		slog.Error("failed to update attachment content", "id", uuidToString(att.ID), "error", err)
+		writeError(w, http.StatusInternalServerError, "failed to update attachment")
+		return
+	}
+
+	// Issue-bound attachments have a realtime surface (the attachment list
+	// and the preview URLs derived from it); publish so open pages refetch.
+	if updated.IssueID.Valid {
+		workspaceID := uuidToString(updated.WorkspaceID)
+		uploaderType, uploaderID := h.resolveActor(r, userID, workspaceID)
+		h.publish(protocol.EventIssueAttachmentsChanged, workspaceID, uploaderType, uploaderID, map[string]any{
+			"issue_id":       uuidToString(updated.IssueID),
+			"issue_revision": updated.IssueRevision,
+		})
+	}
+
+	writeJSON(w, http.StatusOK, h.attachmentToResponse(updated.Attachment(), attachmentURLModeFromRequest(r)))
 }
 
 // isTextPreviewable is the whitelist for the text preview proxy.

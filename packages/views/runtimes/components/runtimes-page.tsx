@@ -2,60 +2,40 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  ChevronRight,
+  ArrowRight,
   Cloud,
-  Loader2,
+  Copy,
   Monitor,
   Plus,
-  Server,
+  Search,
 } from "lucide-react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuthStore } from "@quickwork/core/auth";
 import { useWorkspaceId } from "@quickwork/core/hooks";
-import { memberNeedsMikaSetup, useBootstrapMika } from "@quickwork/core/onboarding";
-import { MIKA_PLACEHOLDER_EMOJI } from "../../onboarding/components/mika-intro";
-import { useRequiredWorkspaceSlug, useWorkspacePaths } from "@quickwork/core/paths";
+import { useWorkspacePaths } from "@quickwork/core/paths";
 import { agentTaskSnapshotOptions } from "@quickwork/core/agents";
-import { chatSessionsOptions } from "@quickwork/core/chat/queries";
 import { runtimeProfileListOptions } from "@quickwork/core/runtimes";
 import { runtimeListOptions, runtimeKeys } from "@quickwork/core/runtimes/queries";
 import { useWSEvent } from "@quickwork/core/realtime";
 import { agentListOptions } from "@quickwork/core/workspace/queries";
-import type { AgentRuntime } from "@quickwork/core/types";
-import { Button } from "@quickwork/ui/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@quickwork/ui/components/ui/dialog";
-import {
-  MikaRuntimeChoice,
-  type MikaRuntimeSelection,
-} from "./mika-runtime-choice";
+import { copyText } from "@quickwork/ui/lib/clipboard";
 import { Skeleton } from "@quickwork/ui/components/ui/skeleton";
-import {
-  CollectionPageHeader,
-  CollectionPageHeaderAction,
-  CollectionPageState,
-} from "../../layout/collection-page";
-import { PageHeader } from "../../layout/page-header";
-import { AppLink, useNavigation } from "../../navigation";
-import {
-  getMikaOnboarding,
-  pickContentLang,
-} from "../../onboarding/templates";
+import { useNavigation } from "../../navigation";
 import { ConnectRemoteDialog } from "./connect-remote-dialog";
 import { ProviderLogo } from "./provider-logo";
-import { buildWorkloadIndex, RuntimeList } from "./runtime-list";
+import {
+  buildWorkloadIndex,
+  type RuntimeWorkload,
+} from "./runtime-list";
 import { pendingRuntimeFromProfile } from "./pending-runtime";
-import { buildRuntimeMachines, type RuntimeMachine } from "./runtime-machines";
-import { HealthDot, HealthIcon, useHealthLabel } from "./shared";
+import {
+  buildRuntimeMachines,
+  runtimeRowLabel,
+  type RuntimeMachine,
+} from "./runtime-machines";
+import { useHealthLabel } from "./shared";
 import { useT, useTimeAgo } from "../../i18n";
-import { daemonRuntimesDocsHref } from "./runtime-docs";
 
 export interface RuntimesPageProps {
   /** Desktop-only daemon id used to identify this device. */
@@ -66,8 +46,11 @@ export interface RuntimesPageProps {
   hasLocalMachine?: boolean;
   /** The bundled daemon is starting but has not registered yet. */
   bootstrapping?: boolean;
-  /** Web SaaS-only Cloud Runtime entrypoint. */
 }
+
+const DAEMON_SETUP_COMMAND = "quickwork setup";
+
+type MachineFilter = "all" | "online" | "issues";
 
 function useNowTick(intervalMs = 30_000): number {
   const [now, setNow] = useState(() => Date.now());
@@ -78,17 +61,49 @@ function useNowTick(intervalMs = 30_000): number {
   return now;
 }
 
+function machineMatches(machine: RuntimeMachine, query: string): boolean {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  return [
+    machine.title,
+    machine.subtitle,
+    machine.deviceInfo,
+    machine.daemonId,
+    machine.providerNames.join(" "),
+    machine.runtimes.map((runtime) => runtime.name).join(" "),
+    machine.runtimes.map((runtime) => runtime.custom_name ?? "").join(" "),
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase()
+    .includes(q);
+}
+
+function agentCountFor(machine: RuntimeMachine, workload: Map<string, RuntimeWorkload>): number {
+  return machine.runtimes.reduce(
+    (sum, runtime) => sum + (workload.get(runtime.id)?.agentIds.length ?? 0),
+    0,
+  );
+}
+
 export function RuntimesPage({
   localDaemonId,
   localMachineName,
   hasLocalMachine,
   bootstrapping,
 }: RuntimesPageProps = {}) {
+  const { t } = useT("runtimes");
+  const healthLabel = useHealthLabel();
+  const timeAgo = useTimeAgo();
+  const wsId = useWorkspaceId();
+  const paths = useWorkspacePaths();
+  const navigation = useNavigation();
+  const qc = useQueryClient();
   const isAuthLoading = useAuthStore((state) => state.isLoading);
   const currentUserId = useAuthStore((state) => state.user?.id);
-  const wsId = useWorkspaceId();
-  const qc = useQueryClient();
   const [showConnectDialog, setShowConnectDialog] = useState(false);
+  const [filter, setFilter] = useState<MachineFilter>("all");
+  const [query, setQuery] = useState("");
 
   const { data: runtimes = [], isLoading: runtimesLoading } = useQuery(
     runtimeListOptions(wsId),
@@ -96,16 +111,8 @@ export function RuntimesPage({
   const { data: runtimeProfiles = [], isLoading: profilesLoading } = useQuery(
     runtimeProfileListOptions(wsId),
   );
-  const { data: agents = [], isLoading: agentsLoading } = useQuery(
-    agentListOptions(wsId),
-  );
+  const { data: agents = [] } = useQuery(agentListOptions(wsId));
   const { data: snapshot = [] } = useQuery(agentTaskSnapshotOptions(wsId));
-  // The Mika entrypoint is per member, not per workspace: the agent alone does
-  // not say whether *this* member's conversation was ever opened and kicked
-  // off. See memberNeedsMikaSetup.
-  const { data: chatSessions = [], isLoading: chatSessionsLoading } = useQuery(
-    chatSessionsOptions(wsId),
-  );
 
   const handleDaemonEvent = useCallback(() => {
     qc.invalidateQueries({ queryKey: runtimeKeys.all(wsId) });
@@ -149,428 +156,417 @@ export function RuntimesPage({
     });
   }, [machines, runtimeProfiles]);
 
+  const boundAgentCount = useMemo(
+    () => agents.filter((agent) => agent.runtime_id && !agent.archived_at).length,
+    [agents],
+  );
+  const runtimeCount =
+    machines.reduce((sum, machine) => sum + machine.runtimes.length, 0) +
+    orphanProfileRuntimes.length;
+  const onlineMachines = machines.filter(
+    (machine) => machine.health === "online",
+  ).length;
+  const queued = machines.reduce((sum, machine) => sum + machine.queuedCount, 0);
+
+  const visibleMachines = machines.filter((machine) => {
+    if (filter === "online" && machine.health !== "online") return false;
+    if (filter === "issues" && machine.health === "online") return false;
+    return machineMatches(machine, query);
+  });
+  const visiblePending =
+    filter === "online"
+      ? []
+      : orphanProfileRuntimes.filter((runtime) => {
+          const q = query.trim().toLowerCase();
+          if (!q) return true;
+          return `${runtime.name} ${runtime.provider}`
+            .toLowerCase()
+            .includes(q);
+        });
+  const visibleCount = visibleMachines.length + visiblePending.length;
+  const machineTotal = machines.length + orphanProfileRuntimes.length;
+  const issueMachines = machineTotal - onlineMachines;
+  const isEmptyWorkspace =
+    machines.length === 0 && orphanProfileRuntimes.length === 0 && !bootstrapping;
+
+  const tabs: { id: MachineFilter; label: string; count: number }[] = [
+    { id: "all", label: t(($) => $.console.list_all), count: machineTotal },
+    { id: "online", label: t(($) => $.console.list_online), count: onlineMachines },
+    { id: "issues", label: t(($) => $.console.list_issues), count: issueMachines },
+  ];
+
+  const copySetupCommand = async () => {
+    const ok = await copyText(DAEMON_SETUP_COMMAND);
+    if (ok) toast.success(t(($) => $.page.command_copied));
+    else toast.error(t(($) => $.machine.copy_failed));
+  };
+
   if (isAuthLoading || runtimesLoading || profilesLoading) {
     return <RuntimesPageSkeleton />;
   }
 
-  const showEmpty =
-    machines.length === 0 &&
-    orphanProfileRuntimes.length === 0 &&
-    !bootstrapping &&
-    hasLocalMachine !== true;
-
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <PageHeaderBar
-        totalCount={machines.length}
-        onConnectRemote={() => setShowConnectDialog(true)}
-      />
-
-      {showEmpty ? (
-        <div className="flex flex-1 items-center justify-center p-6">
-          <EmptyState onConnectRemote={() => setShowConnectDialog(true)} />
-        </div>
-      ) : (
-        <div className="min-h-0 flex-1 overflow-y-auto">
-          <div className="mx-auto flex w-full max-w-[1440px] flex-col p-4 sm:p-6">
-            {!agentsLoading &&
-              !chatSessionsLoading &&
-              memberNeedsMikaSetup(agents, chatSessions) &&
-              runtimes.length > 0 && (
-              <MikaSetupCard
-                workspaceId={wsId}
-                runtimes={runtimes}
-                runtimesLoading={runtimesLoading}
-                currentUserId={currentUserId ?? null}
-              />
-            )}
-            {(machines.length > 0 || bootstrapping) && (
-              <MachineList
-                machines={machines}
-                bootstrapping={bootstrapping}
-              />
-            )}
-            {orphanProfileRuntimes.length > 0 && (
-              <OrphanRuntimeProfiles
-                runtimes={orphanProfileRuntimes}
-                now={now}
-                hasMachines={machines.length > 0}
-              />
-            )}
+    <div className="qw-rt-page">
+      <header className="qw-rt-masthead">
+        <div className="qw-rt-mast-main">
+          <div className="qw-rt-mast-line">
+            <h1>{t(($) => $.page.title)}</h1>
+            <span className="qw-rt-count">
+              <b>{runtimeCount}</b>
+              <span>{t(($) => $.console.list_cap)}</span>
+            </span>
+            <div className="qw-rt-mast-actions">
+              <button
+                type="button"
+                className="qw-rt-create"
+                onClick={() => setShowConnectDialog(true)}
+              >
+                <span className="plus">
+                  <Plus className="size-3" aria-hidden="true" />
+                </span>
+                {t(($) => $.page.connect_remote)}
+              </button>
+            </div>
           </div>
-        </div>
-      )}
-
-      {showConnectDialog && (
-        <ConnectRemoteDialog onClose={() => setShowConnectDialog(false)} />
-      )}
-    </div>
-  );
-}
-
-/**
- * Entry point for creating Mika once a runtime exists.
- *
- * The action opens a picker rather than provisioning straight away. It used to
- * take `runtimes.find(online) ?? runtimes[0]` and create Mika on it silently —
- * but one machine commonly exposes every agent CLI it has installed (nine, on
- * the box this was reported from), so "the first online one" is arbitrary and
- * could well be a CLI the member never intended to run their Chief of Staff
- * on. Onboarding already makes this an explicit choice; this is the same
- * decision reached from a different entry point, so it asks the same way and
- * reuses the same two controls.
- */
-function MikaSetupCard({
-  workspaceId,
-  runtimes,
-  runtimesLoading,
-  currentUserId,
-}: {
-  workspaceId: string;
-  runtimes: AgentRuntime[];
-  runtimesLoading?: boolean;
-  currentUserId: string | null;
-}) {
-  const { t, i18n } = useT("runtimes");
-  const navigation = useNavigation();
-  const paths = useWorkspacePaths();
-  const wsSlug = useRequiredWorkspaceSlug();
-  const bootstrapMika = useBootstrapMika(workspaceId);
-
-  const [open, setOpen] = useState(false);
-  // Seeded with the old heuristic so the dialog opens on a sensible default;
-  // the point is that it is now visible and changeable, not that it is unset.
-  const defaultRuntimeId =
-    runtimes.find((runtime) => runtime.status === "online")?.id ??
-    runtimes[0]?.id ??
-    "";
-  const [choice, setChoice] = useState<MikaRuntimeSelection | null>(null);
-
-  const value: MikaRuntimeSelection = choice ?? {
-    runtimeId: defaultRuntimeId,
-    model: "",
-  };
-  const runtimeId = value.runtimeId;
-
-  const handleStart = async () => {
-    if (!runtimeId || bootstrapMika.isPending) return;
-    const lang = pickContentLang(i18n.language);
-    try {
-      await bootstrapMika.mutateAsync({
-        workspaceSlug: wsSlug,
-        runtimeId,
-        model: value.model || undefined,
-        ...getMikaOnboarding(lang),
-      });
-      setOpen(false);
-      // The greeting run now shows up as work in flight rather than opening
-      // a chat window.
-      navigation.push(paths.root());
-    } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : t(($) => $.mika_setup.failed),
-      );
-    }
-  };
-
-  return (
-    <>
-      <div className="mb-6 flex flex-col gap-4 rounded-xl border bg-card p-5 sm:flex-row sm:items-center">
-        <span
-          role="img"
-          aria-label={t(($) => $.mika_setup.title)}
-          className="flex size-10 shrink-0 select-none items-center justify-center rounded-full bg-muted text-title-lg leading-none"
-        >
-          {MIKA_PLACEHOLDER_EMOJI}
-        </span>
-        <div className="min-w-0 flex-1">
-          <h2 className="text-body font-semibold">
-            {t(($) => $.mika_setup.title)}
-          </h2>
-          <p className="mt-1 text-body leading-relaxed text-muted-foreground">
-            {t(($) => $.mika_setup.description)}
+          <p className="qw-rt-live">
+            <b>{machines.length}</b>
+            {t(($) => $.console.list_machines, { count: machines.length })}
+            <span className="sep">·</span>
+            <b>{onlineMachines}</b>
+            {t(($) => $.console.list_online_unit)}
+            <span className="sep">·</span>
+            <span className="quiet">
+              <b>{boundAgentCount}</b>
+              {t(($) => $.console.list_agents, { count: boundAgentCount })}
+            </span>
+            {queued > 0 ? (
+              <>
+                <span className="sep">·</span>
+                <span className="lamp queued" aria-hidden="true" />
+                <b>{queued}</b>
+                {t(($) => $.console.list_queued, { count: queued })}
+              </>
+            ) : null}
           </p>
         </div>
-        <Button className="shrink-0" onClick={() => setOpen(true)}>
-          {t(($) => $.mika_setup.action)}
-        </Button>
-      </div>
-
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="sm:max-w-[480px]">
-          <DialogHeader>
-            <DialogTitle>{t(($) => $.mika_setup.dialog_title)}</DialogTitle>
-            <DialogDescription>
-              {t(($) => $.mika_setup.dialog_description)}
-            </DialogDescription>
-          </DialogHeader>
-
-          <MikaRuntimeChoice
-            runtimes={runtimes}
-            runtimesLoading={runtimesLoading}
-            currentUserId={currentUserId}
-            value={value}
-            onChange={setChoice}
-            disabled={bootstrapMika.isPending}
-          />
-
-          <DialogFooter>
-            <Button
-              variant="ghost"
-              onClick={() => setOpen(false)}
-              disabled={bootstrapMika.isPending}
-            >
-              {t(($) => $.mika_setup.cancel)}
-            </Button>
-            <Button
-              onClick={handleStart}
-              disabled={!runtimeId || bootstrapMika.isPending}
-            >
-              {bootstrapMika.isPending && (
-                <Loader2 aria-hidden className="size-4 animate-spin" />
-              )}
-              {t(($) => $.mika_setup.action)}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </>
-  );
-}
-
-function OrphanRuntimeProfiles({
-  runtimes,
-  now,
-  hasMachines,
-}: {
-  runtimes: ReturnType<typeof pendingRuntimeFromProfile>[];
-  now: number;
-  hasMachines: boolean;
-}) {
-  const { t } = useT("runtimes");
-  return (
-    <section className={hasMachines ? "mt-6" : undefined}>
-      <div className="mb-3">
-        <h2 className="text-body font-semibold">
-          {t(($) => $.profiles.unassigned_title)}
-        </h2>
-        <p className="mt-1 text-caption text-muted-foreground">
-          {t(($) => $.profiles.unassigned_description)}
-        </p>
-      </div>
-      <div className="overflow-hidden rounded-lg border bg-card">
-        <RuntimeList runtimes={runtimes} now={now} />
-      </div>
-    </section>
-  );
-}
-
-function PageHeaderBar({
-  totalCount,
-  onConnectRemote,
-}: {
-  totalCount: number;
-  onConnectRemote: () => void;
-}) {
-  const { t, i18n } = useT("runtimes");
-  return (
-    <CollectionPageHeader
-      icon={Server}
-      title={t(($) => $.page.title)}
-      count={totalCount}
-      description={t(($) => $.page.tagline)}
-      learnMore={{
-        href: daemonRuntimesDocsHref(i18n.language),
-        label: t(($) => $.page.learn_more),
-      }}
-      actions={
-        <>
-          <CollectionPageHeaderAction
-            icon={Plus}
-            label={t(($) => $.page.connect_remote)}
-            onClick={onConnectRemote}
-          />
-        </>
-      }
-    />
-  );
-}
-
-function MachineList({
-  machines,
-  bootstrapping,
-}: {
-  machines: RuntimeMachine[];
-  bootstrapping?: boolean;
-}) {
-  const { t } = useT("runtimes");
-  if (machines.length === 0) {
-    return (
-      <CollectionPageState
-        icon={Server}
-        title={
-          bootstrapping
-            ? t(($) => $.page.bootstrapping.title)
-            : t(($) => $.page.empty.title)
-        }
-        description={
-          bootstrapping
-            ? t(($) => $.page.bootstrapping.hint)
-            : t(($) => $.page.empty.hint)
-        }
-      />
-    );
-  }
-
-  return (
-    <div className="overflow-hidden rounded-lg border bg-card">
-      <div className="divide-y">
-        {machines.map((machine) => (
-          <MachineRow key={machine.id} machine={machine} />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function MachineRow({ machine }: { machine: RuntimeMachine }) {
-  const { t } = useT("runtimes");
-  const healthLabel = useHealthLabel();
-  const timeAgo = useTimeAgo();
-  const paths = useWorkspacePaths();
-  const Icon = machine.section === "cloud" ? Cloud : Monitor;
-  const locator = machine.id;
-  const busyCount = machine.runningCount + machine.queuedCount;
-  const body = (
-    <>
-      <span className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border bg-background">
-        <Icon aria-hidden="true" className="h-4 w-4 text-muted-foreground" />
-        <HealthDot
-          health={machine.health}
-          className="absolute -bottom-0.5 -right-0.5 ring-2 ring-background"
-        />
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="block truncate text-body font-medium">
-          {machine.title}
-        </span>
-        <span className="mt-1 flex min-w-0 items-center gap-2 text-caption text-muted-foreground">
-          <span className="truncate">
-            {machine.subtitle ??
-              (machine.section === "cloud"
-                ? t(($) => $.machine.metrics.cloud_worker)
-                : t(($) => $.machine.metrics.local_daemon))}
+        <div className="qw-rt-sync">
+          <span className="sync">
+            <i aria-hidden="true" />
+            SYNCED
           </span>
-          {machine.isCurrent && (
-            <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-micro font-medium text-muted-foreground">
-              {t(($) => $.machine.this_machine)}
-            </span>
-          )}
-        </span>
-      </span>
+          <span className="time">
+            {new Intl.DateTimeFormat(undefined, {
+              hour: "2-digit",
+              minute: "2-digit",
+            }).format(new Date(now))}
+          </span>
+          <span className="hint">{t(($) => $.console.list_sync_hint)}</span>
+        </div>
+      </header>
 
-      <span className="hidden w-36 shrink-0 items-center gap-1.5 text-caption md:flex">
-        <HealthIcon health={machine.health} />
-        <span>{healthLabel(machine.health)}</span>
-      </span>
-      <span className="hidden w-40 shrink-0 flex-col gap-1 lg:flex">
-        <span className="text-caption text-muted-foreground">
-          {t(($) => $.machine.runtime_count, {
-            count: machine.runtimes.length,
-          })}
-        </span>
-        <ProviderIconStack providers={machine.providerNames} />
-      </span>
-      <span className="hidden w-36 shrink-0 text-caption text-muted-foreground xl:block">
-        {busyCount > 0
-          ? t(($) => $.machine.metrics.workload_hint, {
-              running: machine.runningCount,
-              queued: machine.queuedCount,
-            })
-          : t(($) => $.machine.metrics.workload_idle)}
-      </span>
-      <span className="hidden w-28 shrink-0 text-right text-caption text-muted-foreground lg:block">
-        {machine.lastSeenAt ? timeAgo(machine.lastSeenAt) : "—"}
-      </span>
-      {locator && (
-        <ChevronRight
-          aria-hidden="true"
-          className="h-4 w-4 shrink-0 text-faint-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-muted-foreground"
-        />
-      )}
-    </>
-  );
+      <div className="qw-rt-toolbar">
+        <div className="qw-rt-tabs" role="tablist" aria-label={t(($) => $.console.list_tabs_aria)}>
+          {tabs.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              role="tab"
+              aria-selected={filter === tab.id}
+              className="qw-rt-tab"
+              data-on={filter === tab.id ? "" : undefined}
+              onClick={() => setFilter(tab.id)}
+            >
+              {tab.label}
+              <em>{tab.count}</em>
+            </button>
+          ))}
+        </div>
+        <div className="qw-rt-toolbar-right">
+          <label className="qw-rt-search">
+            <Search className="size-3" aria-hidden="true" />
+            <input
+              type="search"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Escape") setQuery("");
+              }}
+              placeholder={t(($) => $.console.list_search_placeholder)}
+              aria-label={t(($) => $.console.list_search_aria)}
+              autoComplete="off"
+            />
+          </label>
+        </div>
+      </div>
 
-  return (
-    <AppLink
-      href={paths.runtimeDetail(locator)}
-      className="group flex min-w-0 items-center gap-3 px-4 py-3.5 transition-colors hover:bg-accent/40 focus-visible:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
-    >
-      {body}
-    </AppLink>
-  );
-}
+      <div className="qw-rt-board">
+        <div className="qw-rt-thead">
+          <span>{t(($) => $.console.list_col_machine)}</span>
+          <span className="th-mode">{t(($) => $.console.list_col_mode)}</span>
+          <span className="th-runtimes">{t(($) => $.console.list_col_runtimes)}</span>
+          <span className="th-agents">{t(($) => $.console.list_col_agents)}</span>
+          <span className="th-workload">{t(($) => $.console.list_col_workload)}</span>
+          <span className="th-state">{t(($) => $.console.list_col_state)}</span>
+          <span />
+        </div>
 
-function ProviderIconStack({ providers }: { providers: string[] }) {
-  const visible = providers.slice(0, 4);
-  const extra = providers.length - visible.length;
-  if (visible.length === 0) return null;
-  return (
-    <span className="flex min-w-0 items-center -space-x-1">
-      {visible.map((provider) => (
-        <span
-          key={provider}
-          className="inline-flex h-5 w-5 items-center justify-center rounded bg-background ring-1 ring-border"
-        >
-          <ProviderLogo provider={provider} className="h-3.5 w-3.5" />
-        </span>
-      ))}
-      {extra > 0 && (
-        <span className="inline-flex h-5 min-w-5 items-center justify-center rounded bg-muted px-1 text-micro font-medium text-muted-foreground ring-1 ring-border">
-          +{extra}
-        </span>
-      )}
-    </span>
-  );
-}
+        {isEmptyWorkspace ? (
+          <div className="qw-rt-empty">
+            <Monitor aria-hidden="true" className="size-6" />
+            <h3>{t(($) => $.page.empty.title)}</h3>
+            <p>{t(($) => $.page.empty.hint)}</p>
+            <button type="button" onClick={() => setShowConnectDialog(true)}>
+              {t(($) => $.page.connect_remote)}
+            </button>
+          </div>
+        ) : visibleCount === 0 && !bootstrapping ? (
+          <div className="qw-rt-empty">
+            <p>{t(($) => $.console.list_no_matches)}</p>
+            <button
+              type="button"
+              onClick={() => {
+                setFilter("all");
+                setQuery("");
+              }}
+            >
+              {t(($) => $.console.list_clear)}
+            </button>
+          </div>
+        ) : (
+          <>
+            {visibleMachines.map((machine) => {
+              const Icon = machine.section === "cloud" ? Cloud : Monitor;
+              const busyCount = machine.runningCount + machine.queuedCount;
+              const totalAgents = agentCountFor(machine, workloadIndex);
+              const modeLabel =
+                machine.section === "cloud"
+                  ? t(($) => $.machine.section_cloud)
+                  : machine.section === "remote"
+                    ? t(($) => $.machine.section_remote)
+                    : t(($) => $.machine.section_local);
+              const details = [
+                machine.daemonId ? `daemon ${machine.daemonId}` : null,
+                machine.subtitle ?? machine.deviceInfo,
+              ]
+                .filter((part): part is string => !!part)
+                .join(" · ");
+              const shownProviders = Array.from(
+                new Set(machine.runtimes.map((runtime) => runtime.provider)),
+              ).slice(0, 3);
+              return (
+                <div
+                  key={machine.id}
+                  role="link"
+                  tabIndex={0}
+                  className="qw-rt-row"
+                  data-offline={machine.health !== "online" ? "" : undefined}
+                  aria-label={t(($) => $.console.list_open_machine, {
+                    name: machine.title,
+                  })}
+                  onClick={() => navigation.push(paths.runtimeDetail(machine.id))}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      navigation.push(paths.runtimeDetail(machine.id));
+                    }
+                  }}
+                >
+                  <span className="qw-rt-machine">
+                    <span className="qw-rt-machine-mark">
+                      <Icon aria-hidden="true" />
+                    </span>
+                    <span className="qw-rt-machine-main">
+                      <span className="qw-rt-machine-name">
+                        {machine.title}
+                        {machine.isCurrent ? (
+                          <em className="qw-rt-this">
+                            {t(($) => $.machine.this_machine)}
+                          </em>
+                        ) : null}
+                      </span>
+                      <span className="qw-rt-machine-sub">
+                        {details ||
+                          (machine.section === "cloud"
+                            ? t(($) => $.machine.metrics.cloud_worker)
+                            : t(($) => $.machine.metrics.local_daemon))}
+                      </span>
+                    </span>
+                  </span>
 
-function EmptyState({ onConnectRemote }: { onConnectRemote: () => void }) {
-  const { t } = useT("runtimes");
-  return (
-    <CollectionPageState
-      icon={Server}
-      title={t(($) => $.page.empty.title)}
-      description={t(($) => $.page.empty.hint)}
-      actions={
-        <Button type="button" size="sm" onClick={onConnectRemote}>
-          <Plus aria-hidden="true" className="size-3" />
-          {t(($) => $.page.connect_remote)}
-        </Button>
-      }
-    />
+                  <span className="qw-rt-mode" data-mode={machine.section}>
+                    {modeLabel}
+                  </span>
+
+                  <span className="qw-rt-runtime-stack">
+                    {machine.runtimes.length === 0 ? (
+                      <span className="qw-rt-muted">
+                        {t(($) => $.console.list_no_runtimes)}
+                      </span>
+                    ) : (
+                      <>
+                        <span className="qw-rt-logos" aria-hidden="true">
+                          {shownProviders.map((provider) => (
+                            <span key={provider} className="qw-rt-logo">
+                              <ProviderLogo provider={provider} className="size-[14px]" />
+                            </span>
+                          ))}
+                        </span>
+                        <span className="qw-rt-runtime-names">
+                          {machine.runtimes
+                            .slice(0, 2)
+                            .map((runtime) => runtimeRowLabel(runtime, machine.title))
+                            .join(" · ")}
+                          {machine.runtimes.length > 2
+                            ? ` +${machine.runtimes.length - 2}`
+                            : ""}
+                        </span>
+                      </>
+                    )}
+                  </span>
+
+                  <span className="qw-rt-num">{totalAgents}</span>
+
+                  <span className="qw-rt-workload">
+                    {busyCount > 0
+                      ? t(($) => $.console.list_workload, {
+                          running: machine.runningCount,
+                          queued: machine.queuedCount,
+                        })
+                      : t(($) => $.machine.metrics.workload_idle)}
+                  </span>
+
+                  <span
+                    className="qw-rt-state"
+                    data-health={machine.health}
+                  >
+                    <i aria-hidden="true" />
+                    {healthLabel(machine.health)}
+                    <em>
+                      {machine.lastSeenAt ? timeAgo(machine.lastSeenAt) : "—"}
+                    </em>
+                  </span>
+
+                  <span className="qw-rt-go">
+                    <ArrowRight className="size-3" aria-hidden="true" />
+                  </span>
+                </div>
+              );
+            })}
+
+            {visiblePending.length > 0 ? (
+              <>
+                <div className="qw-rt-pending-head">
+                  <span>{t(($) => $.profiles.unassigned_title)}</span>
+                  <em>{visiblePending.length}</em>
+                </div>
+                {visiblePending.map((runtime) => (
+                  <div key={runtime.id} className="qw-rt-row pending">
+                    <span className="qw-rt-machine">
+                      <span className="qw-rt-machine-mark">
+                        <Cloud aria-hidden="true" />
+                      </span>
+                      <span className="qw-rt-machine-main">
+                        <span className="qw-rt-machine-name">{runtime.name}</span>
+                        <span className="qw-rt-machine-sub">
+                          {t(($) => $.console.list_pending_hint)}
+                        </span>
+                      </span>
+                    </span>
+                    <span className="qw-rt-mode" data-mode="cloud">
+                      {t(($) => $.machine.section_cloud)}
+                    </span>
+                    <span className="qw-rt-runtime-stack">
+                      <span className="qw-rt-logos" aria-hidden="true">
+                        <span className="qw-rt-logo">
+                          <ProviderLogo provider={runtime.provider} className="size-[14px]" />
+                        </span>
+                      </span>
+                      <span className="qw-rt-runtime-names">{runtime.provider}</span>
+                    </span>
+                    <span className="qw-rt-num">0</span>
+                    <span className="qw-rt-workload">
+                      {t(($) => $.machine.metrics.workload_idle)}
+                    </span>
+                    <span className="qw-rt-state" data-health="recently_lost">
+                      <i aria-hidden="true" />
+                      {t(($) => $.console.list_pending_state)}
+                      <em>—</em>
+                    </span>
+                    <span className="qw-rt-go" />
+                  </div>
+                ))}
+              </>
+            ) : null}
+
+            {bootstrapping && machines.length === 0 ? (
+              <div className="qw-rt-boot">
+                <i aria-hidden="true" />
+                <span>{t(($) => $.console.list_bootstrapping)}</span>
+              </div>
+            ) : null}
+
+            <div className="qw-rt-add">
+              <span className="qw-rt-add-icon">
+                <Plus className="size-3.5" aria-hidden="true" />
+              </span>
+              <span className="qw-rt-add-main">
+                <b>{t(($) => $.page.add_machine_title)}</b>
+                <span>{t(($) => $.page.add_machine_hint)}</span>
+              </span>
+              <code>{DAEMON_SETUP_COMMAND}</code>
+              <button type="button" className="qw-rt-textbtn" onClick={copySetupCommand}>
+                <Copy className="size-3" aria-hidden="true" />
+                {t(($) => $.page.copy_command)}
+              </button>
+              <button
+                type="button"
+                className="qw-rt-add-btn"
+                onClick={() => setShowConnectDialog(true)}
+              >
+                {t(($) => $.page.connect_remote)}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+
+      <footer className="qw-rt-pager">
+        <span className="sum">
+          {visibleCount === machineTotal
+            ? `${machines.length} ${t(($) => $.console.list_machines, { count: machines.length })} · ${runtimeCount} ${t(($) => $.console.stat_runtimes, { count: runtimeCount })} · ${boundAgentCount} ${t(($) => $.console.list_agents, { count: boundAgentCount })} · ${onlineMachines} ${t(($) => $.console.list_online_unit)}`
+            : `${t(($) => $.console.list_footer_showing, { shown: visibleCount, total: machineTotal })} · ${runtimeCount} ${t(($) => $.console.stat_runtimes, { count: runtimeCount })} · ${onlineMachines} ${t(($) => $.console.list_online_unit)}`}
+        </span>
+        <span className="grow" />
+        <span className="sum">{t(($) => $.console.list_footer_hint)}</span>
+      </footer>
+
+      {showConnectDialog ? (
+        <ConnectRemoteDialog onClose={() => setShowConnectDialog(false)} />
+      ) : null}
+    </div>
   );
 }
 
 function RuntimesPageSkeleton() {
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <PageHeader>
-        <Skeleton className="h-4 w-24" />
-      </PageHeader>
-      <div className="mx-auto w-full max-w-[1440px] p-6">
-        <div className="overflow-hidden rounded-lg border">
-          {Array.from({ length: 5 }).map((_, index) => (
-            <div key={index} className="flex h-[76px] items-center gap-3 border-b px-4 last:border-b-0">
-              <Skeleton className="h-10 w-10 rounded-lg" />
-              <div className="flex-1">
-                <Skeleton className="h-4 w-44" />
-                <Skeleton className="mt-2 h-3 w-28" />
-              </div>
-              <Skeleton className="hidden h-4 w-24 md:block" />
-              <Skeleton className="hidden h-4 w-28 lg:block" />
-            </div>
-          ))}
+    <div className="qw-rt-page">
+      <div className="qw-rt-masthead">
+        <div className="qw-rt-mast-main">
+          <Skeleton className="h-9 w-40" />
+          <Skeleton className="mt-2 h-3 w-64" />
         </div>
+      </div>
+      <div className="qw-rt-board">
+        {Array.from({ length: 4 }).map((_, index) => (
+          <div key={index} className="qw-rt-row">
+            <Skeleton className="h-8 w-64" />
+            <Skeleton className="h-3 w-12" />
+            <Skeleton className="h-3 w-32" />
+            <Skeleton className="h-3 w-8" />
+            <Skeleton className="h-3 w-24" />
+            <Skeleton className="h-3 w-20" />
+          </div>
+        ))}
       </div>
     </div>
   );

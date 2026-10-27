@@ -85,4 +85,4 @@ __pycache__/
 # local-only design workspace and dev tooling
 docs/mockups/
 e2e/_shot.spec.ts
-scripts/import-multica-fixtures.sh
+scripts/import-legacy-fixtures.sh

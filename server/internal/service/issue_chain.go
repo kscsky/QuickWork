@@ -19,21 +19,26 @@ import (
 // the ordered steps, who holds each one, and what happens when the person
 // whose turn it is has no agent to run it.
 //
-// Two states carry the whole idea:
+// Three states carry the whole idea:
 //
-//	doing  — this step's agent is running right now
-//	parked — the relay reached this person and they have not bound an agent,
-//	         so nothing runs and the task waits. Not an error, not a skip.
+//	doing     — this step's agent is running right now
+//	reviewing — the run is over and the step waits on its holder's own 通过.
+//	            A run can finish wrong; the person who owns the leg is the one
+//	            who says whether it finished right, and only their approval
+//	            hands the baton on (owner's model, 2026-10-14).
+//	parked    — the relay reached this person and they have not bound an agent,
+//	            so nothing runs and the task waits. Not an error, not a skip.
 //
 // Step 0 is always the squad's leading person, because that is who a squad
 // dispatch already goes to. The chain describes the hand-offs AFTER them.
 
 const (
-	ChainStatePending = "pending"
-	ChainStateDoing   = "doing"
-	ChainStateDone    = "done"
-	ChainStateParked  = "parked"
-	ChainStateSkipped = "skipped"
+	ChainStatePending   = "pending"
+	ChainStateDoing     = "doing"
+	ChainStateReviewing = "reviewing"
+	ChainStateDone      = "done"
+	ChainStateParked    = "parked"
+	ChainStateSkipped   = "skipped"
 )
 
 // ChainStepSpec is one authored step, before it has been resolved to an agent.
@@ -45,6 +50,27 @@ type ChainStepSpec struct {
 	// from their current binding. A per-dispatch choice rather than a squad
 	// default: which agent to use is a decision about THIS task.
 	AgentID string `json:"agent_id,omitempty"`
+}
+
+// ChainHandoffFile is one entry of a leg's handoff package. Deliberately loose:
+// a file the leg produced is named by whatever pointer the holder curates —
+// an attachment id when it uploaded one, a branch name when the run delivered
+// on one — and unknown kinds from a newer client must render, not reject.
+type ChainHandoffFile struct {
+	Name string `json:"name"`
+	Size int64  `json:"size,omitempty"`
+	// AttachmentID links back to an uploaded attachment when the entry is one.
+	AttachmentID string `json:"attachment_id,omitempty"`
+	// Kind is the entry's flavour ("attachment", "branch", "").
+	Kind string `json:"kind,omitempty"`
+}
+
+// ChainHandoff is the package a leg publishes on 通过: the files the holder
+// ticked plus the summary they wrote. What crosses the leg boundary is the
+// holder's call — this is the curated side of the leg, not its raw content.
+type ChainHandoff struct {
+	Summary string             `json:"summary"`
+	Files   []ChainHandoffFile `json:"files"`
 }
 
 // InstantiateChain writes a task's chain and starts its first step.
@@ -117,6 +143,9 @@ func (s *TaskService) InstantiateChain(
 		steps = append(steps, step)
 		position++
 	}
+	// The relay has started (step 0 is doing): the task is now in progress,
+	// wherever it was parked before the squad got it.
+	s.syncRelayStatus(ctx, q, issue.ID)
 	return steps, nil
 }
 
@@ -206,19 +235,133 @@ func (s *TaskService) AdvanceChain(ctx context.Context, q *db.Queries, issueID p
 	}
 
 	if steps[current].State == ChainStateDoing {
-		if _, err := q.SetIssueChainStepState(ctx, db.SetIssueChainStepStateParams{
+		// The run is over, the leg is not: the relay stops on the holder's
+		// own review. ApproveChainStep is what carries it on from here.
+		reviewing, err := q.SetIssueChainStepState(ctx, db.SetIssueChainStepStateParams{
 			IssueID:  issueID,
 			Position: steps[current].Position,
-			State:    ChainStateDone,
+			State:    ChainStateReviewing,
+		})
+		if err != nil {
+			return nil, err
+		}
+		return &reviewing, nil
+	}
+
+	next, err := s.startNextStep(ctx, q, issueID, steps, current)
+	if err != nil {
+		return nil, err
+	}
+	// `next` is a started step, a freshly parked one, or nil (chain over) —
+	// all three are status transitions the projection must follow.
+	s.syncRelayStatus(ctx, q, issueID)
+	return next, nil
+}
+
+// ApproveChainStep is the holder's own 通过 — the last thing a leg needs before
+// the baton moves. The run finishing only parked the step in `reviewing`; this
+// is the person saying the output is what they meant to hand over.
+//
+// Only the step's holder may approve. That single rule is the permission the
+// personal-view relay hangs on ("只有这一棒的负责人能点通过"), so it lives here
+// rather than in the UI.
+func (s *TaskService) ApproveChainStep(ctx context.Context, q *db.Queries, issue db.Issue, holderID pgtype.UUID, handoff *ChainHandoff) (*db.IssueChainStep, error) {
+	steps, err := q.ListIssueChainSteps(ctx, issue.ID)
+	if err != nil {
+		return nil, err
+	}
+	if len(steps) == 0 {
+		return nil, ErrNoChain
+	}
+	current := -1
+	for i, step := range steps {
+		if step.State == ChainStateReviewing {
+			current = i
+			break
+		}
+	}
+	if current < 0 {
+		return nil, ErrNoReviewingStep
+	}
+	if steps[current].HolderUserID != holderID {
+		return nil, ErrNotStepHolder
+	}
+	// The handoff package lands before the state moves: the approve response
+	// carries the chain as it now stands, and readers of the finished leg must
+	// see the package in the same read that shows it done.
+	if handoff != nil {
+		filesJSON, err := json.Marshal(handoff.Files)
+		if err != nil {
+			return nil, err
+		}
+		if handoff.Files == nil {
+			filesJSON = []byte("[]")
+		}
+		if _, err := q.SetIssueChainStepHandoff(ctx, db.SetIssueChainStepHandoffParams{
+			IssueID:        issue.ID,
+			Position:       steps[current].Position,
+			HandoffSummary: handoff.Summary,
+			HandoffFiles:   filesJSON,
 		}); err != nil {
 			return nil, err
 		}
-		// Keep the local slice in the state the database now holds: the move
-		// below checks that the step being left behind actually finished.
-		steps[current].State = ChainStateDone
 	}
+	if _, err := q.SetIssueChainStepState(ctx, db.SetIssueChainStepStateParams{
+		IssueID:  issue.ID,
+		Position: steps[current].Position,
+		State:    ChainStateDone,
+	}); err != nil {
+		return nil, err
+	}
+	steps[current].State = ChainStateDone
+	next, err := s.startNextStep(ctx, q, issue.ID, steps, current)
+	if err != nil {
+		return nil, err
+	}
+	if next != nil {
+		s.dispatchChainStep(ctx, issue, *next)
+	}
+	s.syncRelayStatus(ctx, q, issue.ID)
+	return next, nil
+}
 
-	return s.startNextStep(ctx, q, issueID, steps, current)
+// SetChainStepPlan records the holder's own brief for their leg.
+//
+// The brief belongs to the person whose turn this is (or is about to be).
+// The next person is handed the previous leg's OUTPUT — never a brief written
+// on their behalf — which is what makes the view personal. Writing somebody
+// else's leg is refused here, not in the UI.
+func (s *TaskService) SetChainStepPlan(ctx context.Context, q *db.Queries, issue db.Issue, holderID pgtype.UUID, plan string) (*db.IssueChainStep, error) {
+	steps, err := q.ListIssueChainSteps(ctx, issue.ID)
+	if err != nil {
+		return nil, err
+	}
+	if len(steps) == 0 {
+		return nil, ErrNoChain
+	}
+	mine := -1
+	for i, step := range steps {
+		if step.HolderUserID != holderID {
+			continue
+		}
+		if step.State == ChainStateDone || step.State == ChainStateSkipped {
+			continue
+		}
+		mine = i
+		break
+	}
+	if mine < 0 {
+		return nil, ErrNotStepHolder
+	}
+	saved, err := q.SetIssueChainStepPlan(ctx, db.SetIssueChainStepPlanParams{
+		IssueID:  issue.ID,
+		Position: steps[mine].Position,
+		Plan:     plan,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &saved, nil
 }
 
 // SkipParkedStep moves the relay past a parked step and carries it on.
@@ -260,6 +403,7 @@ func (s *TaskService) SkipParkedStep(ctx context.Context, q *db.Queries, issue d
 	if next != nil {
 		s.dispatchChainStep(ctx, issue, *next)
 	}
+	s.syncRelayStatus(ctx, q, issue.ID)
 	return next, nil
 }
 
@@ -368,6 +512,8 @@ func (s *TaskService) ResumeParkedChain(ctx context.Context, q *db.Queries, squa
 			continue
 		}
 		s.publishChainChanged(issue)
+		// Parking put this task on `blocked`; the resume is what takes it off.
+		s.syncRelayStatus(ctx, q, step.IssueID)
 		slog.Info("issue chain resumed after its holder bound an agent",
 			"issue_id", util.UUIDToString(step.IssueID),
 			"position", step.Position)
@@ -386,6 +532,14 @@ type ChainHolder struct {
 // ErrNoChain reports that an issue has no relay, which is the normal state for
 // a task dispatched straight to one agent.
 var ErrNoChain = errors.New("issue has no chain")
+
+// ErrNoReviewingStep reports that no step is waiting for its holder's review.
+var ErrNoReviewingStep = errors.New("no step is waiting for review")
+
+// ErrNotStepHolder reports that the caller is not the person whose turn it is.
+// The relay's permission boundary: only a leg's holder writes its plan and
+// only they approve it.
+var ErrNotStepHolder = errors.New("only the step's holder can do that")
 
 // ErrNoParkedStep reports that nothing in the chain is waiting on a person, so
 // there is no step to skip.
@@ -479,6 +633,77 @@ func (s *TaskService) dispatchChainStep(ctx context.Context, issue db.Issue, nex
 // publishChainChanged tells the workspace a relay moved. A pointer, not a
 // copy: a chain strip on anyone's screen refetches the server's own answer
 // instead of being patched with one client's guess.
+// syncRelayStatus derives the issue's status from the chain and writes it.
+//
+// A squad task does not get a hand-set status: the relay IS the status
+// machine. Every transition — first leg starts, a leg parks the relay, the
+// last leg passes — lands here, so `issue.status` stays a faithful projection
+// of the chain for the surfaces that still speak status (list filters, inbox,
+// the stuck-issue sweeper) without anyone setting it by hand. The page itself
+// speaks in relay terms; this column is the translation layer.
+//
+// Two writes are refused on purpose: a cancelled task is never resurrected by
+// a late chain event, and a task a human marked done is not dragged back to
+// in_progress — the relay may still be mid-flight in both cases, and the
+// person's word outranks the projection.
+func (s *TaskService) syncRelayStatus(ctx context.Context, q *db.Queries, issueID pgtype.UUID) {
+	steps, err := q.ListIssueChainSteps(ctx, issueID)
+	if err != nil || len(steps) == 0 {
+		return
+	}
+	issue, err := q.GetIssue(ctx, issueID)
+	if err != nil {
+		slog.Warn("relay status sync could not load its issue",
+			"issue_id", util.UUIDToString(issueID), "error", err)
+		return
+	}
+	if issue.Status == "cancelled" || issue.Status == "done" {
+		return
+	}
+
+	parked := false
+	allDelivered := true
+	for _, step := range steps {
+		switch step.State {
+		case ChainStateParked:
+			parked = true
+			allDelivered = false
+		case ChainStateDone, ChainStateSkipped:
+			// delivered
+		default:
+			allDelivered = false
+		}
+	}
+	target := "in_progress"
+	if parked {
+		// A parked step is the relay's honest "stuck on someone" — the same
+		// meaning `blocked` carries for every other surface (the sweeper will
+		// not reset it, the board paints it red).
+		target = "blocked"
+	} else if allDelivered {
+		target = "done"
+	}
+	if issue.Status == target {
+		return
+	}
+
+	updated, err := q.UpdateIssueStatus(ctx, db.UpdateIssueStatusParams{
+		ID:          issueID,
+		Status:      target,
+		WorkspaceID: issue.WorkspaceID,
+	})
+	if err != nil {
+		slog.Warn("relay status sync failed",
+			"issue_id", util.UUIDToString(issueID),
+			"from", issue.Status, "to", target, "error", err)
+		return
+	}
+	// Mirrors the stuck-issue sweeper's direct write: the HTTP handler that
+	// normally emits issue:updated is bypassed, so emit it here or boards and
+	// status-filtered lists keep the old value until some unrelated write.
+	s.broadcastIssueUpdated(ctx, updated, issue.Status)
+}
+
 func (s *TaskService) publishChainChanged(issue db.Issue) {
 	workspaceID := util.UUIDToString(issue.WorkspaceID)
 	if workspaceID == "" {

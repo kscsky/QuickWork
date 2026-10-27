@@ -34,7 +34,7 @@ describe("resolvePostAuthDestination", () => {
   it("onboarded + workspace[0] → /<first.slug>/dispatch (the workspace home)", () => {
     const ws = [makeWs("acme"), makeWs("beta")];
     expect(resolvePostAuthDestination(ws, true)).toBe(
-      paths.workspace("acme").dispatch(),
+      paths.workspace("acme").tasks(),
     );
   });
 

@@ -2184,8 +2184,8 @@ func (h *Handler) buildClaimedTaskResponse(r *http.Request, task *db.AgentTaskQu
 	//
 	// Composing here covers every task kind, because this is the single
 	// place a claimed task's agent payload is assembled.
-	if agent.SystemKey.String == service.MikaSystemKey {
-		resp.Agent.Instructions = service.ComposeMikaInstructions(agent.Name, agent.Instructions)
+	if agent.SystemKey.String == service.QuillSystemKey {
+		resp.Agent.Instructions = service.ComposeQuillInstructions(agent.Name, agent.Instructions)
 	}
 	if useSkillRefs {
 		_, skillRefs, err := h.TaskService.LoadAgentSkillBundles(r.Context(), task.AgentID)
@@ -2307,7 +2307,37 @@ func (h *Handler) buildClaimedTaskResponse(r *http.Request, task *db.AgentTaskQu
 		// (No FK on squad_id — see migration 127.) We append (not replace)
 		// so per-agent instructions stay authoritative; the squad briefing
 		// stacks on top as task-specific squad context.
-		if task.IsLeaderTask {
+		//
+		// Relay issues never take this path. On an issue with a chain the
+		// coordinator protocol ("delegate by @mention, do not do the work")
+		// contradicts the relay: each leg's agent does its own leg's work and
+		// the baton moves on the holder's 通过. The leg's own agent gets the
+		// relay leg briefing instead, and any leader-flagged task degrades to
+		// an ordinary worker turn — the chain is the coordinator.
+		relaySteps, relayErr := h.Queries.ListIssueChainSteps(r.Context(), issue.ID)
+		hasRelay := relayErr == nil && len(relaySteps) > 0
+		if resp.Agent != nil && hasRelay {
+			if briefing, ok := buildRelayLegBriefing(r.Context(), h.Queries, issue, relaySteps, resp.Agent.ID); ok {
+				if strings.TrimSpace(resp.Agent.Instructions) == "" {
+					resp.Agent.Instructions = briefing
+				} else {
+					resp.Agent.Instructions = resp.Agent.Instructions + "\n\n" + briefing
+				}
+				slog.Debug("injected relay leg briefing",
+					"issue_id", uuidToString(issue.ID),
+					"agent_id", resp.Agent.ID,
+					"steps", len(relaySteps),
+				)
+			}
+			if task.IsLeaderTask {
+				resp.IsLeaderTask = false
+				slog.Debug("relay issue: leader flag cleared, chain coordinates",
+					"task_id", uuidToString(task.ID),
+					"issue_id", uuidToString(issue.ID),
+				)
+			}
+		}
+		if task.IsLeaderTask && !hasRelay {
 			injected := false
 			if resp.Agent != nil && task.SquadID.Valid {
 				if squad, err := h.Queries.GetSquadInWorkspace(r.Context(), db.GetSquadInWorkspaceParams{
@@ -4020,6 +4050,7 @@ func (h *Handler) reconcileCommentsOnCompletion(ctx context.Context, task *db.Ag
 			ExcludeTriggerCommentID:            c.ID,
 			OriginatorUserID:                   originatorUserID,
 			AutopilotDelegationAuthorityUserID: delegationAuthority,
+			ChainStepID:                        c.ChainStepID,
 		})
 		// For an AGENT author, compensate ONLY explicit @agent/@squad mentions.
 		// computeCommentAgentTriggers can also return the assigned-squad-leader
@@ -4512,13 +4543,24 @@ func (h *Handler) failTask(w http.ResponseWriter, r *http.Request, taskID, works
 // Task Messages (live agent output)
 // ---------------------------------------------------------------------------
 
+// TaskMessageUsage is one assistant turn's token delta, carried on the message
+// the turn's usage belongs to. All-zero means "not reported" (an older daemon,
+// or a provider without per-turn metering) — never render a fake zero.
+type TaskMessageUsage struct {
+	InputTokens      int64 `json:"input_tokens"`
+	OutputTokens     int64 `json:"output_tokens"`
+	CacheReadTokens  int64 `json:"cache_read_tokens"`
+	CacheWriteTokens int64 `json:"cache_write_tokens"`
+}
+
 type TaskMessageRequest struct {
-	Seq     int            `json:"seq"`
-	Type    string         `json:"type"`
-	Tool    string         `json:"tool,omitempty"`
-	Content string         `json:"content,omitempty"`
-	Input   map[string]any `json:"input,omitempty"`
-	Output  string         `json:"output,omitempty"`
+	Seq     int               `json:"seq"`
+	Type    string            `json:"type"`
+	Tool    string            `json:"tool,omitempty"`
+	Content string            `json:"content,omitempty"`
+	Input   map[string]any    `json:"input,omitempty"`
+	Output  string            `json:"output,omitempty"`
+	Usage   *TaskMessageUsage `json:"usage,omitempty"`
 }
 
 type TaskMessageBatchRequest struct {
@@ -4623,6 +4665,14 @@ func (h *Handler) ReportTaskMessages(w http.ResponseWriter, r *http.Request) {
 			inputJSON = string(encoded)
 		}
 
+		var inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens int64
+		if msg.Usage != nil {
+			inputTokens = msg.Usage.InputTokens
+			outputTokens = msg.Usage.OutputTokens
+			cacheReadTokens = msg.Usage.CacheReadTokens
+			cacheWriteTokens = msg.Usage.CacheWriteTokens
+		}
+
 		params.Ids = append(params.Ids, pgtype.UUID{Bytes: [16]byte(id), Valid: true})
 		params.Seqs = append(params.Seqs, int32(msg.Seq))
 		params.Types = append(params.Types, msg.Type)
@@ -4630,6 +4680,10 @@ func (h *Handler) ReportTaskMessages(w http.ResponseWriter, r *http.Request) {
 		params.Contents = append(params.Contents, msg.Content)
 		params.Inputs = append(params.Inputs, inputJSON)
 		params.Outputs = append(params.Outputs, msg.Output)
+		params.InputTokens = append(params.InputTokens, inputTokens)
+		params.OutputTokens = append(params.OutputTokens, outputTokens)
+		params.CacheReadTokens = append(params.CacheReadTokens, cacheReadTokens)
+		params.CacheWriteTokens = append(params.CacheWriteTokens, cacheWriteTokens)
 	}
 
 	created, err := h.Queries.CreateTaskMessages(r.Context(), params)
@@ -4768,6 +4822,15 @@ func taskMessageToPayload(m db.TaskMessage, taskID, issueID string) protocol.Tas
 	if m.CreatedAt.Valid {
 		createdAt = m.CreatedAt.Time.UTC().Format(time.RFC3339Nano)
 	}
+	var usage *protocol.TaskMessageUsage
+	if m.InputTokens != 0 || m.OutputTokens != 0 || m.CacheReadTokens != 0 || m.CacheWriteTokens != 0 {
+		usage = &protocol.TaskMessageUsage{
+			InputTokens:      m.InputTokens,
+			OutputTokens:     m.OutputTokens,
+			CacheReadTokens:  m.CacheReadTokens,
+			CacheWriteTokens: m.CacheWriteTokens,
+		}
+	}
 	return protocol.TaskMessagePayload{
 		TaskID:    taskID,
 		IssueID:   issueID,
@@ -4777,6 +4840,7 @@ func taskMessageToPayload(m db.TaskMessage, taskID, issueID string) protocol.Tas
 		Content:   m.Content.String,
 		Input:     input,
 		Output:    m.Output.String,
+		Usage:     usage,
 		CreatedAt: createdAt,
 	}
 }

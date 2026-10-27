@@ -492,7 +492,10 @@ func (h *Handler) ListPluginComments(w http.ResponseWriter, r *http.Request) {
 	comments, err := h.Queries.ListCommentsForIssue(r.Context(), db.ListCommentsForIssueParams{
 		IssueID:     issue.ID,
 		WorkspaceID: caller.WorkspaceID,
-		Limit:       maxPluginCommentsPerRead,
+		// The plugin reads with the caller's seat: leg interiors it does not
+		// hold are as invisible to it as they are to that person in the UI.
+		ViewerID:  caller.UserID,
+		RowLimit:  maxPluginCommentsPerRead,
 	})
 	if err != nil {
 		publicapiv1.WriteProblem(w, r, http.StatusInternalServerError, "internal_error", "failed to list comments")

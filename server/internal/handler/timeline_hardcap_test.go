@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"github.com/jackc/pgx/v5/pgtype"
 	"context"
 	"encoding/json"
 	"net/http"
@@ -514,7 +515,8 @@ func TestListCommentsForIssue_KeepsNewestWindow(t *testing.T) {
 	rows, err := testHandler.Queries.ListCommentsForIssue(context.Background(), db.ListCommentsForIssueParams{
 		IssueID:     issueUUID,
 		WorkspaceID: wsUUID,
-		Limit:       limit,
+		ViewerID:    pgtype.UUID{}, // no viewer: room comments only, which is all this fixture writes
+		RowLimit:    limit,
 	})
 	if err != nil {
 		t.Fatalf("ListCommentsForIssue: %v", err)

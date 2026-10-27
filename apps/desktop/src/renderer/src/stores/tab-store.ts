@@ -22,7 +22,7 @@ import { isReservedSlug } from "@quickwork/core/paths";
  *
  * `contentKey` is an optional fingerprint of the rendered content, used by
  * out-of-DOM scroll sources (the sandboxed HTML-attachment iframe — see
- * multica-ai#6405) to invalidate restoration when the content changed
+ * upstream#6405) to invalidate restoration when the content changed
  * (re-upload to the same attachment id). Plain `[data-tab-scroll-root]`
  * containers leave it undefined; identity comparison (undefined ===
  * undefined) means their behavior is unchanged.
@@ -332,7 +332,7 @@ export function resourceKeyForUrl(url: string): string {
  *     was constructed without the workspace prefix. The router would
  *     interpret `issues` as a workspace slug → NoAccessPage.
  *
- * Normalizes: a bare `/{slug}` (no route segment) becomes `/{slug}/dispatch` —
+ * Normalizes: a bare `/{slug}` (no route segment) becomes `/{slug}/tasks` —
  * the workspace's default surface. This replaces the old in-router
  * `<Navigate to="issues">` index redirect (MUL-4741 invariant 1: the router
  * never self-navigates; URLs are normalized before they become sessions).
@@ -360,7 +360,12 @@ export function sanitizeTabPath(path: string): string | null {
   if (segments.length === 1) {
     // Bare `/{slug}` lands on the workspace home (control tower) — the same
     // surface the web's `/{slug}` index renders.
-    return `/${firstSegment}/dispatch${suffix}`;
+    return `/${firstSegment}/tasks${suffix}`;
+  }
+  if (segments.length === 2 && segments[1] === "issues") {
+    // The flat workspace issue list is retired; `/issues/:id` deep links
+    // remain. Persisted tabs pointing at the old list heal to the feed.
+    return `/${firstSegment}/tasks${suffix}`;
   }
   return path;
 }
@@ -394,7 +399,7 @@ function pinnedBoundary(tabs: TabSession[]): number {
 
 /** Default entry point for a workspace — its control tower (小队任务). */
 function defaultPathFor(slug: string): string {
-  return `/${slug}/dispatch`;
+  return `/${slug}/tasks`;
 }
 
 function defaultTabFor(slug: string): TabSession {

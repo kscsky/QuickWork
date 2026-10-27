@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, nativeImage, Notification, screen } from "electron";
+import { app, BrowserWindow, crashReporter, dialog, ipcMain, nativeImage, Notification, screen } from "electron";
 import { homedir } from "os";
 import { join } from "path";
 import { pathToFileURL } from "url";
@@ -607,6 +607,20 @@ if (!gotTheLock) {
     arg.startsWith(`${PROTOCOL}://`),
   );
   if (coldStartDeepLink) handleDeepLink(coldStartDeepLink);
+
+  // Local-only crash dumps. Renderer crashes (including GPU-triggered ones)
+  // leave a minidump under app.getPath("crashDumps") instead of vanishing;
+  // nothing is uploaded. The breadcrumb file already records the last
+  // unresponsive/gone event for the next launch's telemetry flush.
+  if (!is.dev) {
+    crashReporter.start({
+      productName: "QuickWork",
+      companyName: "QuickWork",
+      submitURL: "https://quickwork.ai/crash-reports",
+      uploadToServer: false,
+      compress: true,
+    });
+  }
 
   app.whenReady().then(async () => {
     const viteEnv = import.meta.env as ImportMetaEnv & {

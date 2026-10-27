@@ -3,11 +3,14 @@ package handler
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"log/slog"
 	"net/http"
 	"strconv"
 
 	"github.com/jackc/pgx/v5/pgtype"
 
+	"github.com/kscsky/quickwork/server/internal/util"
 	db "github.com/kscsky/quickwork/server/pkg/db/generated"
 	"github.com/kscsky/quickwork/server/pkg/protocol"
 )
@@ -201,6 +204,8 @@ func (h *Handler) CreateSquadMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	h.notifySquadMessageInbox(r.Context(), workspaceID, squad, userUUID, req.Body)
+
 	resp := squadMessageToResponse(msg)
 	h.publish(protocol.EventSquadMessageCreated, workspaceID, "member", userID, map[string]any{
 		"squad_id": uuidToString(squad.ID),
@@ -263,6 +268,74 @@ func (h *Handler) UpdateSquadMemberWork(w http.ResponseWriter, r *http.Request) 
 		"squad_id": uuidToString(squad.ID),
 	})
 	writeJSON(w, http.StatusOK, squadMemberToResponse(sm))
+}
+
+// notifySquadMessageInbox fans a human room message out to every other human
+// member as a chat notification. Best-effort: a notification failure must not
+// fail the message the author already sent. Agent rows are skipped (they do
+// not have inboxes) and the author never notifies themselves.
+func (h *Handler) notifySquadMessageInbox(
+	ctx context.Context,
+	workspaceID string,
+	squad db.Squad,
+	authorID pgtype.UUID,
+	body string,
+) {
+	wsUUID, err := util.ParseUUID(workspaceID)
+	if err != nil {
+		return
+	}
+	members, err := h.Queries.ListSquadMembers(ctx, squad.ID)
+	if err != nil {
+		slog.Error("squad room: list members for inbox failed",
+			"squad_id", uuidToString(squad.ID), "error", err)
+		return
+	}
+	authorName := "成员"
+	if author, err := h.Queries.GetUser(ctx, authorID); err == nil && author.Name != "" {
+		authorName = author.Name
+	}
+	details, err := json.Marshal(map[string]any{
+		"squad_id":   uuidToString(squad.ID),
+		"squad_name": squad.Name,
+	})
+	if err != nil {
+		return
+	}
+	title := fmt.Sprintf("%s 在小队「%s」发了消息", authorName, squad.Name)
+	author := uuidToString(authorID)
+	for _, member := range members {
+		if member.MemberType != "member" {
+			continue
+		}
+		recipient := uuidToString(member.MemberID)
+		if recipient == "" || recipient == author {
+			continue
+		}
+		item, err := h.Queries.CreateInboxItem(ctx, db.CreateInboxItemParams{
+			WorkspaceID:   wsUUID,
+			RecipientType: "member",
+			RecipientID:   member.MemberID,
+			Type:          "squad_message",
+			Severity:      "info",
+			IssueID:       pgtype.UUID{},
+			Title:         title,
+			Body:          pgtype.Text{String: body, Valid: true},
+			ActorType:     pgtype.Text{String: "member", Valid: true},
+			ActorID:       authorID,
+			Details:       details,
+		})
+		if err != nil {
+			slog.Error("squad room: inbox write failed",
+				"squad_id", uuidToString(squad.ID),
+				"recipient_id", recipient,
+				"error", err)
+			continue
+		}
+		h.publish(protocol.EventInboxNew, workspaceID, "member", author, map[string]any{
+			"item": inboxItemEventPayload(item),
+		})
+	}
 }
 
 // PostSystemSquadMessage writes a room entry nobody authored — membership

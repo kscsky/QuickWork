@@ -1,0 +1,12 @@
+-- Leg-scoped comments (单流分界, owner-picked 2026-10-15).
+--
+-- A squad task's room is shared, but the WORK inside a leg — the holder's
+-- conversation with their agent, the run's chatter — belongs to that leg.
+-- chain_step_id marks a comment as leg content: it reads back only for the
+-- leg's holder, and everyone else sees a locked placeholder instead. NULL is
+-- the room: public as before.
+--
+-- No foreign key by repo rule; the application resolves the reference. No
+-- index: reads filter by issue_id first (idx_comment_issue_keyset) and the
+-- chain of one task is tiny.
+ALTER TABLE comment ADD COLUMN IF NOT EXISTS chain_step_id UUID;

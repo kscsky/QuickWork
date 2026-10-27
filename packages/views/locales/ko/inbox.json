@@ -1,13 +1,20 @@
 {
   "page": {
-    "title": "인박스",
-    "back": "인박스"
+    "title": "알림 센터",
+    "back": "알림 센터"
   },
   "menu": {
     "mark_all_read": "모두 읽음으로 표시",
     "archive_all": "모두 보관",
     "archive_all_read": "읽은 항목 모두 보관",
-    "archive_completed": "완료된 항목 보관"
+    "archive_completed": "완료된 항목 보관",
+    "clear_all": "모두 지우기",
+    "clear_dialog": {
+      "title": "받은편지함을 비울까요?",
+      "description": "보관된 알림을 포함한 모든 알림이 영구 삭제됩니다. 되돌릴 수 없습니다.",
+      "cancel": "취소",
+      "confirm": "모두 지우기"
+    }
   },
   "filters": {
     "tooltip": "인박스 필터",
@@ -71,7 +78,8 @@
     "quick_create_done": "에이전트로 생성됨",
     "quick_create_failed": "에이전트 생성 실패",
     "quick_create_unconfirmed": "에이전트 생성 결과 미확인",
-    "flow_handoff": "플로우 인계"
+    "flow_handoff": "플로우 인계",
+    "squad_message": "팀 메시지"
   },
   "labels": {
     "set_status_to": "상태 변경:",
@@ -90,7 +98,9 @@
   "toasts": {
     "source_context_retry_started": "원본 컨텍스트로 재시도를 시작했습니다",
     "archived": "알림을 보관했습니다",
-    "unarchived": "알림을 복원했습니다"
+    "unarchived": "알림을 복원했습니다",
+    "archived_all": "모든 알림을 보관했습니다",
+    "deleted_all": "받은편지함 알림을 영구 삭제했습니다"
   },
   "errors": {
     "source_context_retry_failed": "원본 컨텍스트로 재시도하지 못했습니다",
@@ -103,7 +113,68 @@
     "archive_all_failed": "모두 보관하지 못했습니다",
     "archive_all_read_failed": "읽은 항목을 보관하지 못했습니다",
     "archive_completed_failed": "완료된 항목을 보관하지 못했습니다",
+    "delete_all_failed": "받은편지함 알림을 영구 삭제하지 못했습니다",
     "unarchive_failed": "보관 해제에 실패했습니다",
     "archived_load_failed": "보관된 알림을 불러오지 못했습니다"
+  },
+  "console": {
+    "unread_cap": "UNREAD",
+    "task_info": "작업 정보",
+    "chat_info": "채팅",
+    "filter_all": "전체",
+    "filter_unread": "읽지 않음",
+    "filter_task": "작업",
+    "filter_chat": "채팅",
+    "filter_archived": "보관됨",
+    "live_task": "개 작업 정보",
+    "live_chat": "개 채팅",
+    "live_total_one": "총 {{count}}개",
+    "live_total_other": "총 {{count}}개",
+    "sync_hint": "마지막 동기화 · 방금",
+    "mark_all_read": "모두 읽음",
+    "cleanup_read": "읽은 알림 정리",
+    "clear_archived": "보관함 비우기",
+    "cleanup_read_title": "읽은 알림을 정리할까요?",
+    "cleanup_read_body_one": "읽은 알림 {{count}}개를 영구 삭제합니다. 읽지 않음과 보관됨은 유지됩니다.",
+    "cleanup_read_body_other": "읽은 알림 {{count}}개를 영구 삭제합니다. 읽지 않음과 보관됨은 유지됩니다.",
+    "clear_archived_title": "보관된 알림을 비울까요?",
+    "clear_archived_body_one": "보관된 알림 {{count}}개를 영구 삭제합니다.",
+    "clear_archived_body_other": "보관된 알림 {{count}}개를 영구 삭제합니다.",
+    "delete_title": "이 알림을 삭제할까요?",
+    "delete_body": "「{{title}}」이(가) 알림 센터에서 영구 삭제됩니다.",
+    "confirm_delete": "삭제",
+    "cancel": "취소",
+    "mark_read": "읽음으로 표시",
+    "mark_unread": "읽지 않음으로 표시",
+    "archive": "보관",
+    "unarchive": "보관 해제",
+    "delete": "삭제",
+    "source_issue": "원본 작업 / ISSUE",
+    "source_squad": "원본 팀 / SQUAD",
+    "open_task": "작업 열기",
+    "open_squad": "채팅 열기",
+    "priority": "우선순위 {{value}}",
+    "no_assignee": "미할당",
+    "no_project": "프로젝트 없음",
+    "archived_tag": "보관됨",
+    "squad_members_one": "{{count}}명",
+    "squad_members_other": "{{count}}명",
+    "squad_leader": "리더 {{name}}",
+    "empty": "이 필터에 알림이 없습니다",
+    "select_prompt": "알림을 선택해 내용 보기",
+    "undo": "실행 취소",
+    "delete_failed": "알림을 삭제하지 못했습니다",
+    "cleanup_failed": "읽은 알림을 정리하지 못했습니다",
+    "clear_failed": "보관함을 비우지 못했습니다",
+    "deleted_toast": "알림을 삭제했습니다",
+    "cleaned_toast_one": "읽은 알림 {{count}}개를 정리했습니다",
+    "cleaned_toast_other": "읽은 알림 {{count}}개를 정리했습니다",
+    "cleared_toast_one": "보관된 알림 {{count}}개를 비웠습니다",
+    "cleared_toast_other": "보관된 알림 {{count}}개를 비웠습니다",
+    "marked_all_toast": "모두 읽음으로 표시했습니다",
+    "load_failed": "알림을 불러올 수 없습니다",
+    "try_again": "다시 시도",
+    "back": "알림 센터",
+    "system_actor": "시스템"
   }
 }

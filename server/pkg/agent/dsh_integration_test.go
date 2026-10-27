@@ -29,7 +29,7 @@ func TestDshRealRuntimeSmoke(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 	cwd := t.TempDir()
-	session, err := b.Execute(ctx, "Remember the code word PINEAPPLE. Reply with exactly DSH_MULTICA_OK and nothing else.", ExecOptions{
+	session, err := b.Execute(ctx, "Remember the code word PINEAPPLE. Reply with exactly DSH_QUICKWORK_OK and nothing else.", ExecOptions{
 		Cwd: cwd, Model: "deepseek-official/deepseek-v4-flash", ThinkingLevel: "off",
 		Timeout: 90 * time.Second,
 	})
@@ -42,7 +42,7 @@ func TestDshRealRuntimeSmoke(t *testing.T) {
 	if result.Status != "completed" {
 		t.Fatalf("DSH smoke failed: status=%q error=%q", result.Status, result.Error)
 	}
-	if strings.TrimSpace(result.Output) != "DSH_MULTICA_OK" {
+	if strings.TrimSpace(result.Output) != "DSH_QUICKWORK_OK" {
 		t.Fatalf("unexpected DSH output: %q", result.Output)
 	}
 	if result.SessionID == "" {

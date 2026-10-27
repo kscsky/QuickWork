@@ -417,24 +417,29 @@ const seedIssueStatusEntries = `-- name: SeedIssueStatusEntries :exec
 
 INSERT INTO issue_status (workspace_id, key, name, description, category, color, is_system, position)
 VALUES
-    ($1::uuid, 'backlog', 'Backlog', 'Parked. Assigning an issue here never starts an agent run.', 'backlog', '#6b7280', TRUE, 0),
     ($1::uuid, 'todo', 'Todo', 'Queued for work. Moving an issue here starts the assigned agent.', 'todo', '#6b7280', TRUE, 0),
     ($1::uuid, 'in_progress', 'In Progress', 'Actively being worked on.', 'in_progress', '#f59e0b', TRUE, 0),
-    ($1::uuid, 'in_review', 'In Review', 'Work delivered, waiting on human review. Finalizes the autopilot run.', 'in_review', '#22c55e', TRUE, 0),
     ($1::uuid, 'done', 'Done', 'Completed.', 'done', '#3b82f6', TRUE, 0),
-    ($1::uuid, 'blocked', 'Blocked', 'Stalled on an external dependency.', 'blocked', '#ef4444', TRUE, 0),
     ($1::uuid, 'cancelled', 'Cancelled', 'Decided not to do.', 'cancelled', '#6b7280', TRUE, 0)
 ON CONFLICT DO NOTHING
 `
 
-// Issue status catalog (MUL-6243). Each workspace holds the 7 built-in
-// statuses plus any custom ones. A category's value IS its canonical built-in
-// key, so resolving a custom status to its platform behavior is a plain column
-// read — no mapping table, no second concept.
-// Idempotent seed of the 7 built-ins. Safe to call concurrently from multiple
-// pods during a rolling deploy: the unique (workspace_id, key) index makes a
-// losing racer a no-op rather than an error. Positions are intra-category, and
-// each built-in is the only member of its category at seed time, so all 0.
+// Issue status catalog (MUL-6243). Each workspace holds its built-in statuses
+// plus any custom ones. A category's value IS its canonical built-in key, so
+// resolving a custom status to its platform behavior is a plain column read —
+// no mapping table, no second concept.
+// Idempotent seed of the built-ins this product ships: 待办 / 进行中 / 已完成 /
+// 已取消. The catalog still RECOGNIZES the other three canonical keys —
+// backlog, in_review and blocked remain valid built-ins with their platform
+// behaviors (the relay parks a squad task on blocked; autopilot review gates
+// use in_review), so agents and the engine can still move an issue onto them —
+// but they are no longer offered as first-class choices in a fresh workspace.
+// The trim migration deletes them from workspaces that never used them.
+//
+// Safe to call concurrently from multiple pods during a rolling deploy: the
+// unique (workspace_id, key) index makes a losing racer a no-op rather than an
+// error. Positions are intra-category, and each built-in is the only member of
+// its category at seed time, so all 0.
 func (q *Queries) SeedIssueStatusEntries(ctx context.Context, workspaceID pgtype.UUID) error {
 	_, err := q.db.Exec(ctx, seedIssueStatusEntries, workspaceID)
 	return err

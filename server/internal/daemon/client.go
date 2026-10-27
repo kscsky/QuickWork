@@ -478,14 +478,24 @@ func (c *Client) ReportProgress(ctx context.Context, taskID, summary string, ste
 	}, nil)
 }
 
+// TaskUsageDelta is one assistant turn's token delta, carried on the message
+// the turn closed. Omitted when the turn reported none.
+type TaskUsageDelta struct {
+	InputTokens      int64 `json:"input_tokens"`
+	OutputTokens     int64 `json:"output_tokens"`
+	CacheReadTokens  int64 `json:"cache_read_tokens"`
+	CacheWriteTokens int64 `json:"cache_write_tokens"`
+}
+
 // TaskMessageData represents a single agent execution message for batch reporting.
 type TaskMessageData struct {
-	Seq     int            `json:"seq"`
-	Type    string         `json:"type"`
-	Tool    string         `json:"tool,omitempty"`
-	Content string         `json:"content,omitempty"`
-	Input   map[string]any `json:"input,omitempty"`
-	Output  string         `json:"output,omitempty"`
+	Seq     int             `json:"seq"`
+	Type    string          `json:"type"`
+	Tool    string          `json:"tool,omitempty"`
+	Content string          `json:"content,omitempty"`
+	Input   map[string]any  `json:"input,omitempty"`
+	Output  string          `json:"output,omitempty"`
+	Usage   *TaskUsageDelta `json:"usage,omitempty"`
 }
 
 func (c *Client) ReportTaskMessages(ctx context.Context, taskID string, messages []TaskMessageData) error {

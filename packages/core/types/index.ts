@@ -62,6 +62,16 @@ export type {
   DashboardRunTimeDaily,
   DashboardFailureDaily,
   DashboardFailureByAgent,
+  UsageModelSummary,
+  UsageOverviewDaily,
+  UsageOverviewByAgent,
+  UsageOverview,
+  UsageLogStatus,
+  UsageLogRow,
+  UsageStatusCounts,
+  UsageLogSummary,
+  UsageLogPage,
+  UsageLogSortKey,
   RuntimeUpdate,
   RuntimeUpdateStatus,
   RuntimeModel,
@@ -82,7 +92,7 @@ export type {
   RuntimeLocalSkillsResult,
   RuntimeLocalSkillImportResult,
   IssueUsageSummary,
-  MikaBootstrapResponse,
+  QuillBootstrapResponse,
 } from "./agent";
 export { RUNTIME_PROFILE_PROTOCOL_FAMILIES } from "./agent";
 export type { Workspace, WorkspaceRepo, WorkspaceMcpServer, Member, MemberRole, User, MemberWithUser, Invitation, ShareLink, ShareLinkInfo } from "./workspace";
@@ -160,7 +170,7 @@ export type {
   PendingChatTasksResponse,
   HasPendingChatTasksResponse,
   SendChatMessageResponse,
-  StartMikaOnboardingResponse,
+  StartQuillOnboardingResponse,
   CancelledChatMessage,
   CancelTaskResponse,
   ChatDraftRestore,
@@ -311,8 +321,16 @@ export type {
   IssueChainStep,
   IssueChain,
   IssueChainForIssue,
+  IssueChainHandoff,
+  IssueChainHandoffFile,
+  ChainLegOutputResponse,
   PlaybookStep,
   SquadPlaybook,
   DispatchStep,
 } from "./issue-chain";
 export { EMPTY_ISSUE_CHAIN } from "./issue-chain";
+export type {
+  ModelPoolSource,
+  ModelPoolModel,
+  ModelPoolCatalog,
+} from "./model-pool";

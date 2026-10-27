@@ -49,6 +49,7 @@ const (
 	EventInboxUnarchived    = "inbox:unarchived"
 	EventInboxBatchRead     = "inbox:batch-read"
 	EventInboxBatchArchived = "inbox:batch-archived"
+	EventInboxBatchDeleted  = "inbox:batch-deleted"
 
 	// Workspace events
 	EventWorkspaceUpdated = "workspace:updated"

@@ -33,6 +33,14 @@ const WORKSPACE_ROUTE_SEGMENTS = new Set([
   "my-issues",
   "runtimes",
   "skills",
+  "config",
+  "models",
+  "mcp",
+  "github",
+  "integrations",
+  "tokens",
+  "account",
+  "workspace-settings",
   "settings",
 ]);
 

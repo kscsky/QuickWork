@@ -5,7 +5,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { ApiError, api } from "@quickwork/core/api";
 import { orchestrateFailure } from "./orchestrate-failure";
 import { useWorkspacePaths } from "@quickwork/core/paths";
-import type { DispatchStep } from "@quickwork/core/types";
+import type { DispatchStep, IssuePriority } from "@quickwork/core/types";
 import {
   taskIssueOptions,
   TASK_ISSUE_WINDOW_MS,
@@ -44,6 +44,13 @@ export interface OrchestrateRoute {
   steps?: DispatchStep[];
 }
 
+/** Quick-create fields the squad dispatch can carry to the new issue. */
+export interface OrchestrateFields {
+  projectId?: string | null;
+  priority?: IssuePriority;
+  dueDate?: string | null;
+}
+
 export function useOrchestrate(wsId: string) {
   const { t } = useT("home");
   const wsPaths = useWorkspacePaths();
@@ -67,8 +74,16 @@ export function useOrchestrate(wsId: string) {
   const pendingRoute = useRef<OrchestrateRoute>({});
 
   const start = useMutation({
-    mutationFn: (input: { squadId: string; prompt: string }) =>
-      api.quickCreateIssue({ squad_id: input.squadId, prompt: input.prompt }),
+    mutationFn: (input: { squadId: string; prompt: string; fields?: OrchestrateFields }) =>
+      api.quickCreateIssue({
+        squad_id: input.squadId,
+        prompt: input.prompt,
+        ...(input.fields?.projectId ? { project_id: input.fields.projectId } : {}),
+        ...(input.fields?.priority && input.fields.priority !== "none"
+          ? { priority: input.fields.priority }
+          : {}),
+        ...(input.fields?.dueDate ? { due_date: input.fields.dueDate } : {}),
+      }),
     onSuccess: (response) => {
       toast.success(t(($) => $.toasts.started));
       // A submission after a give-up starts a new window; leaving the flag set
@@ -155,7 +170,7 @@ export function useOrchestrate(wsId: string) {
         ? wsPaths.issueDetail(linkedIssueId)
         : ""
       : gaveUp
-        ? wsPaths.issues()
+        ? wsPaths.tasks()
         : "";
     const key = destination && `${pendingTaskId ?? ""}|${destination}`;
     if (!key || navigatedTo.current === key) return;
@@ -176,12 +191,13 @@ export function useOrchestrate(wsId: string) {
       squadId: string,
       prompt: string,
       route: OrchestrateRoute = {},
+      fields?: OrchestrateFields,
     ) => {
       if (!squadId || !prompt.trim() || start.isPending || isWaitingOnIssue) {
         return;
       }
       pendingRoute.current = route;
-      start.mutate({ squadId, prompt: prompt.trim() });
+      start.mutate({ squadId, prompt: prompt.trim(), fields });
     },
     /** A run is in flight — either being submitted or being followed. */
     isBusy: start.isPending || isWaitingOnIssue,

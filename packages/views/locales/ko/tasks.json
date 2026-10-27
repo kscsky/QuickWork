@@ -1,48 +1,88 @@
 {
-  "title": "작업",
-  "subtitle": "각 작업은 릴레이입니다. 체인을 따라 순서대로 넘어가며, 에이전트를 아직 연결하지 않은 사람 차례에서 멈춥니다 — 어디서 멈췄는지 보입니다.",
-  "new_task": "새 작업",
+  "title": "태스크",
+  "create": "새 태스크",
+  "tagline": "단독 태스크는 한 사람이나 에이전트에게, 스쿼드 태스크는 릴레이로 실행 — 각 순서가 승인돼야 다음으로 넘어갑니다.",
   "filter": {
     "all": "전체 {{count}}",
-    "mine": "내 차례 {{count}}",
+    "single": "단독 {{count}}",
+    "squad": "스쿼드 {{count}}",
+    "mine": "내 것 {{count}}",
     "parked": "멈춤 {{count}}"
   },
-  "state": {
-    "pending": "시작 전",
-    "doing": "진행 중",
-    "done": "완료",
-    "parked": "멈춤·대기",
-    "skipped": "건너뜀",
-    "unknown": "알 수 없음"
+  "pager": {
+    "sum": "총 {{count}}개 · 페이지당 {{size}}개 · {{page}} / {{pages}} 페이지",
+    "prev": "이전",
+    "next": "다음"
   },
   "row": {
-    "parked_at": "{{name}}에서 멈춤 · {{step}}",
-    "doing_at": "{{name}} 작업 중 · {{step}}",
-    "waiting_at": "{{name}} 님의 머신이 가져가길 기다리는 중 · {{step}}",
-    "running_at": "{{name}} 님의 머신에서 실행 중 · {{step}}",
-    "interrupted_at": "{{name}} 님 쪽에서 멈췄습니다 · {{step}}",
-    "finished": "모두 완료",
-    "head_pending": "시작 대기 · {{step}}",
-    "no_chain": "릴레이 없음",
-    "unassigned": "담당자 없음",
-    "assignee": "담당 {{name}}"
+    "leg_parent": "상위 작업",
+    "leg_seq": "{{seq}}/{{total}} 구간",
+    "type_single": "단독",
+    "type_squad": "스쿼드",
+    "unassigned": "미할당",
+    "select_task": "{{identifier}} 선택",
+    "delete_task": "태스크 삭제"
+  },
+  "bulk": {
+    "selected": "{{count}}개 선택됨",
+    "clear": "선택 해제",
+    "select_page": "이 페이지 전체 선택",
+    "delete": "삭제",
+    "delete_title": "태스크 {{count}}개를 삭제할까요?",
+    "delete_desc": "이 작업은 되돌릴 수 없습니다. 선택한 태스크와 모든 댓글이 영구 삭제됩니다.",
+    "delete_warning": "스페이스 멤버 누구나 태스크를 삭제할 수 있습니다.",
+    "cancel": "취소",
+    "delete_success": "태스크 {{count}}개를 삭제했습니다",
+    "delete_failed": "태스크를 삭제하지 못했습니다"
   },
   "empty": {
-    "title": "아직 작업이 없습니다",
-    "body": "디스패치 타워에서 만든 작업이 릴레이와 함께 여기에 표시됩니다.",
-    "filtered_title": "이 필터에 맞는 작업이 없습니다",
-    "filtered_body": "다른 필터를 시도해 보세요."
+    "title": "아직 태스크가 없습니다",
+    "body": "「새 태스크」로 만들어 보세요 — 단독 태스크는 한 사람이나 에이전트에게, 스쿼드 태스크는 릴레이로 실행됩니다.",
+    "filtered_title": "이 필터에 맞는 태스크가 없습니다",
+    "filtered_body": "다른 필터를 사용해 보세요."
   },
-  "load_error": "작업을 불러오지 못했습니다",
   "chain": {
     "parked_dot": "멈춤",
-    "none": "릴레이가 없습니다. 팀에 배정하면 각 단계의 인계가 여기 표시됩니다.",
-    "parked_at": "{{name}}에서 멈춤 (에이전트 없음)",
-    "delivered": "{{name}} 인계 완료",
-    "skipped_at": "{{name}} 건너뜀",
-    "running": "{{name}} 실행 중",
-    "awaiting_pickup": "{{name}} 미착수",
-    "waiting": "{{name}} 대기",
-    "open_task": "작업 열기"
-  }
+    "none": "릴레이 없음",
+    "chip_done": "전달됨",
+    "chip_doing": "진행 중",
+    "chip_queued": "인수 대기",
+    "chip_review": "검토 대기",
+    "chip_parked": "멈춤·대기",
+    "chip_skipped": "건너뜀",
+    "chip_waiting": "대기 중"
+  },
+  "mast": {
+    "running": "개 진행 중",
+    "review": "개 확인 대기",
+    "quiet": "개 조용함",
+    "sync_hint": "마지막 동기화 · 방금",
+    "info": "단독 태스크는 한 사람이나 에이전트에게, 스쿼드 태스크는 릴레이로 실행됩니다. 멈춘 순서는 누군가 맡을 때까지 기다립니다.",
+    "sort_recent": "최근 활동",
+    "sort_oldest": "오래된 활동",
+    "sort_label": "정렬 전환"
+  },
+  "filter_name": {
+    "all": "전체",
+    "single": "단독",
+    "squad": "스쿼드",
+    "mine": "내 것",
+    "parked": "멈춤"
+  },
+  "board": {
+    "task": "태스크",
+    "state": "상태",
+    "actions": "작업"
+  },
+  "state": {
+    "open": "열기",
+    "view": "보기",
+    "review": "검토",
+    "fill": "채우기",
+    "needs_fill": "담당자 필요",
+    "delivered": "전달됨"
+  },
+  "quick_create_failed_banner": "{{count}}개의 빠른 작업 생성에 실패했습니다",
+  "quick_create_failed_view": "알림 열기",
+  "quick_create_failed_fallback": "알림에서 오류 세부 정보를 확인하세요."
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef } from "react";
-import { Paperclip } from "lucide-react";
+import { Paperclip, Plus } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@quickwork/ui/components/ui/button";
 import { cn } from "@quickwork/ui/lib/utils";
@@ -13,6 +13,7 @@ interface FileUploadButtonProps {
   className?: string;
   size?: "sm" | "default";
   multiple?: boolean;
+  showLabel?: boolean;
 }
 
 function FileUploadButton({
@@ -21,6 +22,7 @@ function FileUploadButton({
   className,
   size = "default",
   multiple = false,
+  showLabel = false,
 }: FileUploadButtonProps) {
   const { t } = useTranslation("ui");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -46,9 +48,14 @@ function FileUploadButton({
         disabled={disabled}
         aria-label={attachLabel}
         title={attachLabel}
-        className={cn("text-muted-foreground", className)}
+        className={cn(
+          "text-muted-foreground",
+          showLabel && "!w-auto gap-1 px-2",
+          className,
+        )}
       >
-        <Paperclip className={iconSize} />
+        {showLabel ? <Plus className={iconSize} /> : <Paperclip className={iconSize} />}
+        {showLabel ? <span className="text-[9.5px]">{attachLabel}</span> : null}
       </Button>
       <input
         ref={inputRef}

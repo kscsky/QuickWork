@@ -47,6 +47,8 @@ export function useCreateAgentSubmit(options: {
   /** Creation-source attribution for the `agent_created` analytics event. */
   template?: string;
   duplicateSource?: Agent | null;
+  /** Omit to let the server apply its default concurrency. */
+  maxConcurrentTasks?: number;
   /** Runs after the agent is committed, before navigation. */
   onCreated?: (agent: Agent) => Promise<void> | void;
 }) {
@@ -60,8 +62,15 @@ export function useCreateAgentSubmit(options: {
   const [nameError, setNameError] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
 
-  const { draft, runtimeId, squadId, template, duplicateSource, onCreated } =
-    options;
+  const {
+    draft,
+    runtimeId,
+    squadId,
+    template,
+    duplicateSource,
+    maxConcurrentTasks,
+    onCreated,
+  } = options;
 
   const create = async () => {
     if (!runtimeId || creating) return;
@@ -69,14 +78,21 @@ export function useCreateAgentSubmit(options: {
     setNameError(null);
     setFormError(null);
     try {
-      const agent = await api.createAgent(
-        buildCreateAgentRequest({
-          draft,
-          runtimeId,
-          template,
-          duplicateSource,
-        }),
-      );
+      const request = buildCreateAgentRequest({
+        draft,
+        runtimeId,
+        template,
+        duplicateSource,
+      });
+      if (
+        maxConcurrentTasks !== undefined &&
+        Number.isInteger(maxConcurrentTasks) &&
+        maxConcurrentTasks >= 1 &&
+        maxConcurrentTasks <= 50
+      ) {
+        request.max_concurrent_tasks = maxConcurrentTasks;
+      }
+      const agent = await api.createAgent(request);
       if (!agent.id) throw new Error(t(($) => $.creation_studio.create_failed));
 
       if (squadId) {

@@ -48,7 +48,7 @@ function WindowOverlayInner() {
     <div className="fixed inset-0 z-50 flex flex-col overflow-auto bg-background">
       {/* Creating a workspace is the onboarding flow entered at the
           workspace step: a second workspace still needs its own runtime and
-          its own Mika, so running one flow keeps the two from drifting. */}
+          its own Quill, so running one flow keeps the two from drifting. */}
       {overlay.type === "new-workspace" && (
         <OnboardingFlow
           mode="new_workspace"
@@ -58,7 +58,7 @@ function WindowOverlayInner() {
             if (ws && destination?.kind === "issue") {
               push(paths.workspace(ws.slug).issueDetail(destination.issueId));
             } else if (ws) {
-              push(paths.workspace(ws.slug).dispatch());
+              push(paths.workspace(ws.slug).tasks());
             }
           }}
         />
@@ -79,7 +79,7 @@ function WindowOverlayInner() {
                 paths.workspace(ws.slug).issueDetail(destination.issueId),
               );
             } else if (ws) {
-              push(paths.workspace(ws.slug).dispatch());
+              push(paths.workspace(ws.slug).tasks());
             } else {
               push(paths.root());
             }

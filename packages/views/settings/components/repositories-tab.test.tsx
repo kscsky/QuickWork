@@ -16,7 +16,7 @@ const workspaceRef = vi.hoisted(() => ({
     id: "workspace-1",
     name: "Test Workspace",
     slug: "test-workspace",
-    repos: [{ url: "https://github.com/multica-ai/multica" }] as {
+    repos: [{ url: "https://github.com/kscsky/QuickWork" }] as {
       url: string;
       description?: string;
     }[],
@@ -150,7 +150,7 @@ describe("RepositoriesTab — automatic updates", () => {
       id: "workspace-1",
       name: "Test Workspace",
       slug: "test-workspace",
-      repos: [{ url: "https://github.com/multica-ai/multica" }],
+      repos: [{ url: "https://github.com/kscsky/QuickWork" }],
     };
     membersRef.current = [{ user_id: "user-1", role: "owner" }];
     githubRef.current = {
@@ -189,7 +189,7 @@ describe("RepositoriesTab — automatic updates", () => {
 
     const inputs = screen.getAllByRole("textbox") as HTMLInputElement[];
     expect(inputs).toHaveLength(2);
-    expect(inputs[0]!.value).toBe("https://github.com/multica-ai/multica");
+    expect(inputs[0]!.value).toBe("https://github.com/kscsky/QuickWork");
     expect(screen.queryByRole("button", { name: /^Save$/ })).toBeNull();
   });
 
@@ -199,12 +199,12 @@ describe("RepositoriesTab — automatic updates", () => {
 
     const urlInput = screen.getAllByRole("textbox")[0]!;
     await user.clear(urlInput);
-    await user.type(urlInput, "https://github.com/multica-ai/edited");
+    await user.type(urlInput, "https://github.com/kscsky/edited");
     await user.tab();
 
     await waitFor(() => {
       expect(mockUpdateWorkspace).toHaveBeenCalledWith("workspace-1", {
-        repos: [{ url: "https://github.com/multica-ai/edited" }],
+        repos: [{ url: "https://github.com/kscsky/edited" }],
       });
       expect(mockToastSuccess).toHaveBeenCalledWith("Repositories saved", {
         id: "settings-auto-save",
@@ -234,14 +234,14 @@ describe("RepositoriesTab — automatic updates", () => {
     expect(mockUpdateWorkspace).not.toHaveBeenCalled();
 
     const newUrlInput = screen.getAllByRole("textbox")[2]!;
-    await user.type(newUrlInput, "git@github.com:multica-ai/second.git");
+    await user.type(newUrlInput, "git@github.com:kscsky/second.git");
     await user.tab();
 
     await waitFor(() => {
       expect(mockUpdateWorkspace).toHaveBeenCalledWith("workspace-1", {
         repos: [
-          { url: "https://github.com/multica-ai/multica" },
-          { url: "git@github.com:multica-ai/second.git" },
+          { url: "https://github.com/kscsky/QuickWork" },
+          { url: "git@github.com:kscsky/second.git" },
         ],
       });
     });
@@ -269,14 +269,14 @@ describe("RepositoriesTab — automatic updates", () => {
 
     const urlInput = screen.getAllByRole("textbox")[0] as HTMLInputElement;
     await user.clear(urlInput);
-    await user.type(urlInput, "git@github.com:multica-ai/multica.git");
+    await user.type(urlInput, "git@github.com:kscsky/QuickWork.git");
     expect(urlInput.type).toBe("text");
     expect(urlInput.validity.valid).toBe(true);
     await user.tab();
 
     await waitFor(() => {
       expect(mockUpdateWorkspace).toHaveBeenCalledWith("workspace-1", {
-        repos: [{ url: "git@github.com:multica-ai/multica.git" }],
+        repos: [{ url: "git@github.com:kscsky/QuickWork.git" }],
       });
     });
   });
@@ -284,7 +284,7 @@ describe("RepositoriesTab — automatic updates", () => {
   it("includes the description in the automatic update payload", async () => {
     workspaceRef.current = {
       ...workspaceRef.current,
-      repos: [{ url: "https://github.com/multica-ai/multica", description: "Main app" }],
+      repos: [{ url: "https://github.com/kscsky/QuickWork", description: "Main app" }],
     };
     const user = setupUser();
     render(<RepositoriesTab />, { wrapper: I18nWrapper });
@@ -299,7 +299,7 @@ describe("RepositoriesTab — automatic updates", () => {
       expect(mockUpdateWorkspace).toHaveBeenCalledWith("workspace-1", {
         repos: [
           {
-            url: "https://github.com/multica-ai/multica",
+            url: "https://github.com/kscsky/QuickWork",
             description: "Updated description",
           },
         ],
@@ -360,10 +360,10 @@ describe("RepositoriesTab — automatic updates", () => {
   it("imports selected GitHub repositories and deduplicates HTTPS against SSH", async () => {
     workspaceRef.current = {
       ...workspaceRef.current,
-      repos: [{ url: "git@github.com:multica-ai/multica.git" }],
+      repos: [{ url: "git@github.com:kscsky/QuickWork.git" }],
     };
     githubRef.current = {
-      installations: [{ id: "installation-row-1", account_login: "multica-ai" }],
+      installations: [{ id: "installation-row-1", account_login: "kscsky" }],
       configured: true,
       repository_browse_configured: true,
       can_manage: true,
@@ -371,9 +371,9 @@ describe("RepositoriesTab — automatic updates", () => {
     githubRepositoriesRef.current = [
       {
         id: 1,
-        full_name: "multica-ai/multica",
-        html_url: "https://github.com/multica-ai/multica",
-        clone_url: "https://github.com/multica-ai/multica.git",
+        full_name: "kscsky/QuickWork",
+        html_url: "https://github.com/kscsky/QuickWork",
+        clone_url: "https://github.com/kscsky/QuickWork.git",
         description: "Existing repository",
         private: false,
         archived: false,
@@ -381,9 +381,9 @@ describe("RepositoriesTab — automatic updates", () => {
       },
       {
         id: 2,
-        full_name: "multica-ai/console",
-        html_url: "https://github.com/multica-ai/console",
-        clone_url: "https://github.com/multica-ai/console.git",
+        full_name: "kscsky/console",
+        html_url: "https://github.com/kscsky/console",
+        clone_url: "https://github.com/kscsky/console.git",
         description: "Console app",
         private: true,
         archived: false,
@@ -409,9 +409,9 @@ describe("RepositoriesTab — automatic updates", () => {
     await waitFor(() => {
       expect(mockUpdateWorkspace).toHaveBeenCalledWith("workspace-1", {
         repos: [
-          { url: "git@github.com:multica-ai/multica.git" },
+          { url: "git@github.com:kscsky/QuickWork.git" },
           {
-            url: "https://github.com/multica-ai/console.git",
+            url: "https://github.com/kscsky/console.git",
             description: "Console app",
           },
         ],
@@ -430,7 +430,7 @@ describe("RepositoriesTab — automatic updates", () => {
 
   it("opens the picker after returning from a GitHub connection", async () => {
     githubRef.current = {
-      installations: [{ id: "installation-row-1", account_login: "multica-ai" }],
+      installations: [{ id: "installation-row-1", account_login: "kscsky" }],
       configured: true,
       repository_browse_configured: true,
       can_manage: true,

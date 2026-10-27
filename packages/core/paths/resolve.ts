@@ -5,15 +5,15 @@ import { paths } from "./paths";
 /**
  * Priority (onboarded-first):
  *   !hasOnboarded               → /onboarding
- *   hasOnboarded + workspace[0] → /<first.slug>/issues
+ *   hasOnboarded + workspace[0] → /<first.slug>/tasks
  *   hasOnboarded + no workspace → /workspaces/new
  *
  * V3 invariant: `onboarded_at != null` is the single source of truth for
  * "may access /<slug>/*". The web workspace layout and the desktop App.tsx
  * overlay decision both gate on this — sending an un-onboarded user
- * straight to /issues would just be redirected back to /onboarding by
- * the layout gate, costing a navigation round-trip. Check onboarded
- * first.
+ * straight to a workspace route would just be redirected back to
+ * /onboarding by the layout gate, costing a navigation round-trip. Check
+ * onboarded first.
  *
  * In v3 "has workspace but !onboarded" is physically rare (a user can
  * only land in that state by closing the app between Step 2 and Step 3
@@ -36,10 +36,8 @@ export function resolvePostAuthDestination(
   }
   const first = workspaces[0];
   if (first) {
-    // The workspace home is the control tower (小队任务), not the retired
-    // flat issue list — landing users on /issues opened a page that is no
-    // longer in the nav.
-    return paths.workspace(first.slug).dispatch();
+    // The workspace home is the task feed, not the retired flat issue list.
+    return paths.workspace(first.slug).tasks();
   }
   return paths.newWorkspace();
 }

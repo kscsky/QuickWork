@@ -198,8 +198,9 @@ function PageHeaderBar({
         href: "https://quickwork.ai/docs/agents",
         label: t(($) => $.page.learn_more),
       }}
-      actions={
+      leadingAction={
         <CollectionPageHeaderAction
+          variant="default"
           icon={Plus}
           label={t(($) => $.page.new_agent)}
           onClick={onCreate}

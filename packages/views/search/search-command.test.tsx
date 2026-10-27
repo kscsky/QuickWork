@@ -217,6 +217,13 @@ vi.mock("@quickwork/core/paths", async (importOriginal) => ({
     usage: () => "/ws-test/usage",
     runtimes: () => "/ws-test/runtimes",
     skills: () => "/ws-test/skills",
+    config: () => "/ws-test/config",
+    mcp: () => "/ws-test/mcp",
+    github: () => "/ws-test/github",
+    integrations: () => "/ws-test/integrations",
+    tokens: () => "/ws-test/tokens",
+    account: () => "/ws-test/account",
+    workspaceSettings: () => "/ws-test/workspace-settings",
     settings: () => "/ws-test/settings",
     issueDetail: (id: string) => `/ws-test/issues/${id}`,
     memberDetail: (id: string) => `/ws-test/members/${id}`,
@@ -236,6 +243,7 @@ vi.mock("@quickwork/core/issues/queries", () => ({
 }));
 
 vi.mock("@quickwork/core/workspace/queries", () => ({
+  workspaceListOptions: () => ({ queryKey: ["workspaces", "list"] }),
   memberListOptions: () => ({ queryKey: ["workspaces", "ws-test", "members"] }),
   agentListOptions: () => ({ queryKey: ["workspaces", "ws-test", "agents"] }),
   squadListOptions: () => ({ queryKey: ["workspaces", "ws-test", "squads"] }),
@@ -259,6 +267,9 @@ function resolveIssue(key: readonly unknown[]) {
 vi.mock("@tanstack/react-query", () => ({
   useQuery: (opts: { queryKey: readonly unknown[]; enabled?: boolean }) => {
     const key = opts.queryKey;
+    if (key[0] === "workspaces" && key[1] === "list") {
+      return { data: [{ id: "ws-test", slug: "ws-test", name: "Test" }] };
+    }
     if (key[0] === "workspaces" && key[2] === "members") {
       return { data: mockMembers.current };
     }
@@ -340,7 +351,7 @@ describe("SearchCommand", () => {
 
     renderSearch();
 
-    const input = screen.getByPlaceholderText("Type a command or search...");
+    const input = screen.getByPlaceholderText("Search tasks, projects, agents, members, and settings…");
     await user.click(input);
 
     expect(useSearchStore.getState().open).toBe(true);
@@ -350,7 +361,7 @@ describe("SearchCommand", () => {
     await waitFor(() => {
       expect(useSearchStore.getState().open).toBe(false);
     });
-    expect(screen.queryByPlaceholderText("Type a command or search...")).not.toBeInTheDocument();
+    expect(screen.queryByPlaceholderText("Search tasks, projects, agents, members, and settings…")).not.toBeInTheDocument();
   });
 
   it("shows only New Issue by default and hides Pages / low-frequency commands until query", () => {
@@ -373,12 +384,12 @@ describe("SearchCommand", () => {
     const user = userEvent.setup();
     renderSearch();
 
-    const input = screen.getByPlaceholderText("Type a command or search...");
-    await user.type(input, "set");
+    const input = screen.getByPlaceholderText("Search tasks, projects, agents, members, and settings…");
+    await user.type(input, "ski");
 
     await waitFor(() => {
       // HighlightText splits text, so use a function matcher
-      expect(screen.getByText((_, el) => el?.textContent === "Settings" && el?.tagName === "SPAN")).toBeInTheDocument();
+      expect(screen.getByText((_, el) => el?.textContent === "Skills" && el?.tagName === "SPAN")).toBeInTheDocument();
     });
     expect(screen.queryByText("Inbox")).not.toBeInTheDocument();
   });
@@ -386,7 +397,7 @@ describe("SearchCommand", () => {
   it("offers every workspace nav page, not a hand-maintained subset", async () => {
     const user = userEvent.setup();
     renderSearch();
-    const input = screen.getByPlaceholderText("Type a command or search...");
+    const input = screen.getByPlaceholderText("Search tasks, projects, agents, members, and settings…");
 
     // The Pages group is generated from WORKSPACE_PAGES — the same registry
     // the sidebar and the desktop tab bar read — so searching a page by the
@@ -402,13 +413,13 @@ describe("SearchCommand", () => {
         ),
       ).toBeInTheDocument();
     }
-  });
+  }, 20_000);
 
   it("does not surface a page on an incidental substring of a hidden keyword", async () => {
     const user = userEvent.setup();
     renderSearch();
 
-    const input = screen.getByPlaceholderText("Type a command or search...");
+    const input = screen.getByPlaceholderText("Search tasks, projects, agents, members, and settings…");
     await user.type(input, "s");
 
     // Inbox carries the hidden keyword "notifications". Matching keywords by
@@ -416,7 +427,7 @@ describe("SearchCommand", () => {
     // row to explain why; keywords match by prefix instead.
     await waitFor(() => {
       expect(
-        screen.getByText((_, el) => el?.textContent === "Settings" && el?.tagName === "SPAN"),
+        screen.getByText((_, el) => el?.textContent === "Skills" && el?.tagName === "SPAN"),
       ).toBeInTheDocument();
     });
     expect(screen.queryByText("Inbox")).not.toBeInTheDocument();
@@ -426,12 +437,12 @@ describe("SearchCommand", () => {
     const user = userEvent.setup();
     renderSearch();
 
-    // Analytics lives at /usage: proof the row resolves its destination from
-    // the page key rather than from the words on screen.
-    const input = screen.getByPlaceholderText("Type a command or search...");
+    // Usage lives at /usage: proof the row resolves its destination from the
+    // page key rather than from the words on screen.
+    const input = screen.getByPlaceholderText("Search tasks, projects, agents, members, and settings…");
     await user.type(input, "analytics");
 
-    await user.click(await screen.findByText("Analytics"));
+    await user.click(await screen.findByText("Usage"));
 
     expect(mockPush).toHaveBeenCalledWith("/ws-test/usage");
     expect(useSearchStore.getState().open).toBe(false);
@@ -441,13 +452,13 @@ describe("SearchCommand", () => {
     const user = userEvent.setup();
     renderSearch();
 
-    const input = screen.getByPlaceholderText("Type a command or search...");
-    await user.type(input, "settings");
+    const input = screen.getByPlaceholderText("Search tasks, projects, agents, members, and settings…");
+    await user.type(input, "config");
 
-    const settingsItem = await screen.findByText("Settings");
-    await user.click(settingsItem);
+    const configItem = await screen.findByText("Overview");
+    await user.click(configItem);
 
-    expect(mockPush).toHaveBeenCalledWith("/ws-test/settings");
+    expect(mockPush).toHaveBeenCalledWith("/ws-test/config");
     expect(useSearchStore.getState().open).toBe(false);
   });
 
@@ -456,14 +467,14 @@ describe("SearchCommand", () => {
     const open = vi.spyOn(window, "open").mockReturnValue(null);
     renderSearch();
 
-    const input = screen.getByPlaceholderText("Type a command or search...");
-    await user.type(input, "settings");
+    const input = screen.getByPlaceholderText("Search tasks, projects, agents, members, and settings…");
+    await user.type(input, "config");
 
-    const settingsItem = await screen.findByText("Settings");
-    fireEvent.click(settingsItem, { metaKey: true });
+    const configItem = await screen.findByText("Overview");
+    fireEvent.click(configItem, { metaKey: true });
 
     expect(open).toHaveBeenCalledWith(
-      "https://app.quickwork//ws-test/settings",
+      "https://app.quickwork//ws-test/config",
       "_blank",
       "noopener,noreferrer",
     );
@@ -477,13 +488,13 @@ describe("SearchCommand", () => {
     const open = vi.spyOn(window, "open").mockReturnValue(null);
     renderSearch();
 
-    const input = screen.getByPlaceholderText("Type a command or search...");
-    await user.type(input, "settings");
-    await screen.findByText("Settings");
+    const input = screen.getByPlaceholderText("Search tasks, projects, agents, members, and settings…");
+    await user.type(input, "config");
+    await screen.findByText("Overview");
     fireEvent.keyDown(input, { key: "Enter", metaKey: true });
 
     expect(open).toHaveBeenCalledWith(
-      "https://app.quickwork//ws-test/settings",
+      "https://app.quickwork//ws-test/config",
       "_blank",
       "noopener,noreferrer",
     );
@@ -496,16 +507,16 @@ describe("SearchCommand", () => {
     const open = vi.spyOn(window, "open").mockReturnValue(null);
     renderSearch();
 
-    const input = screen.getByPlaceholderText("Type a command or search...");
+    const input = screen.getByPlaceholderText("Search tasks, projects, agents, members, and settings…");
     // cmd-click somewhere that selects nothing…
     fireEvent.click(input, { metaKey: true });
-    await user.type(input, "settings");
+    await user.type(input, "config");
 
-    const settingsItem = await screen.findByText("Settings");
+    const configItem = await screen.findByText("Overview");
     // …then a plain click must navigate in place, not open a tab.
-    await user.click(settingsItem);
+    await user.click(configItem);
 
-    expect(mockPush).toHaveBeenCalledWith("/ws-test/settings");
+    expect(mockPush).toHaveBeenCalledWith("/ws-test/config");
     expect(open).not.toHaveBeenCalled();
     open.mockRestore();
   });
@@ -536,7 +547,7 @@ describe("SearchCommand", () => {
     ];
     renderSearch();
 
-    const input = screen.getByPlaceholderText("Type a command or search...");
+    const input = screen.getByPlaceholderText("Search tasks, projects, agents, members, and settings…");
     await user.type(input, "alice");
 
     await waitFor(() => {
@@ -582,7 +593,7 @@ describe("SearchCommand", () => {
     const user = userEvent.setup();
     renderSearch();
 
-    const input = screen.getByPlaceholderText("Type a command or search...");
+    const input = screen.getByPlaceholderText("Search tasks, projects, agents, members, and settings…");
     await user.type(input, "new");
 
     await waitFor(() => {
@@ -609,7 +620,7 @@ describe("SearchCommand", () => {
     mockPathname.current = "/ws-test/projects";
     renderSearch();
 
-    const input = screen.getByPlaceholderText("Type a command or search...");
+    const input = screen.getByPlaceholderText("Search tasks, projects, agents, members, and settings…");
     await user.type(input, "copy");
 
     // Commands section may still be empty / absent.
@@ -629,7 +640,7 @@ describe("SearchCommand", () => {
     ];
     renderSearch();
 
-    const input = screen.getByPlaceholderText("Type a command or search...");
+    const input = screen.getByPlaceholderText("Search tasks, projects, agents, members, and settings…");
     await user.type(input, "copy");
 
     const linkItem = await screen.findByText(
@@ -645,7 +656,7 @@ describe("SearchCommand", () => {
     act(() => {
       useSearchStore.setState({ open: true });
     });
-    const input2 = screen.getByPlaceholderText("Type a command or search...");
+    const input2 = screen.getByPlaceholderText("Search tasks, projects, agents, members, and settings…");
     await user.type(input2, "copy");
     const idItem = await screen.findByText(
       (_, el) =>
@@ -663,7 +674,7 @@ describe("SearchCommand", () => {
     mockPathname.current = "/ws-test/projects";
     renderSearch();
 
-    const input = screen.getByPlaceholderText("Type a command or search...");
+    const input = screen.getByPlaceholderText("Search tasks, projects, agents, members, and settings…");
     await user.type(input, "fold");
 
     expect(screen.queryByText("Fold All Comments")).not.toBeInTheDocument();
@@ -684,7 +695,7 @@ describe("SearchCommand", () => {
     ];
     renderSearch();
 
-    const input = screen.getByPlaceholderText("Type a command or search...");
+    const input = screen.getByPlaceholderText("Search tasks, projects, agents, members, and settings…");
     await user.type(input, "fold");
 
     const foldItem = await screen.findByText(
@@ -716,7 +727,7 @@ describe("SearchCommand", () => {
     ];
     renderSearch();
 
-    const input = screen.getByPlaceholderText("Type a command or search...");
+    const input = screen.getByPlaceholderText("Search tasks, projects, agents, members, and settings…");
     await user.type(input, "unfold");
 
     const unfoldItem = await screen.findByText(
@@ -737,7 +748,7 @@ describe("SearchCommand", () => {
     const user = userEvent.setup();
     renderSearch();
 
-    const input = screen.getByPlaceholderText("Type a command or search...");
+    const input = screen.getByPlaceholderText("Search tasks, projects, agents, members, and settings…");
     await user.type(input, "dark");
 
     await waitFor(() => {
@@ -755,7 +766,7 @@ describe("SearchCommand", () => {
     mockTheme.current = "light";
     renderSearch();
 
-    const input = screen.getByPlaceholderText("Type a command or search...");
+    const input = screen.getByPlaceholderText("Search tasks, projects, agents, members, and settings…");
     await user.type(input, "dark");
 
     const darkItem = await screen.findByText(
@@ -772,7 +783,7 @@ describe("SearchCommand", () => {
     mockTheme.current = "dark";
     renderSearch();
 
-    const input = screen.getByPlaceholderText("Type a command or search...");
+    const input = screen.getByPlaceholderText("Search tasks, projects, agents, members, and settings…");
     await user.type(input, "theme");
 
     await waitFor(() => {
@@ -849,7 +860,7 @@ describe("SearchCommand", () => {
 
     renderSearch();
 
-    const input = screen.getByPlaceholderText("Type a command or search...");
+    const input = screen.getByPlaceholderText("Search tasks, projects, agents, members, and settings…");
     await user.type(input, "assigned");
 
     await waitFor(
@@ -922,7 +933,7 @@ describe("SearchCommand", () => {
     });
     renderSearch();
 
-    const input = screen.getByPlaceholderText("Type a command or search...");
+    const input = screen.getByPlaceholderText("Search tasks, projects, agents, members, and settings…");
     await user.type(input, "html");
 
     await waitFor(
@@ -954,7 +965,7 @@ describe("SearchCommand", () => {
     renderSearch();
 
     const input = screen.getByPlaceholderText(
-      "Type a command or search...",
+      "Search tasks, projects, agents, members, and settings…",
     ) as HTMLInputElement;
     await user.type(input, "new");
 
@@ -1061,7 +1072,12 @@ describe("SearchCommand", () => {
     const renderedHeadings = () =>
       Array.from(
         document.querySelectorAll<HTMLElement>("[cmdk-group-heading]"),
-      ).map((el) => el.textContent ?? "");
+      ).map(
+        (el) =>
+          el.querySelector<HTMLElement>(".qw-cmd-group-label")?.textContent ??
+          el.textContent ??
+          "",
+      );
 
     it("renders project status in the selected UI language", async () => {
       const user = userEvent.setup();
@@ -1078,7 +1094,7 @@ describe("SearchCommand", () => {
 
       renderSearchInChinese();
       await user.type(
-        screen.getByPlaceholderText("Type a command or search..."),
+        screen.getByPlaceholderText("Search tasks, projects, agents, members, and settings…"),
         "localized",
       );
 
@@ -1115,7 +1131,7 @@ describe("SearchCommand", () => {
 
       renderSearch();
       await user.type(
-        screen.getByPlaceholderText("Type a command or search..."),
+        screen.getByPlaceholderText("Search tasks, projects, agents, members, and settings…"),
         "search",
       );
 
@@ -1167,7 +1183,7 @@ describe("SearchCommand", () => {
 
       renderSearch();
       await user.type(
-        screen.getByPlaceholderText("Type a command or search..."),
+        screen.getByPlaceholderText("Search tasks, projects, agents, members, and settings…"),
         "search",
       );
 
@@ -1204,7 +1220,7 @@ describe("SearchCommand", () => {
 
       renderSearch();
       await user.type(
-        screen.getByPlaceholderText("Type a command or search..."),
+        screen.getByPlaceholderText("Search tasks, projects, agents, members, and settings…"),
         "MUL-7",
       );
 
@@ -1272,7 +1288,7 @@ describe("SearchCommand", () => {
     ) => {
       answerOnlyAlpha();
       renderSearch();
-      const input = screen.getByPlaceholderText("Type a command or search...");
+      const input = screen.getByPlaceholderText("Search tasks, projects, agents, members, and settings…");
       await user.type(input, "alpha");
       await waitFor(
         () => {

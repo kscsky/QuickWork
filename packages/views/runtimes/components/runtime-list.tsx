@@ -129,13 +129,13 @@ function columnTrackVars(
   } as React.CSSProperties;
 }
 
-interface RuntimeWorkload {
+export interface RuntimeWorkload {
   agentIds: string[];
   runningCount: number;
   queuedCount: number;
 }
 
-const EMPTY_WORKLOAD: RuntimeWorkload = {
+export const EMPTY_WORKLOAD: RuntimeWorkload = {
   agentIds: [],
   runningCount: 0,
   queuedCount: 0,

@@ -21,10 +21,10 @@ test.describe("Navigation", () => {
     await waitForPageText(page, "Agents");
     await expect(page).toHaveTitle("Agents | QuickWork");
 
-    await page.getByRole("link", { name: "Issues", exact: true }).click();
-    await expect(page).toHaveURL(/\/issues/, { timeout: ROUTE_CHANGE_TIMEOUT });
-    await waitForPageText(page, "Issues");
-    await expect(page).toHaveTitle("Issues | QuickWork");
+    await page.getByRole("link", { name: "Task list", exact: true }).click();
+    await expect(page).toHaveURL(/\/tasks/, { timeout: ROUTE_CHANGE_TIMEOUT });
+    await waitForPageText(page, "Tasks");
+    await expect(page).toHaveTitle("Tasks | QuickWork");
   });
 
   test("settings page loads via sidebar", async ({ page }) => {

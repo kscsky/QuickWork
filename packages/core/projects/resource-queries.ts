@@ -43,6 +43,8 @@ export function useCreateProjectResource(wsId: string, projectId: string) {
       qc.invalidateQueries({
         queryKey: projectResourceKeys.list(wsId, projectId),
       });
+      qc.invalidateQueries({ queryKey: projectKeys.list(wsId) });
+      qc.invalidateQueries({ queryKey: projectKeys.detail(wsId, projectId) });
     },
   });
 }
@@ -75,6 +77,8 @@ export function useUpdateProjectResource(wsId: string, projectId: string) {
       qc.invalidateQueries({
         queryKey: projectResourceKeys.list(wsId, projectId),
       });
+      qc.invalidateQueries({ queryKey: projectKeys.list(wsId) });
+      qc.invalidateQueries({ queryKey: projectKeys.detail(wsId, projectId) });
     },
   });
 }
@@ -115,6 +119,8 @@ export function useDeleteProjectResource(wsId: string, projectId: string) {
       qc.invalidateQueries({
         queryKey: projectResourceKeys.list(wsId, projectId),
       });
+      qc.invalidateQueries({ queryKey: projectKeys.list(wsId) });
+      qc.invalidateQueries({ queryKey: projectKeys.detail(wsId, projectId) });
     },
   });
 }

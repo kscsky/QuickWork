@@ -1,4 +1,4 @@
-import { writeFileSync, readFileSync, rmSync } from "node:fs";
+import { appendFileSync, writeFileSync, readFileSync, rmSync } from "node:fs";
 import type { FreezeBreadcrumb } from "../shared/freeze-breadcrumb";
 
 // When the renderer truly hangs or its process dies, it can't send telemetry
@@ -37,6 +37,15 @@ export const FREEZE_BREADCRUMB_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 export function writeFreezeBreadcrumb(filePath: string, breadcrumb: FreezeBreadcrumb): void {
   try {
     writeFileSync(filePath, JSON.stringify(breadcrumb), "utf8");
+    // Keep a short append-only trail beside the single-slot breadcrumb. The
+    // slot is last-write-wins; two crashes in one session would otherwise
+    // erase the first one before it is ever reported.
+    appendFileSync(
+      `${filePath}.log`,
+      `${JSON.stringify({ ...breadcrumb, recordedAt: Date.now() })}
+`,
+      "utf8",
+    );
   } catch {
     // Disk full / permissions — drop silently.
   }

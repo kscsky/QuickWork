@@ -165,6 +165,17 @@ members carry no skills segment. Builtin `quickwork-*` skills are not listed —
 only the workspace skills explicitly attached to the agent. Archived agent
 members are skipped from the briefing roster.
 
+**Relay tasks are the exception.** An issue with a chain (小队接力) coordinates
+through the chain, not through a leader: each leg's agent does its own leg's
+work and the baton moves when the leg's holder approves (审核通过). On such
+issues the coordinator protocol is never injected — a run by one of the chain's
+agents gets a relay leg briefing instead (which leg, the holder's own brief,
+what the previous leg handed over, and that hand-offs move on approval, not on
+@mentions), and a leader-flagged task degrades to a plain worker turn. The
+Squad Operating Protocol's "delegate by @mention, do not do the work yourself"
+must never fire on a relay: other members' agents are private and cannot be
+invoked across owners, so following it dead-ends in `invocation_not_allowed`.
+
 ## Issue assignment behavior
 
 Issues can be assigned to squads with:

@@ -36,6 +36,7 @@ export function useTypeLabels(): Record<InboxItemType, string> {
     quick_create_failed: t(($) => $.types.quick_create_failed),
     quick_create_unconfirmed: t(($) => $.types.quick_create_unconfirmed),
     flow_handoff: t(($) => $.types.flow_handoff),
+    squad_message: t(($) => $.types.squad_message),
   };
 }
 

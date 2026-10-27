@@ -1,5 +1,5 @@
 {
-  "title": "分析",
+  "title": "使用量",
   "tab_usage": "使用量",
   "header": {
     "timezone_and_updated": "{{tz}} · {{time}} 更新",
@@ -104,5 +104,200 @@
   },
   "duration": {
     "less_than_minute": "1分未満"
+  },
+  "subtitle": "モデル・エージェント・プロジェクト別に Token 消費とコストを確認します。",
+  "tabs": {
+    "overview": "概要",
+    "logs": "呼び出しログ"
+  },
+  "range": {
+    "label": "期間",
+    "days": "{{days}} 日"
+  },
+  "overview": {
+    "empty_title": "この期間に使用量はありません",
+    "empty_body": "期間またはプロジェクトを変更してください。",
+    "error_title": "使用量を読み込めませんでした",
+    "error_body": "しばらくしてから再試行してください。",
+    "error_retry": "再試行",
+    "hero": {
+      "label": "合計コスト · {{range}}",
+      "vs_previous": "前期比",
+      "daily_avg": "1 日あたり {{value}}",
+      "last7": "直近 7 日 {{value}}/日"
+    },
+    "kpi": {
+      "calls": "呼び出し回数",
+      "calls_hint": "成功 {{success}} · 失敗 {{failed}} · キャンセル {{cancelled}}",
+      "tokens": "総 Token",
+      "tokens_hint": "入力 {{input}} · 出力 {{output}} · キャッシュ {{cache}}",
+      "cache": "キャッシュヒット率",
+      "cache_hint": "換算節約 {{saved}} · 前期比 {{delta}}pp",
+      "avg_cost": "平均単価",
+      "avg_cost_hint": "{{models}} モデル · {{agents}} エージェント",
+      "cache_hint_plain": "換算節約 {{saved}}"
+    },
+    "trend": {
+      "title_cost": "コスト推移",
+      "title_tokens": "Token 推移",
+      "title_calls": "呼び出し推移",
+      "subtitle": "モデル別積み上げ · {{range}}",
+      "total_label": "合計",
+      "total_value": "合計 {{value}}",
+      "average": "平均 {{value}}",
+      "metric_label": "指標",
+      "metric_cost": "コスト",
+      "metric_tokens": "Token",
+      "metric_calls": "呼び出し",
+      "other": "その他"
+    },
+    "models": {
+      "title": "モデル別シェア",
+      "subtitle": "{{range}} · コスト順",
+      "total_label": "合計コスト",
+      "footer": "{{count}} モデル。コストはプロバイダー報告額を優先し、ない場合は現在の料金表から推定します。",
+      "detail_title": "モデル明細",
+      "detail_subtitle": "{{range}} のモデル別集計。行を選択すると呼び出しログを開きます",
+      "view_logs": "すべてのログ",
+      "col_model": "モデル",
+      "col_calls": "呼び出し",
+      "col_input": "入力",
+      "col_output": "出力",
+      "col_cache_read": "キャッシュ読取",
+      "col_cache_write": "キャッシュ書込",
+      "col_hit": "ヒット率",
+      "col_avg": "平均",
+      "col_cost": "コスト",
+      "col_share": "割合",
+      "row_action": "{{model}} の呼び出しログを表示",
+      "footnote": "コストはプロバイダー報告額を優先し、ない場合は現在の料金表から推定して ≈ を付けます。ヒット率 = キャッシュ読取 ÷（キャッシュ読取 + 入力）。内訳は四捨五入のため、合計は集計値を正とします。",
+      "subtitle_tokens": "{{range}} · Token 順",
+      "total_label_tokens": "総 Token"
+    },
+    "agents": {
+      "title": "エージェント別消費",
+      "subtitle": "{{range}} · コスト順",
+      "row_hint": "{{calls}} 回 · 失敗率 {{rate}}",
+      "footnote": "失敗率 = 失敗呼び出し ÷ 全呼び出し。キャンセルは失敗に含みません。",
+      "restricted": "制限付きエージェント",
+      "deleted": "削除済みエージェント"
+    },
+    "composition": {
+      "title": "コスト構成",
+      "subtitle": "{{range}} · Token 種別",
+      "input": "入力 Token",
+      "output": "出力 Token",
+      "cache_read": "キャッシュ読取",
+      "cache_write": "キャッシュ書込",
+      "saved_label": "キャッシュ読取 · 換算節約",
+      "saved_hint": "入力単価で換算 · ヒット率 {{rate}}",
+      "saved_hint_delta": "入力単価で換算 · ヒット率 {{rate}}（前期比 {{delta}}pp）"
+    },
+    "unpriced_title": "料金未設定のモデルがあります",
+    "unpriced_body": "コストには {{models}} が含まれていません。ランタイムページで単価を設定すると反映されます。"
+  },
+  "logs": {
+    "title": "モデル呼び出しログ",
+    "subtitle": "1 task × 1 モデルで 1 行。概要と同じ範囲: {{range}} · {{project}}。",
+    "export": "CSV エクスポート",
+    "summary": {
+      "calls": "呼び出し回数",
+      "calls_hint": "成功 {{success}} · 失敗 {{failed}} · キャンセル {{cancelled}}",
+      "cost": "合計コスト",
+      "cost_hint": "現在のフィルターと期間",
+      "avg": "平均単価",
+      "avg_hint": "モデル呼び出しあたり",
+      "fail_rate": "失敗率",
+      "fail_hint": "{{failed}} 件失敗"
+    },
+    "search_placeholder": "タスク、モデル、task ID を検索",
+    "status": {
+      "all": "すべて",
+      "success": "成功",
+      "failed": "失敗",
+      "cancelled": "キャンセル",
+      "running": "実行中",
+      "unknown": "不明"
+    },
+    "filters": {
+      "all_models": "すべてのモデル",
+      "all_agents": "すべてのエージェント",
+      "reset": "リセット",
+      "model_label": "モデルフィルター",
+      "agent_label": "エージェントフィルター"
+    },
+    "table": {
+      "time": "時刻",
+      "status": "ステータス",
+      "agent": "エージェント",
+      "issue": "タスク",
+      "model": "モデル / プロバイダー",
+      "input": "入力",
+      "output": "出力",
+      "cache": "キャッシュ読取 / 書込",
+      "duration": "所要時間",
+      "cost": "コスト",
+      "trigger": "トリガー"
+    },
+    "trigger": {
+      "comment": "コメント",
+      "autopilot": "自動化",
+      "direct": "自動",
+      "retry": "再試行",
+      "rerun": "再実行",
+      "chat": "チャット",
+      "quick_create": "クイック作成",
+      "other": "その他"
+    },
+    "no_issue": "タスク未紐付け",
+    "restricted_agent": "制限付きエージェント",
+    "unknown_agent": "不明なエージェント",
+    "detail": {
+      "tokens": "Token 構成",
+      "input": "入力",
+      "output": "出力",
+      "cache_read": "キャッシュ読取",
+      "cache_write": "キャッシュ書込",
+      "task_id": "task ID",
+      "started": "開始",
+      "completed": "終了",
+      "agent_project": "エージェント / プロジェクト",
+      "trigger": "トリガー",
+      "failure": "失敗理由",
+      "cost": "コスト内訳",
+      "reported": "プロバイダー報告",
+      "estimated": "料金表から推定",
+      "pending": "保留",
+      "total": "合計",
+      "view_run": "タスクで表示 →",
+      "no_usage": "この失敗実行は使用量を報告していません。",
+      "running_usage": "実行中です。使用量は終了時に報告されます。",
+      "unpriced": "このモデルの料金が未設定のため、コストに含まれていません。"
+    },
+    "pagination": {
+      "showing": "{{from}}–{{to}} / {{total}} 件",
+      "per_page": "{{count}} 件/ページ",
+      "per_page_label": "1 ページの件数",
+      "prev": "前のページ",
+      "next": "次のページ"
+    },
+    "empty_title": "一致する呼び出しはありません",
+    "empty_body": "フィルターを変更するか、期間を広げてください。",
+    "empty_reset": "フィルターをリセット",
+    "error_title": "呼び出しログを読み込めませんでした",
+    "error_body": "しばらくしてから再試行してください。",
+    "error_retry": "再試行",
+    "note": "1 行は 1 つの task が 1 つのモデルに使った使用量です。モデルのフォールバックや再試行で同じ task に複数行ができることがあります。コストはプロバイダー報告額を優先し、ない場合は現在の料金表から推定して ≈ を付けます。時刻は使用量の報告時刻（{{tz}}）です。ページングは表だけに影響し、集計は常にフィルター後の全行を対象にします。",
+    "export_empty": "現在のフィルターにエクスポートできる呼び出しがありません。",
+    "export_failed": "エクスポートに失敗しました。しばらくしてから再試行してください。",
+    "export_success": "{{count}} 件の呼び出しをエクスポートしました。",
+    "export_too_large": "{{limit}} 件を超えています。フィルターを絞ってからエクスポートしてください。"
+  },
+  "console": {
+    "days_near": "直近 {{days}} 日",
+    "calls_unit": "回の呼び出し",
+    "tokens_unit": "tokens",
+    "top5": "TOP 5",
+    "chart_title": "日次消費"
   }
 }

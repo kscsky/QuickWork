@@ -1,12 +1,14 @@
 "use client";
 
-import { useLayoutEffect, useState } from "react";
+import { useLayoutEffect, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { cn } from "@quickwork/ui/lib/utils";
 import { Dialog, DialogContent } from "@quickwork/ui/components/ui/dialog";
 import type { CreateMode } from "@quickwork/core/issues/stores/create-mode-store";
 import { AgentCreatePanel } from "./quick-create-issue";
 import { ManualCreatePanel, manualDialogContentClass } from "./create-issue";
+import { SquadTaskBody } from "./squad-task-body";
+import { TaskTypeSwitch } from "./create-task-chrome";
 import { sourceContextPreviewOptions } from "@quickwork/core/issues/queries";
 import { useIssueDraftStore } from "@quickwork/core/issues/stores/draft-store";
 import { useWorkspaceId } from "@quickwork/core/hooks";
@@ -15,8 +17,13 @@ import { useWorkspaceId } from "@quickwork/core/hooks";
  * Shell that owns the single `<Dialog>` AND `<DialogContent>` for the
  * create-issue flow. `initialMode` comes from the modal registry
  * (`quick-create-issue` → agent, `create-issue` → manual) and is fixed for
- * the dialog's lifetime — the 单人任务 entry is agent-only, so there is no
- * in-dialog mode switch any more.
+ * the dialog's lifetime.
+ *
+ * One dialog creates both kinds of work: the strip's 单人任务 / 小队任务
+ * switch swaps the body between the solo panel and the squad relay composer.
+ * The task list's create button, the sidebar button and the palette all open
+ * this same dialog — the type is chosen inside, not by which entry point was
+ * used.
  *
  * `isExpanded` is lifted up because it drives `DialogContent`'s className —
  * the className lives here in the shell since the Popup is here, but the
@@ -107,32 +114,29 @@ function CreateIssueDialogBody({
   sourceContextExpanded?: boolean;
 }) {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [createType, setCreateType] = useState<"single" | "squad">("single");
+  // A squad dispatch in flight owns the dialog: the issue link and chain
+  // write happen in the body's effects, so closing would strand them.
+  const [squadBusy, setSquadBusy] = useState(false);
   const effectiveData = sourceContextData
     ? { ...(data ?? {}), ...sourceContextData }
     : data;
 
+  // The source-context create is single-purpose (it hangs off one comment);
+  // it has no second body to switch to, so it keeps the static label.
+  const typeSwitch: ReactNode = sourceContextData ? undefined : (
+    <TaskTypeSwitch
+      value={createType}
+      onChange={setCreateType}
+      disabled={createType === "squad" && squadBusy}
+    />
+  );
+
   const className =
-    initialMode === "agent"
+    createType === "squad" || initialMode === "agent"
       ? cn(
-          "p-0 gap-0 flex flex-col overflow-hidden",
+          "qk-create-dialog",
           "!top-1/2 !left-1/2 !-translate-x-1/2 !-translate-y-1/2",
-          // Phone gutter. The widths below are `!important` so they beat
-          // DialogContent's own sizing — which also made them beat its
-          // `max-w-[calc(100%-2rem)]` safety margin, leaving the card flush
-          // against both screen edges on a 430px viewport (MUL-6236). Restore
-          // the margin here and let the `sm:` widths take over above 640px.
-          "!w-full !max-w-[calc(100vw-1.5rem)]",
-          // Source-context create needs numeric collapsed/expanded endpoints
-          // so its preview transition can interpolate the height. Ordinary
-          // quick create has no expanding preview and keeps its original
-          // content-driven height, capped for mobile browser chrome.
-          isExpanded
-            ? "!h-5/6 sm:!max-w-4xl"
-            : sourceContextData
-              ? sourceContextExpanded
-                ? "!h-5/6 sm:!max-w-2xl"
-                : "!h-96 sm:!max-w-xl"
-              : "!max-h-[80dvh] sm:!max-w-2xl",
         )
       : cn(
           manualDialogContentClass(isExpanded),
@@ -140,18 +144,32 @@ function CreateIssueDialogBody({
         );
 
   return (
-    <Dialog open onOpenChange={(v) => { if (!v) onClose(); }}>
+    <Dialog
+      open
+      onOpenChange={(v) => {
+        if (!v && squadBusy) return;
+        if (!v) onClose();
+      }}
+    >
       <DialogContent
         finalFocus={false}
         showCloseButton={false}
+        data-mode={createType === "squad" ? "squad" : "single"}
         className={className}
       >
-        {initialMode === "agent" ? (
+        {createType === "squad" ? (
+          <SquadTaskBody
+            onClose={onClose}
+            onBusyChange={setSquadBusy}
+            typeSwitch={typeSwitch}
+          />
+        ) : initialMode === "agent" ? (
           <AgentCreatePanel
             onClose={onClose}
             data={effectiveData}
             isExpanded={isExpanded}
             setIsExpanded={setIsExpanded}
+            typeSwitch={typeSwitch}
           />
         ) : (
           <ManualCreatePanel
@@ -159,6 +177,7 @@ function CreateIssueDialogBody({
             data={effectiveData}
             isExpanded={isExpanded}
             setIsExpanded={setIsExpanded}
+            typeSwitch={typeSwitch}
           />
         )}
       </DialogContent>

@@ -316,6 +316,87 @@ func (q *Queries) CreateInboxItem(ctx context.Context, arg CreateInboxItemParams
 	return i, err
 }
 
+const deleteAllInbox = `-- name: DeleteAllInbox :execrows
+DELETE FROM inbox_item
+WHERE workspace_id = $1 AND recipient_type = 'member' AND recipient_id = $2
+`
+
+type DeleteAllInboxParams struct {
+	WorkspaceID pgtype.UUID `json:"workspace_id"`
+	RecipientID pgtype.UUID `json:"recipient_id"`
+}
+
+// Permanent deletion, including archived rows. Unlike ArchiveAllInbox this
+// cannot be undone; the handler backs an explicitly worded destructive action.
+func (q *Queries) DeleteAllInbox(ctx context.Context, arg DeleteAllInboxParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteAllInbox, arg.WorkspaceID, arg.RecipientID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const deleteArchivedInbox = `-- name: DeleteArchivedInbox :execrows
+DELETE FROM inbox_item
+WHERE workspace_id = $1 AND recipient_type = 'member' AND recipient_id = $2 AND archived = true
+`
+
+type DeleteArchivedInboxParams struct {
+	WorkspaceID pgtype.UUID `json:"workspace_id"`
+	RecipientID pgtype.UUID `json:"recipient_id"`
+}
+
+// "清空归档": permanently removes the recipient's archived notifications.
+func (q *Queries) DeleteArchivedInbox(ctx context.Context, arg DeleteArchivedInboxParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteArchivedInbox, arg.WorkspaceID, arg.RecipientID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const deleteInboxItem = `-- name: DeleteInboxItem :execrows
+DELETE FROM inbox_item
+WHERE id = $1 AND workspace_id = $2 AND recipient_type = 'member' AND recipient_id = $3
+`
+
+type DeleteInboxItemParams struct {
+	ID          pgtype.UUID `json:"id"`
+	WorkspaceID pgtype.UUID `json:"workspace_id"`
+	RecipientID pgtype.UUID `json:"recipient_id"`
+}
+
+// Permanent, recipient-scoped deletion of one notification. The console's
+// per-item delete is explicitly confirmed, so there is no archive tombstone to
+// restore from.
+func (q *Queries) DeleteInboxItem(ctx context.Context, arg DeleteInboxItemParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteInboxItem, arg.ID, arg.WorkspaceID, arg.RecipientID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const deleteReadInbox = `-- name: DeleteReadInbox :execrows
+DELETE FROM inbox_item
+WHERE workspace_id = $1 AND recipient_type = 'member' AND recipient_id = $2 AND read = true AND archived = false
+`
+
+type DeleteReadInboxParams struct {
+	WorkspaceID pgtype.UUID `json:"workspace_id"`
+	RecipientID pgtype.UUID `json:"recipient_id"`
+}
+
+// "清理已读": permanently removes read notifications from the active list.
+// Archived rows and unread rows are untouched.
+func (q *Queries) DeleteReadInbox(ctx context.Context, arg DeleteReadInboxParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteReadInbox, arg.WorkspaceID, arg.RecipientID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const getInboxItem = `-- name: GetInboxItem :one
 SELECT id, workspace_id, recipient_type, recipient_id, type, severity, issue_id, title, body, read, archived, created_at, actor_type, actor_id, details FROM inbox_item
 WHERE id = $1

@@ -13,6 +13,7 @@ import { isOfficialMarketingHost } from "./lib/public-host";
 // and post-revert-and-reapply users don't hit 404.
 const LEGACY_ROUTE_SEGMENTS = new Set([
   "issues",
+  "tasks",
   "projects",
   "agents",
   "squads",
@@ -71,8 +72,14 @@ export function proxy(req: NextRequest) {
     }
 
     if (lastSlug) {
+      // The flat workspace issue list is retired (its surface is /tasks);
+      // /issues/:id stays a valid detail deep link.
+      const targetPath =
+        firstSegment === "issues" && /^\/issues\/?$/.test(pathname)
+          ? "/tasks"
+          : pathname;
       // Preserve deep-link path + query: /issues/abc → /{lastSlug}/issues/abc
-      url.pathname = `/${lastSlug}${pathname}`;
+      url.pathname = `/${lastSlug}${targetPath}`;
       return NextResponse.redirect(url);
     }
 

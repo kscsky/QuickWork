@@ -177,6 +177,17 @@ type TaskMessagePayload struct {
 	Input     map[string]any `json:"input,omitempty"`   // tool input (tool_use only)
 	Output    string         `json:"output,omitempty"`  // tool output (tool_result only)
 	CreatedAt string         `json:"created_at,omitempty"`
+	// Usage is the token delta of the assistant turn this message closed;
+	// omitted when the turn reported none (older daemons, unmetered providers).
+	Usage *TaskMessageUsage `json:"usage,omitempty"`
+}
+
+// TaskMessageUsage is one assistant turn's token delta.
+type TaskMessageUsage struct {
+	InputTokens      int64 `json:"input_tokens"`
+	OutputTokens     int64 `json:"output_tokens"`
+	CacheReadTokens  int64 `json:"cache_read_tokens"`
+	CacheWriteTokens int64 `json:"cache_write_tokens"`
 }
 
 // DaemonRegisterPayload is sent from daemon to server on connection.
@@ -213,7 +224,7 @@ const (
 	// than a silently-dropped turn (MUL-4351).
 	ChatMessageKindNoResponse = "no_response"
 	// ChatMessageKindOnboardingKickoff is the server-authored, hidden first
-	// turn used to start Mika's onboarding conversation. It is persisted so
+	// turn used to start Quill's onboarding conversation. It is persisted so
 	// the runtime receives a normal immutable chat input batch. User-facing
 	// APIs filter it out; clients also ignore the kind defensively.
 	ChatMessageKindOnboardingKickoff = "onboarding_kickoff"

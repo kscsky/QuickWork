@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
 import { render, screen, within } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { I18nProvider } from "@quickwork/core/i18n/react";
 import enCommon from "../../locales/en/common.json";
 import enOnboarding from "../../locales/en/onboarding.json";
@@ -118,7 +117,7 @@ describe("onboarding step shell", () => {
 
     const compact = container.querySelector("main .md\\:hidden")!;
     expect(compact).not.toBeNull();
-    expect(compact.textContent).toContain("Meet Mika");
+    expect(compact.textContent).toContain("Space");
     expect(compact.querySelector("button")).not.toBeNull();
   });
 
@@ -153,7 +152,8 @@ describe("onboarding progress rail", () => {
     // so an unscoped query matches it twice.
     const rail = within(container.querySelector("aside")!);
     expect(rail.getByText("Space")).toBeInTheDocument();
-    expect(rail.getByText("Meet Mika")).toBeInTheDocument();
+    // Only persisted steps appear in the rail; the intro is not one.
+    expect(rail.queryByText("Meet Quill")).toBeNull();
   });
 
   it("marks the current step for assistive tech", () => {
@@ -166,17 +166,13 @@ describe("onboarding progress rail", () => {
 
   // Forward navigation has to run the current step's validation and submit, so
   // only the steps already behind the member are reachable from the rail.
-  it("links completed steps and leaves the current and later ones inert", async () => {
+  it("leaves the only persisted step inert because nothing is behind it", () => {
     const onStepChange = vi.fn();
     renderShell({ currentStep: "workspace", onStepChange });
 
-    // Workspace is the first persisted step, so it is the only one that can
-    // ever be behind the member — there is nothing before it to walk back to.
-    const back = screen.getByRole("button", { name: /space/i });
-    await userEvent.click(back);
-    expect(onStepChange).toHaveBeenCalledWith("workspace");
-
-    expect(screen.queryByRole("button", { name: /meet mika/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /space/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /meet quill/i })).toBeNull();
+    expect(onStepChange).not.toHaveBeenCalled();
   });
 
   it("is display-only when the flow supplies no step handler", () => {

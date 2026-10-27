@@ -1,6 +1,6 @@
 import { useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { ProjectDetail } from "@quickwork/views/projects/components";
+import { ProjectsPage } from "@quickwork/views/projects/components";
 import { useWorkspaceId } from "@quickwork/core/hooks";
 import { projectDetailOptions } from "@quickwork/core/projects/queries";
 import { useDocumentTitle } from "@/hooks/use-document-title";
@@ -15,5 +15,5 @@ export function ProjectDetailPage() {
   useDocumentTitle(project ? project.title : "Project");
 
   if (!id) return null;
-  return <ProjectDetail projectId={id} />;
+  return <ProjectsPage initialProjectId={id} />;
 }

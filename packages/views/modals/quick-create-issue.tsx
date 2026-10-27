@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
-  Bot,
+  ArrowUpRight,
   CalendarDays,
   Check,
   FolderKanban,
@@ -11,7 +11,6 @@ import {
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { DialogTitle } from "@quickwork/ui/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,9 +18,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@quickwork/ui/components/ui/dropdown-menu";
-import { Button } from "@quickwork/ui/components/ui/button";
 import { Switch } from "@quickwork/ui/components/ui/switch";
-import { cn } from "@quickwork/ui/lib/utils";
 import { api, ApiError } from "@quickwork/core/api";
 import { useWorkspaceId } from "@quickwork/core/hooks";
 import { useCurrentWorkspace, useWorkspacePaths } from "@quickwork/core/paths";
@@ -42,6 +39,7 @@ import {
   checkQuickCreateCliVersion,
   checkQuickCreateFieldsCliVersion,
   readRuntimeCliVersion,
+  runtimeDisplayLabel,
 } from "@quickwork/core/runtimes";
 import { useShortcut } from "@quickwork/core/shortcuts";
 import { ShortcutKeycaps } from "../common/shortcut-keycaps";
@@ -52,15 +50,9 @@ import {
   type SourceContextPreview,
 } from "@quickwork/core/types";
 import { ActorAvatar } from "../common/actor-avatar";
-import { ClearablePillButton, PillButton } from "../common/pill-button";
 import { ProjectPicker } from "../projects/components/project-picker";
-import { DueDatePicker, PriorityIcon, PriorityPicker } from "../issues/components";
+import { DueDatePicker, PriorityIcon } from "../issues/components";
 import { isAgentRuntimeBound } from "@quickwork/core/agents";
-import {
-  PropertyPicker,
-  PickerItem,
-  PickerEmpty,
-} from "../issues/components/pickers/property-picker";
 import { useAuthStore } from "@quickwork/core/auth";
 import {
   ContentEditor,
@@ -73,9 +65,9 @@ import {
 import { useIssueCreateUploads } from "./use-issue-create-uploads";
 import { FileUploadButton } from "@quickwork/ui/components/common/file-upload-button";
 import { useT } from "../i18n";
-import { matchesPinyin } from "../editor/extensions/pinyin-match";
 import { SourceContextPreviewCard, useSourceContextFailureMessage } from "./source-context-preview";
-import { DocketStrip } from "./docket-strip";
+import { CreateTaskChrome, DispatchPriority } from "./create-task-chrome";
+import { cn } from "@quickwork/ui/lib/utils";
 
 // Solo-task dialog: the actor is always one of the caller's own agents.
 type ActorSelection = { type: "agent"; id: string };
@@ -88,18 +80,18 @@ type ActorSelection = { type: "agent"; id: string };
 export function AgentCreatePanel({
   onClose,
   data,
-  isExpanded,
-  setIsExpanded,
+  typeSwitch,
 }: {
   onClose: () => void;
   data?: Record<string, unknown> | null;
-  /** Lifted to the shell so DialogContent's className can react. */
-  isExpanded: boolean;
-  setIsExpanded: (v: boolean) => void;
+  /** Kept for the source-context create call site; the refresh dialog has no expand state. */
+  isExpanded?: boolean;
+  setIsExpanded?: (v: boolean) => void;
+  /** The 单人/小队 switch, owned by the shell; rendered into the top strip. */
+  typeSwitch?: ReactNode;
 }) {
   const { t } = useT("modals");
   const { t: tIssues } = useT("issues");
-  const { t: tProjects } = useT("projects");
   const sendShortcut = useShortcut("send");
   const workspaceName = useCurrentWorkspace()?.name;
   const workspacePaths = useWorkspacePaths();
@@ -287,6 +279,10 @@ export function AgentCreatePanel({
         : undefined,
     [runtimes, selectedAgent?.runtime_id],
   );
+  const runtimeById = useMemo(
+    () => new Map(runtimes.map((runtime) => [runtime.id, runtime])),
+    [runtimes],
+  );
   const runtimeCliVersion = readRuntimeCliVersion(selectedRuntime?.metadata);
   const baseVersionCheck = useMemo(
     () => checkQuickCreateCliVersion(runtimeCliVersion),
@@ -303,14 +299,31 @@ export function AgentCreatePanel({
     (usesExplicitFields && fieldVersionCheck.state !== "ok");
 
   const initialPrompt = draft.agent.prompt || (data?.prompt as string) || "";
+  const title = draft.agent.title ?? "";
   // The editor is uncontrolled — we read the latest markdown via the ref at
-  // submit/switch time. `hasContent` mirrors emptiness so the Create button
-  // can disable correctly without a controlled-input rerender on every keystroke.
+  // submit/switch time. The headline names the action; the brief is optional.
   const editorRef = useRef<ContentEditorRef>(null);
-  const [hasContent, setHasContent] = useState(initialPrompt.trim().length > 0);
+  const titleRef = useRef<HTMLInputElement>(null);
+  const hasContent = title.trim().length > 0;
+  const composePrompt = (body: string) => {
+    const headline = title.trim();
+    if (!headline) return body;
+    if (!body.trim()) return headline;
+    return `# ${headline}
+
+${body}`;
+  };
   const [justSent, setJustSent] = useState(false);
   const [sentCount, setSentCount] = useState(0);
+  const [stamped, setStamped] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (closeTimer.current) clearTimeout(closeTimer.current);
+    },
+    [],
+  );
   const uploadGate = useUploadGate(editorRef);
   // Coordinator-owned uploads in the shared draft pool (MUL-5181, L2): a file
   // pasted into the prompt survives dialog close and mode switches, aborts on
@@ -326,11 +339,21 @@ export function AgentCreatePanel({
   });
 
   useEffect(() => {
-    // Defer focus so it lands after the dialog's focus trap has settled —
-    // otherwise the trap can bounce focus back to the first focusable header
-    // button on the next tick.
-    const id = requestAnimationFrame(() => editorRef.current?.focus());
-    return () => cancelAnimationFrame(id);
+    // Defer focus so it lands after the dialog's focus trap has settled, but
+    // never steal it back from a field the user already reached.
+    const focusTitle = () => {
+      const active = document.activeElement as HTMLElement | null;
+      if (active && (active.isContentEditable || /^(INPUT|TEXTAREA)$/.test(active.tagName))) {
+        return;
+      }
+      titleRef.current?.focus();
+    };
+    const id = requestAnimationFrame(focusTitle);
+    const timer = window.setTimeout(focusTitle, 90);
+    return () => {
+      cancelAnimationFrame(id);
+      window.clearTimeout(timer);
+    };
   }, []);
 
   // Agent create runs through the shared await-then-render composer contract
@@ -356,6 +379,7 @@ export function AgentCreatePanel({
   const composer = useComposerSubmit({
     editorRef,
     uploadGate: gate,
+    allowEmpty: () => (draft.agent.title ?? "").trim().length > 0,
     onSubmit: async (md): Promise<boolean> => {
       // The button already disables on !actor / versionBlocked, but the
       // ⌘+Enter path bypasses it — re-guard here and keep the draft in place.
@@ -365,8 +389,9 @@ export function AgentCreatePanel({
       const pendingPrompt = editorRef.current?.flushPendingUpdate?.();
       if (pendingPrompt != null) setAgent({ prompt: pendingPrompt });
       submittedDraftRef.current = useIssueDraftStore.getState().draft;
+      const prompt = composePrompt(md);
       const activeAttachmentIds = pendingAttachments
-        .filter((a) => contentReferencesAttachment(md, a))
+        .filter((a) => contentReferencesAttachment(prompt, a))
         .map((a) => a.id);
       setError(null);
       try {
@@ -376,7 +401,7 @@ export function AgentCreatePanel({
             capture_token: sourcePreview.capture_token,
             quick_create: {
               agent_id: actor.id,
-              prompt: md,
+              prompt,
               project_id: projectId ?? undefined,
               ...(priority !== "none" ? { priority } : {}),
               ...(dueDate ? { due_date: dueDate } : {}),
@@ -386,7 +411,7 @@ export function AgentCreatePanel({
         } else {
           await api.quickCreateIssue({
             agent_id: actor.id,
-            prompt: md,
+            prompt,
             project_id: projectId ?? undefined,
             ...(priority !== "none" ? { priority } : {}),
             ...(dueDate ? { due_date: dueDate } : {}),
@@ -500,19 +525,38 @@ export function AgentCreatePanel({
         // Stay open for continuous creation — clear the editor so the user can
         // immediately type the next prompt.
         editorRef.current?.clearContent();
-        setHasContent(false);
+        setAgent({ title: "" });
         setSentCount((c) => c + 1);
         setJustSent(true);
         setTimeout(() => setJustSent(false), 1500);
         refocusAfterAcceptRef.current = true;
       } else {
-        onClose();
+        setStamped(true);
+        closeTimer.current = setTimeout(onClose, 560);
       }
     },
   });
   const submit = () => {
+    if (stamped) return;
+    if (!title.trim()) {
+      setError(t(($) => $.create_issue.title_required_solo));
+      titleRef.current?.focus();
+      return;
+    }
     void composer.submit();
   };
+  const submitRef = useRef(submit);
+  submitRef.current = submit;
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+        event.preventDefault();
+        submitRef.current();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
   const submitting = composer.submitting;
 
   // Field visibility lives in Settings → Issue. Persist the prompt draft
@@ -528,233 +572,96 @@ export function AgentCreatePanel({
   };
 
   return (
-    <>
-        <DialogTitle className="sr-only">{t(($) => $.create_issue.sr_agent)}</DialogTitle>
+    <CreateTaskChrome onClose={onClose} typeSwitch={typeSwitch}>
+          <div className={cn("qk-create-paper", stamped && "is-stamping")}>
+            <div className="qk-paper-head">
+              <span className="qk-paper-label">{t(($) => $.create_issue.paper_dispatch)}</span>
+              <span className="qk-paper-kind">{t(($) => $.create_issue.kind_solo)}</span>
+              <span className="qk-paper-meta">{(workspaceName ?? "").toUpperCase()}</span>
+            </div>
 
-        <DocketStrip
-          workspaceName={workspaceName ?? ""}
-          isExpanded={isExpanded}
-          onToggleExpanded={() => setIsExpanded(!isExpanded)}
-          onClose={onClose}
-        />
+            <label className="qk-title-field" htmlFor="qk-create-title">
+              <span className="qk-title-label">{t(($) => $.create_issue.title_label_solo)}</span>
+              <input
+                ref={titleRef}
+                id="qk-create-title"
+                value={title}
+                onChange={(e) => {
+                  setAgent({ title: e.target.value });
+                  setError(null);
+                }}
+                placeholder={t(($) => $.create_issue.title_placeholder_solo)}
+                autoComplete="off"
+                className="qk-title-input"
+              />
+            </label>
 
-        {/* 我的智能体 — a solo task runs on one of the caller's OWN agents;
-            squads and other members' agents are deliberately not listed. */}
-        <div className="shrink-0 px-5 pt-3.5">
-          <span className="text-micro text-faint-foreground">
-            {t(($) => $.create_issue.section_agent)}
-          </span>
-          <div className="mt-1.5">
-            <AgentSeat
-              agent={selectedAgent}
-              agents={visibleAgents}
-              onPick={(next) => {
-                setActor({ type: "agent", id: next.id });
-                setAgent({ actorType: "agent", actorId: next.id });
-                setError(null);
-              }}
-              t={t}
-            />
-          </div>
-        </div>
+            <div className="qk-form-error" role="status">{error ?? ""}</div>
 
-        {selectedAgent && versionBlocked && (
-          <div className="mx-5 mt-2 shrink-0 rounded-md border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-caption text-amber-700 dark:text-amber-300">
-            {versionCheck.state === "missing"
-              ? t(($) => $.create_issue.agent.version_missing, { min: versionCheck.min })
-              : t(($) => $.create_issue.agent.version_below, {
-                  current: versionCheck.current,
-                  min: versionCheck.min,
-                })}
-          </div>
-        )}
-
-        {/* 要什么 — same rich editor Advanced uses, now boxed as a card:
-            paste/drop images, mentions, and formatting all work. The card
-            absorbs the remaining vertical space and scrolls internally;
-            without that, pasting an image expanded the editor unbounded and
-            pushed the modal past the viewport. */}
-        <div className="flex min-h-0 flex-1 flex-col px-5 pb-1 pt-4">
-          <span className="shrink-0 text-micro text-faint-foreground">
-            {t(($) => $.create_issue.section_goal)}
-          </span>
-          <div
-            {...dropZoneProps}
-            className={cn(
-              "relative mt-1.5 min-h-[132px] flex-1 overflow-y-auto rounded-[var(--radius)]",
-              "border border-input bg-surface px-3 py-2.5 transition-colors focus-within:border-brand",
-            )}
-          >
-            <ContentEditor
-              ref={editorRef}
-              defaultValue={initialPrompt}
-              placeholder={anchorCommentId
-                ? t(($) => $.create_issue.agent.source_context_prompt_placeholder)
-                : t(($) => $.create_issue.agent.prompt_placeholder)}
-              onUpdate={(md) => {
-                setHasContent(md.trim().length > 0);
-                setAgent({ prompt: md });
-              }}
-              onUploadFile={handleUploadFile}
-              onUploadingChange={uploadGate.onUploadingChange}
-              attachments={pendingAttachments}
-              onSubmit={submit}
-              debounceMs={150}
-            />
-            {isDragOver && <FileDropOverlay />}
-          </div>
-        </div>
-
-        {anchorCommentId && (
-          <SourceContextPreviewCard
-            preview={sourcePreview}
-            loading={sourceContextLoading}
-            failed={sourceContextFailed}
-            error={sourceContextError}
-            onRetry={refetchSourceContext ? () => { void refetchSourceContext(); } : undefined}
-            constrainToParent
-            expanded={sourceContextExpanded}
-            onExpandedChange={onSourceContextExpandedChange}
-          />
-        )}
-
-        {error && (
-          <div className="px-5 pb-2 text-caption text-destructive">{error}</div>
-        )}
-
-        {/* Property toolbar — the project is visible by default; priority and
-            due date live behind the overflow until exposed in settings or
-            given a value. Unfinished picks remain workspace-persistent.
-            When the modal was opened from "Add sub issue" on an existing
-            issue, a read-only chip on the same row tells the user that the
-            new issue will be filed as a sub-issue of that parent — the agent
-            handles the wiring silently, but surfacing the relationship
-            avoids "where did this end up?" surprise. We deliberately keep
-            it non-editable: changing the parent is a `Set parent` action on
-            the parent itself, not a knob in the quick-create flow. */}
-        {/* 细节 — labeled field rows (docket style). Field visibility is
-            workspace-driven: project shows by default, priority / due date
-            live behind the overflow until exposed in settings or given a
-            value. */}
-        <div className="shrink-0 px-5 pb-3 pt-2">
-          <span className="text-micro text-faint-foreground">
-            {t(($) => $.create_issue.section_details)}
-          </span>
-          <div className="mt-0.5">
-            {(visibleFields.includes("project") ||
-              projectId !== null ||
-              fieldPickerOpen === "project") && (
-              <div className="flex items-center gap-3 border-t border-dashed border-border py-1.5 first:border-t-0 first:pt-0">
-                <span className="w-[52px] shrink-0 text-caption text-muted-foreground">
-                  {t(($) => $.create_issue.field_project)}
-                </span>
-                <ProjectPicker
-                  projectId={projectId}
-                  onUpdate={(u) => commitProject(u.project_id ?? null)}
-                  triggerRender={
-                    <ClearablePillButton
-                      onClear={projectId !== null ? () => commitProject(null) : undefined}
-                      clearLabel={tProjects(($) => $.picker.clear_aria)}
-                    />
-                  }
-                  align="start"
-                  open={fieldPickerOpen === "project" ? true : undefined}
-                  onOpenChange={(open) => setFieldPickerOpen(open ? "project" : null)}
-                />
-              </div>
-            )}
-            {(visibleFields.includes("priority") ||
-              priority !== "none" ||
-              fieldPickerOpen === "priority") && (
-              <div className="flex items-center gap-3 border-t border-dashed border-border py-1.5 first:border-t-0 first:pt-0">
-                <span className="w-[52px] shrink-0 text-caption text-muted-foreground">
-                  {t(($) => $.create_issue.field_priority)}
-                </span>
-                <PriorityPicker
-                  priority={priority}
-                  onUpdate={(updates) => {
-                    if (updates.priority) {
-                      setPriority(updates.priority);
-                      setShared({ priority: updates.priority });
-                    }
+            <div className="qk-brief-field">
+              <span className="qk-field-label">{t(($) => $.create_issue.brief_label)}</span>
+              <div {...dropZoneProps} className="qk-brief-editor">
+                <ContentEditor
+                  ref={editorRef}
+                  defaultValue={initialPrompt}
+                  placeholder={anchorCommentId
+                    ? t(($) => $.create_issue.agent.source_context_prompt_placeholder)
+                    : t(($) => $.create_issue.agent.prompt_placeholder)}
+                  onUpdate={(md) => {
+                    setAgent({ prompt: md });
                   }}
-                  triggerRender={<PillButton />}
-                  align="start"
-                  open={fieldPickerOpen === "priority" ? true : undefined}
-                  onOpenChange={(open) => setFieldPickerOpen(open ? "priority" : null)}
+                  onUploadFile={handleUploadFile}
+                  onUploadingChange={uploadGate.onUploadingChange}
+                  attachments={pendingAttachments}
+                  onSubmit={submit}
+                  debounceMs={150}
+                />
+                {isDragOver && <FileDropOverlay />}
+              </div>
+            </div>
+
+            {anchorCommentId && (
+              <div className="qk-source-card">
+                <SourceContextPreviewCard
+                  preview={sourcePreview}
+                  loading={sourceContextLoading}
+                  failed={sourceContextFailed}
+                  error={sourceContextError}
+                  onRetry={refetchSourceContext ? () => { void refetchSourceContext(); } : undefined}
+                  constrainToParent
+                  expanded={sourceContextExpanded}
+                  onExpandedChange={onSourceContextExpandedChange}
                 />
               </div>
             )}
-            {(visibleFields.includes("due_date") ||
-              dueDate !== null ||
-              fieldPickerOpen === "due_date") && (
-              <div className="flex items-center gap-3 border-t border-dashed border-border py-1.5 first:border-t-0 first:pt-0">
-                <span className="w-[52px] shrink-0 text-caption text-muted-foreground">
-                  {t(($) => $.create_issue.field_due)}
-                </span>
-                <DueDatePicker
-                  dueDate={dueDate}
-                  onUpdate={(updates) => {
-                    const next = updates.due_date ?? null;
-                    setDueDate(next);
-                    setShared({ dueDate: next });
-                  }}
-                  triggerRender={<PillButton />}
-                  align="start"
-                  open={fieldPickerOpen === "due_date" ? true : undefined}
-                  onOpenChange={(open) => setFieldPickerOpen(open ? "due_date" : null)}
-                />
-              </div>
-            )}
-            <div className="flex items-center gap-1.5 border-t border-dashed border-border pt-1.5">
-              <DropdownMenu>
-                <DropdownMenuTrigger
-                  render={
-                    <PillButton
-                      aria-label={t(($) => $.create_issue.agent.more_fields_aria)}
-                      title={t(($) => $.create_issue.agent.more_fields_aria)}
-                    >
-                      <MoreHorizontal className="size-3.5" />
-                    </PillButton>
-                  }
-                />
-                <DropdownMenuContent align="start" className="w-52">
-                  {!visibleFields.includes("project") && projectId === null && (
-                    <DropdownMenuItem onClick={() => setFieldPickerOpen("project")}>
-                      <FolderKanban className="size-3.5 text-muted-foreground" />
-                      {t(($) => $.create_issue.agent.set_project)}
-                    </DropdownMenuItem>
-                  )}
-                  {!visibleFields.includes("priority") && priority === "none" && (
-                    <DropdownMenuItem onClick={() => setFieldPickerOpen("priority")}>
-                      <PriorityIcon priority="none" className="size-3.5" />
-                      {t(($) => $.create_issue.agent.set_priority)}
-                    </DropdownMenuItem>
-                  )}
-                  {!visibleFields.includes("due_date") && dueDate === null && (
-                    <DropdownMenuItem onClick={() => setFieldPickerOpen("due_date")}>
-                      <CalendarDays className="size-3.5 text-muted-foreground" />
-                      {t(($) => $.create_issue.agent.set_due_date)}
-                    </DropdownMenuItem>
-                  )}
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    render={
-                      <AppLink
-                        href={`${workspacePaths.settings()}?tab=issue`}
-                        onClick={openFieldSettings}
-                      />
-                    }
-                  >
-                    <Settings2 className="size-3.5 text-muted-foreground" />
-                    {t(($) => $.create_issue.agent.customize_fields)}
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+
+            <div className="qk-files">
+              <span className="qk-field-label">{t(($) => $.create_issue.files_label)}</span>
+              <FileUploadButton
+                size="sm"
+                multiple
+                showLabel
+                className="qk-file-button"
+                onSelect={(file) => editorRef.current?.uploadFile(file)}
+              />
+              <span className="qk-files-note">
+                {pendingAttachments.length > 0
+                  ? t(($) => $.create_issue.files_count, { count: pendingAttachments.length })
+                  : t(($) => $.create_issue.files_hint)}
+              </span>
+            </div>
+
+            <div className="qk-paper-foot">
+              <label className="qk-keep-open">
+                <Switch size="sm" checked={keepOpen} onCheckedChange={setKeepOpen} />
+                {t(($) => $.create_issue.create_another)}
+                {keepOpen && sentCount > 0 && (
+                  <span>· {t(($) => $.create_issue.agent.sent_count, { count: sentCount })}</span>
+                )}
+              </label>
               {parentIssueId && (
                 <span
                   data-testid="agent-sub-issue-chip"
-                  className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-caption text-muted-foreground"
                   title={t(($) => $.create_issue.agent.sub_issue_of, {
                     identifier: parentIssueIdentifier ?? "",
                   })}
@@ -764,225 +671,236 @@ export function AgentCreatePanel({
                   })}
                 </span>
               )}
+              <span>{t(($) => $.create_issue.paper_foot_solo)}</span>
             </div>
-          </div>
-        </div>
 
-        {/* Footer. Two layouts, one flat child list:
-            - Phones get a 2x2 grid — attach on the top row, keep-open toggle /
-              Create on the bottom one. Laid out as a single row the controls
-              need ~383px of the 398px a 430px phone has left after padding,
-              which reads as jammed and wraps outright below ~410px
-              (MUL-6236). The mode switch moved to the header strip.
-            - From `sm` up it is the original single flex row: `mr-auto` on the
-              attach group reproduces what `justify-between` did when the
-              children were two wrapper divs, and `justify-self-end` goes
-              inert on flex items. */}
-        <div className="grid grid-cols-[auto_1fr] items-center gap-x-2 gap-y-2.5 border-t px-4 py-3 shrink-0 sm:flex sm:flex-wrap">
-          <div className="flex min-h-7 items-center gap-2 sm:mr-auto">
-            {/* Deliberately NOT disabled while uploading: each file is its
-                own queue entry, so queueing a second one is safe and waiting
-                for the first to land just to attach the next is busywork. */}
-            <FileUploadButton
-              size="sm"
-              multiple
-              onSelect={(file) => editorRef.current?.uploadFile(file)}
-            />
-            {keepOpen && sentCount > 0 && (
-              <span className="text-caption text-emerald-600 dark:text-emerald-400">
-                {t(($) => $.create_issue.agent.sent_count, { count: sentCount })}
-              </span>
-            )}
-            {/* The consequence of Create, in one line — phones drop it to
-                keep the 2x2 footer grid intact (MUL-6236). */}
-            {selectedAgent && !versionBlocked && (
-              <span className="flex min-w-0 items-center gap-1.5 text-caption text-muted-foreground max-sm:hidden">
-                <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-success" />
-                <span className="truncate">
-                  {t(($) => $.run_confirm.create_will_start, { name: selectedAgent.name })}
-                </span>
-              </span>
-            )}
+            <span className="qk-dispatch-stamp" aria-hidden="true">
+              {t(($) => $.create_issue.stamp_solo)}
+            </span>
           </div>
-          <label className="flex shrink-0 items-center gap-1.5 text-caption text-muted-foreground cursor-pointer select-none">
-            <Switch
-              size="sm"
-              checked={keepOpen}
-              onCheckedChange={setKeepOpen}
-            />
-            {t(($) => $.create_issue.create_another)}
-          </label>
-          <Button
-            size="sm"
-            onClick={submit}
-            disabled={!hasContent || !actor || submitting || versionBlocked || gate.uploading || (!!anchorCommentId && !sourcePreview)}
-            aria-disabled={gate.uploading || undefined}
-            // Sending is a busy state too, not just uploading.
-            aria-busy={gate.uploading || submitting || undefined}
-            title={
-              versionBlocked
-                ? t(($) => $.create_issue.agent.version_blocked_tooltip, { min: versionCheck.min })
-                : undefined
-            }
-            className={cn(
-              "justify-self-end min-w-28",
-              justSent && "!bg-emerald-600 !text-white",
-            )}
-          >
-            {submitting ? t(($) => $.create_issue.agent.sending) : gate.uploading ? t(($) => $.create_issue.agent.uploading) : justSent ? (
-              <span className="flex items-center gap-1"><Check className="size-3.5" />{t(($) => $.create_issue.agent.sent_label)}</span>
+
+          <aside className="qk-create-panel">
+            <div className="qk-panel-scroll">
+            <div className="qk-panel-head">
+              <span>{t(($) => $.create_issue.executor_label)}</span>
+              <span className="qk-panel-hint">
+                {t(($) => $.create_issue.available_agents, { count: visibleAgents.length })}
+              </span>
+            </div>
+
+            {visibleAgents.length === 0 ? (
+              <div className="qk-panel-warning">
+                {t(($) => $.create_issue.no_own_agents)}{" "}
+                <AppLink href={workspacePaths.agents()} className="underline underline-offset-2">
+                  {t(($) => $.create_issue.create_agent)}
+                </AppLink>
+              </div>
             ) : (
-              <>
-                {t(($) => $.create_issue.agent.submit)}
-                {sendShortcut ? (
-                  // Touch phones have no ⌘ key and the narrowest footer row
-                  // to spare — drop the hint at the same breakpoint the
-                  // footer reflows at.
-                  <ShortcutKeycaps
-                    shortcut={sendShortcut}
-                    decorative
-                    className="ml-1 max-sm:hidden"
-                    keyClassName="border-background/30 bg-background/15 text-primary-foreground shadow-none"
-                  />
-                ) : null}
-              </>
+              <div className="qk-seats">
+                {visibleAgents.map((agent) => {
+                  const runtime = runtimeById.get(agent.runtime_id);
+                  const selected = selectedAgent?.id === agent.id;
+                  return (
+                    <button
+                      key={agent.id}
+                      type="button"
+                      data-active={selected ? "" : undefined}
+                      onClick={() => {
+                        setActor({ type: "agent", id: agent.id });
+                        setAgent({ actorType: "agent", actorId: agent.id });
+                        setError(null);
+                      }}
+                      className="qk-seat"
+                    >
+                      <ActorAvatar
+                        actorType="agent"
+                        actorId={agent.id}
+                        size="md"
+                        profileLink={false}
+                        className="qk-seat-ava"
+                      />
+                      <span className="qk-seat-main">
+                        <b>{agent.name}</b>
+                        <span>
+                          {runtime ? runtimeDisplayLabel(runtime) : t(($) => $.create_issue.status_offline)}
+                        </span>
+                      </span>
+                      <span
+                        className="qk-seat-state"
+                        data-live={agent.status === "working" ? "" : undefined}
+                      >
+                        {agentStatusLabel(agent.status, t)}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
             )}
-          </Button>
-        </div>
-    </>
-  );
-}
 
-// AgentSeat — the 我的智能体 section: a seat card showing the selected agent
-// (avatar, name, live status) that opens a searchable popover listing ONLY the
-// caller's own agents. Squads and other members' agents are deliberately
-// absent — squad relays are created on the squad-tasks page, and a solo task
-// runs on its owner's agent. Lives in this file (not under
-// issues/components/pickers) because it is tuned to this one surface.
-function AgentSeat({
-  agent,
-  agents,
-  onPick,
-  t,
-}: {
-  agent: Agent | undefined;
-  agents: Agent[];
-  onPick: (next: Agent) => void;
-  t: ReturnType<typeof useT<"modals">>["t"];
-}) {
-  const [open, setOpen] = useState(false);
-  const [filter, setFilter] = useState("");
-  const query = filter.trim().toLowerCase();
-  const paths = useWorkspacePaths();
+            <div className="qk-panel-section">
+              <div className="flex items-center justify-between gap-2">
+                <span className="qk-panel-label">{t(($) => $.create_issue.section_details)}</span>
+                <DropdownMenu>
+                  <DropdownMenuTrigger
+                    render={
+                      <button
+                        type="button"
+                        className="qk-leg-action"
+                        aria-label={t(($) => $.create_issue.agent.more_fields_aria)}
+                        title={t(($) => $.create_issue.agent.more_fields_aria)}
+                      >
+                        <MoreHorizontal className="size-3.5" />
+                      </button>
+                    }
+                  />
+                  <DropdownMenuContent align="end" className="w-52">
+                    {!visibleFields.includes("project") && projectId === null && (
+                      <DropdownMenuItem onClick={() => setFieldPickerOpen("project")}>
+                        <FolderKanban className="size-3.5 text-muted-foreground" />
+                        {t(($) => $.create_issue.agent.set_project)}
+                      </DropdownMenuItem>
+                    )}
+                    {!visibleFields.includes("priority") && priority === "none" && (
+                      <DropdownMenuItem onClick={() => setFieldPickerOpen("priority")}>
+                        <PriorityIcon priority="none" className="size-3.5" />
+                        {t(($) => $.create_issue.agent.set_priority)}
+                      </DropdownMenuItem>
+                    )}
+                    {!visibleFields.includes("due_date") && dueDate === null && (
+                      <DropdownMenuItem onClick={() => setFieldPickerOpen("due_date")}>
+                        <CalendarDays className="size-3.5 text-muted-foreground" />
+                        {t(($) => $.create_issue.agent.set_due_date)}
+                      </DropdownMenuItem>
+                    )}
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      render={
+                        <AppLink
+                          href={`${workspacePaths.settings()}?tab=issue`}
+                          onClick={openFieldSettings}
+                        />
+                      }
+                    >
+                      <Settings2 className="size-3.5 text-muted-foreground" />
+                      {t(($) => $.create_issue.agent.customize_fields)}
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
 
-  const filtered = useMemo(
-    () => agents.filter((a) => a.name.toLowerCase().includes(query) || matchesPinyin(a.name, query)),
-    [agents, query],
-  );
+              <div className="qk-panel-rows">
+                <div className="qk-panel-row">
+                  <span className="qk-row-label">{t(($) => $.create_issue.field_project)}</span>
+                  <div className="min-w-0 flex-1">
+                    <ProjectPicker
+                      projectId={projectId}
+                      onUpdate={(u) => commitProject(u.project_id ?? null)}
+                      triggerRender={<button type="button" className="qk-dark-control" />}
+                      align="start"
+                      open={fieldPickerOpen === "project" ? true : undefined}
+                      onOpenChange={(open) => setFieldPickerOpen(open ? "project" : null)}
+                    />
+                  </div>
+                </div>
+                <div className="qk-panel-row">
+                  <span className="qk-row-label">{t(($) => $.create_issue.field_priority)}</span>
+                  <div className="min-w-0 flex-1">
+                    <DispatchPriority
+                      value={priority}
+                      disabled={submitting}
+                      onChange={(next) => {
+                        setPriority(next);
+                        setShared({ priority: next });
+                      }}
+                    />
+                  </div>
+                </div>
+                <div className="qk-panel-row">
+                  <span className="qk-row-label">{t(($) => $.create_issue.field_due)}</span>
+                  <div className="min-w-0 flex-1">
+                    <DueDatePicker
+                      dueDate={dueDate}
+                      onUpdate={(updates) => {
+                        const next = updates.due_date ?? null;
+                        setDueDate(next);
+                        setShared({ dueDate: next });
+                      }}
+                      triggerRender={<button type="button" className="qk-dark-control" />}
+                      align="start"
+                      open={fieldPickerOpen === "due_date" ? true : undefined}
+                      onOpenChange={(open) => setFieldPickerOpen(open ? "due_date" : null)}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
 
-  if (agents.length === 0) {
-    return (
-      <div className="flex items-center justify-between gap-3 rounded-[calc(var(--radius)*1.2)] border border-dashed border-input px-3 py-2.5">
-        <span className="text-caption text-muted-foreground">
-          {t(($) => $.create_issue.no_own_agents)}
-        </span>
-        <AppLink
-          href={paths.agents()}
-          className="shrink-0 text-caption text-brand hover:underline"
-        >
-          {t(($) => $.create_issue.create_agent)}
-        </AppLink>
-      </div>
-    );
-  }
+            {selectedAgent && versionBlocked && (
+              <div className="qk-panel-warning">
+                {versionCheck.state === "missing"
+                  ? t(($) => $.create_issue.agent.version_missing, { min: versionCheck.min })
+                  : t(($) => $.create_issue.agent.version_below, {
+                      current: versionCheck.current,
+                      min: versionCheck.min,
+                    })}
+              </div>
+            )}
 
-  return (
-    <PropertyPicker
-      open={open}
-      onOpenChange={(v: boolean) => {
-        setOpen(v);
-        if (!v) setFilter("");
-      }}
-      width="w-72"
-      align="start"
-      searchable
-      searchPlaceholder={t(($) => $.create_issue.agent.search_placeholder)}
-      onSearchChange={setFilter}
-      triggerRender={
-        <button
-          type="button"
-          className={cn(
-            "flex w-full items-center gap-2.5 rounded-[calc(var(--radius)*1.2)] border bg-surface px-3 py-2.5 text-left",
-            "shadow-[var(--shadow-surface)] transition-colors hover:border-input",
-          )}
-        />
-      }
-      trigger={
-        agent ? (
-          <>
-            <ActorAvatar actorType="agent" actorId={agent.id} size="lg" />
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-label font-medium">
-                {agent.name}
+            <div className="qk-panel-note">
+              <span
+                aria-hidden="true"
+                className="mt-[5px] size-[5px] shrink-0 rounded-[1px] bg-[var(--qk-panel-accent)]"
+              />
+              <span>
+                {selectedAgent
+                  ? t(($) => $.run_confirm.create_will_start, { name: selectedAgent.name })
+                  : t(($) => $.create_issue.agent.pick_an_agent)}
               </span>
-              <span className="mt-0.5 flex items-center gap-1.5 text-caption text-muted-foreground">
-                <span
-                  aria-hidden
-                  className={cn(
-                    "size-1.5 shrink-0 rounded-full",
-                    agent.status === "idle" && "bg-success",
-                    agent.status === "working" && "bg-inflight",
-                    agent.status !== "idle" &&
-                      agent.status !== "working" &&
-                      "bg-muted-foreground/40",
-                  )}
-                />
-                {agentStatusLabel(agent.status, t)}
-              </span>
-            </span>
-            <span className="shrink-0 text-caption text-muted-foreground">
-              {t(($) => $.create_issue.change_agent)}
-            </span>
-          </>
-        ) : (
-          <>
-            <span className="grid size-8 shrink-0 place-items-center rounded-md bg-muted text-muted-foreground">
-              <Bot className="size-4" />
-            </span>
-            <span className="min-w-0 flex-1 text-label text-muted-foreground">
-              {t(($) => $.create_issue.agent.pick_an_agent)}
-            </span>
-          </>
-        )
-      }
-    >
-      {filtered.length === 0 ? (
-        query ? (
-          <PickerEmpty />
-        ) : (
-          <div className="px-2 py-1.5 text-caption text-muted-foreground">
-            {t(($) => $.create_issue.agent.no_agents)}
-          </div>
-        )
-      ) : (
-        filtered.map((a) => (
-          <PickerItem
-            key={a.id}
-            selected={agent?.id === a.id}
-            onClick={() => {
-              onPick(a);
-              setOpen(false);
-            }}
-          >
-            <ActorAvatar actorType="agent" actorId={a.id} size="sm" />
-            <span className="truncate">{a.name}</span>
-            <span className="ml-auto shrink-0 text-caption text-faint-foreground">
-              {agentStatusLabel(a.status, t)}
-            </span>
-          </PickerItem>
-        ))
-      )}
-    </PropertyPicker>
+            </div>
+
+            </div>
+
+            <div className="qk-panel-foot">
+              <button type="button" className="qk-panel-cancel" onClick={onClose}>
+                {t(($) => $.common.cancel)}
+              </button>
+              <button
+                type="button"
+                onClick={submit}
+                disabled={!hasContent || !actor || submitting || stamped || versionBlocked || gate.uploading || (!!anchorCommentId && !sourcePreview)}
+                aria-disabled={gate.uploading || undefined}
+                aria-busy={gate.uploading || submitting || undefined}
+                title={
+                  versionBlocked
+                    ? t(($) => $.create_issue.agent.version_blocked_tooltip, { min: versionCheck.min })
+                    : undefined
+                }
+                className="qk-panel-submit"
+              >
+                {submitting
+                  ? t(($) => $.create_issue.agent.sending)
+                  : gate.uploading
+                    ? t(($) => $.create_issue.agent.uploading)
+                    : justSent
+                      ? <span className="inline-flex items-center gap-1"><Check className="size-3.5" />{t(($) => $.create_issue.agent.sent_label)}</span>
+                      : (
+                        <>
+                          {t(($) => $.create_issue.dispatch)}
+                          {sendShortcut ? (
+                            <ShortcutKeycaps
+                              shortcut={sendShortcut}
+                              decorative
+                              className="ml-1 max-sm:hidden"
+                              keyClassName="border-black/20 bg-black/10 text-black/55 shadow-none"
+                            />
+                          ) : null}
+                          <ArrowUpRight className="size-3" aria-hidden="true" />
+                        </>
+                      )}
+              </button>
+            </div>
+          </aside>
+    </CreateTaskChrome>
   );
 }
 

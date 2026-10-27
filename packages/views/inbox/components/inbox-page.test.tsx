@@ -66,6 +66,7 @@ vi.mock("@quickwork/core/inbox/queries", () => ({
 const markReadMutate = vi.fn();
 const markUnreadMutate = vi.fn();
 const archiveMutate = vi.fn();
+const deleteAllMutate = vi.fn();
 const unarchiveMutate = vi.fn();
 const retrySourceContextMutateAsync = vi.fn();
 const showIssueLimitUpgradePrompt = vi.hoisted(() => vi.fn());
@@ -83,6 +84,7 @@ vi.mock("@quickwork/core/inbox/mutations", () => {
     useUnarchiveInbox: () => ({ mutate: unarchiveMutate }),
     useMarkAllInboxRead: mutation,
     useArchiveAllInbox: mutation,
+    useDeleteAllInbox: () => ({ mutate: deleteAllMutate, isPending: false }),
     useArchiveAllReadInbox: mutation,
     useArchiveCompletedInbox: mutation,
     useRetrySourceContextQuickCreate: () => ({
@@ -223,6 +225,7 @@ function reset() {
   markReadMutate.mockClear();
   markUnreadMutate.mockClear();
   archiveMutate.mockClear();
+  deleteAllMutate.mockClear();
   unarchiveMutate.mockClear();
   retrySourceContextMutateAsync.mockReset();
   retrySourceContextMutateAsync.mockResolvedValue({});
@@ -257,6 +260,19 @@ describe("InboxPage", () => {
 
     expect(screen.getByTestId("list").dataset.view).toBe("inbox");
     expect(screen.getByTestId("row").textContent).toBe("active-1");
+  });
+
+  it("permanently deletes notifications from the clear-all dialog", () => {
+    reset();
+    listData.active = [item({ id: "active-1" })];
+    listData.archived = [item({ id: "archived-1", archived: true })];
+
+    render(<InboxPage />);
+    fireEvent.click(screen.getByTestId("inbox-clear-all"));
+    fireEvent.click(screen.getByTestId("inbox-clear-all-confirm"));
+
+    expect(deleteAllMutate).toHaveBeenCalledTimes(1);
+    expect(archiveMutate).not.toHaveBeenCalled();
   });
 
   it("filters the list by status and priority together", () => {
@@ -330,7 +346,7 @@ describe("InboxPage", () => {
     render(<InboxPage />);
 
     expect(screen.queryByTestId("row")).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "Inbox" }));
+    fireEvent.click(screen.getByTestId("inbox-clear-filters"));
     expect(screen.getByTestId("row")).toHaveTextContent("todo-high");
   });
 

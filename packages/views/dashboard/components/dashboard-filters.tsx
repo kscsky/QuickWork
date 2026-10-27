@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarDays, ChevronDown, FolderKanban } from "lucide-react";
+import { ChevronDown, FolderKanban } from "lucide-react";
 import { Button } from "@quickwork/ui/components/ui/button";
 import {
   DropdownMenu,
@@ -11,74 +11,16 @@ import {
 } from "@quickwork/ui/components/ui/dropdown-menu";
 import { ProjectIcon } from "../../projects/components/project-icon";
 import { useT } from "../../i18n";
-import { ALL_PROJECTS, TIME_RANGES, type TimeRange } from "./dashboard-shared";
+import { ALL_PROJECTS } from "./dashboard-shared";
 
 type DashboardProject = { id: string; title: string; icon: string | null };
-
-/**
- * Page-scoped time range.
- *
- * A button that states the current value plus a single-select menu, rather
- * than five permanently-expanded segments. The five segments were the widest
- * thing in the header and the least informative: the value they encode is
- * already repeated in every KPI label ("Cost · 30D"). Collapsing them costs one
- * click per change and buys the header back.
- *
- * No "clear" entry: the range is a required parameter of every query on the
- * page, so it has no empty value to return to.
- */
-export function TimeRangeFilter({
-  days,
-  onChange,
-}: {
-  days: TimeRange;
-  onChange: (days: TimeRange) => void;
-}) {
-  const { t } = useT("usage");
-  const current = TIME_RANGES.find((r) => r.days === days) ?? TIME_RANGES[2];
-
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger
-        render={
-          <Button
-            variant="outline"
-            size="sm"
-            aria-label={t(($) => $.filter.period_label)}
-            className="gap-1 px-2.5"
-          >
-            <CalendarDays className="size-3.5 text-muted-foreground" />
-            <span className="tabular-nums">{current.label}</span>
-            <ChevronDown className="size-3 text-muted-foreground" />
-          </Button>
-        }
-      />
-      <DropdownMenuContent align="end" className="w-auto min-w-32">
-        <DropdownMenuRadioGroup
-          value={String(days)}
-          onValueChange={(value) => onChange(Number(value) as TimeRange)}
-        >
-          {TIME_RANGES.map((range) => (
-            <DropdownMenuRadioItem
-              key={range.days}
-              value={String(range.days)}
-              className="tabular-nums"
-            >
-              {range.label}
-            </DropdownMenuRadioItem>
-          ))}
-        </DropdownMenuRadioGroup>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-}
 
 /**
  * Page-scoped project filter.
  *
  * A single-level dropdown, deliberately not a generic "Filter" menu: with one
  * dimension, a wrapper menu only hides what is filterable behind an extra
- * hover. The trigger states the current value like `TimeRangeFilter` does:
+ * hover. The trigger states the current value:
  * a neutral outline throughout, showing the selected project's own icon and
  * name once narrowed — the named value is the active-state signal, no filled
  * tier. If a second dimension ships (agent, model, runtime), fold this back

@@ -36,6 +36,7 @@ import {
   useUnarchiveInbox,
   useMarkAllInboxRead,
   useArchiveAllInbox,
+  useDeleteAllInbox,
   useArchiveAllReadInbox,
   useArchiveCompletedInbox,
   useRetrySourceContextQuickCreate,
@@ -64,9 +65,20 @@ import {
   ChevronLeft,
   ListChecks,
   ArrowLeft,
+  Trash2,
 } from "lucide-react";
 import type { InboxItem } from "@quickwork/core/types";
 import { Button } from "@quickwork/ui/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@quickwork/ui/components/ui/alert-dialog";
 import {
   ResizablePanelGroup,
   ResizablePanel,
@@ -107,6 +119,7 @@ export function InboxPage() {
 
   const [selectedKey, setSelectedKeyState] = useState(() => urlIssue);
   const [view, setViewState] = useState<InboxView>(() => urlView);
+  const [clearAllOpen, setClearAllOpen] = useState(false);
 
   // Sync from URL when searchParams change (e.g. navigation)
   useEffect(() => {
@@ -299,6 +312,7 @@ export function InboxPage() {
   const unarchiveMutation = useUnarchiveInbox();
   const markAllReadMutation = useMarkAllInboxRead();
   const archiveAllMutation = useArchiveAllInbox();
+  const deleteAllMutation = useDeleteAllInbox();
   const archiveAllReadMutation = useArchiveAllReadInbox();
   const archiveCompletedMutation = useArchiveCompletedInbox();
   const retrySourceContextMutation = useRetrySourceContextQuickCreate();
@@ -474,11 +488,28 @@ export function InboxPage() {
   const handleArchiveAll = () => {
     setSelectedKey("");
     archiveAllMutation.mutate(undefined, {
+      onSuccess: () => toast.success(t(($) => $.toasts.archived_all)),
       onError: (err) =>
         toast.error(
           err instanceof Error && err.message
             ? err.message
             : t(($) => $.errors.archive_all_failed),
+        ),
+    });
+  };
+
+  // Permanent, irreversible: deletes active AND archived notifications for this
+  // recipient in the current workspace. Unlike handleArchiveAll above there is
+  // no way back, so the confirmation dialog carries that warning.
+  const handleDeleteAll = () => {
+    setSelectedKey("");
+    deleteAllMutation.mutate(undefined, {
+      onSuccess: () => toast.success(t(($) => $.toasts.deleted_all)),
+      onError: (err) =>
+        toast.error(
+          err instanceof Error && err.message
+            ? err.message
+            : t(($) => $.errors.delete_all_failed),
         ),
     });
   };
@@ -511,6 +542,7 @@ export function InboxPage() {
   // -- Shared sub-components --------------------------------------------------
 
   const listHeader = (
+    <>
     <PageHeader>
       <div className="flex flex-1 items-center gap-2">
         <h1 className="text-body font-semibold">{t(($) => $.page.title)}</h1>
@@ -524,6 +556,20 @@ export function InboxPage() {
           />
         )}
       </div>
+      {!isArchivedView && (items.length > 0 || archivedItems.length > 0) && (
+        <Button
+          type="button"
+          data-testid="inbox-clear-all"
+          variant="ghost"
+          size="sm"
+          onClick={() => setClearAllOpen(true)}
+          disabled={deleteAllMutation.isPending}
+          className="shrink-0 gap-1.5 text-muted-foreground hover:text-destructive"
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+          {t(($) => $.menu.clear_all)}
+        </Button>
+      )}
       <InboxFilterMenu
         wsId={wsId}
         items={viewItems}
@@ -567,6 +613,34 @@ export function InboxPage() {
       </DropdownMenu>
       )}
     </PageHeader>
+    <AlertDialog open={clearAllOpen} onOpenChange={setClearAllOpen}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>
+            {t(($) => $.menu.clear_dialog.title)}
+          </AlertDialogTitle>
+          <AlertDialogDescription>
+            {t(($) => $.menu.clear_dialog.description)}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>
+            {t(($) => $.menu.clear_dialog.cancel)}
+          </AlertDialogCancel>
+          <AlertDialogAction
+            variant="destructive"
+            data-testid="inbox-clear-all-confirm"
+            onClick={() => {
+              setClearAllOpen(false);
+              handleDeleteAll();
+            }}
+          >
+            {t(($) => $.menu.clear_dialog.confirm)}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 
   // Back out of the archive. Sits inside the list panel rather than replacing
@@ -620,6 +694,7 @@ export function InboxPage() {
             <Button
               variant="outline"
               size="sm"
+              data-testid="inbox-clear-filters"
               onClick={() => clearFilters(wsId)}
             >
               {t(($) => $.filters.clear)}
@@ -687,8 +762,6 @@ export function InboxPage() {
       <IssueDetail
         key={detailItem.issue_id}
         issueId={detailItem.issue_id}
-        defaultSidebarOpen={false}
-        layoutId="quickwork_inbox_issue_detail_layout"
         highlightCommentId={detailItem.details?.comment_id ?? undefined}
         highlightRequestToken={highlightRequestToken}
         leadingAction={compactBackAction}

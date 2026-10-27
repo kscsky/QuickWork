@@ -7,7 +7,7 @@ const E2E_RUN_ID = process.env.E2E_RUN_ID ?? `${Date.now().toString(36)}-${proce
 const DEFAULT_E2E_EMAIL = `e2e-${E2E_WORKER}-${E2E_RUN_ID}@quickwork.ai`;
 const DEFAULT_E2E_WORKSPACE = `e2e-workspace-${E2E_WORKER}-${E2E_RUN_ID}`;
 
-async function waitForIssuesPage(page: Page) {
+async function waitForTasksPage(page: Page) {
   await waitForPageText(page, "Solo task");
   await expect(page.getByRole("button", { name: "Solo task" })).toBeVisible({
     timeout: 15000,
@@ -24,7 +24,7 @@ export async function waitForPageText(page: Page, text: string, timeout = 30000)
 
 export async function reloadAppPage(page: Page) {
   await page.reload({ waitUntil: "domcontentloaded" });
-  await waitForPageText(page, "Issues");
+  await waitForPageText(page, "Tasks");
 }
 
 /**
@@ -52,8 +52,8 @@ export async function loginAsDefault(page: Page): Promise<string> {
     localStorage.setItem("quickwork_token", t);
     localStorage.setItem("quickwork:chat:isOpen", "false");
   }, token);
-  await page.goto(`/${workspace.slug}/issues`, { waitUntil: "domcontentloaded" });
-  await waitForIssuesPage(page);
+  await page.goto(`/${workspace.slug}/tasks`, { waitUntil: "domcontentloaded" });
+  await waitForTasksPage(page);
   return workspace.slug;
 }
 
@@ -77,7 +77,7 @@ export async function preferManualCreateMode(page: Page) {
     );
   });
   await reloadAppPage(page);
-  await waitForIssuesPage(page);
+  await waitForTasksPage(page);
 }
 
 export async function openWorkspaceMenu(page: Page) {

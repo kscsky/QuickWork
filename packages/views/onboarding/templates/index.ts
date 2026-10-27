@@ -8,10 +8,10 @@ export {
   INSTALL_RUNTIME_ISSUE_BODY,
 } from "./install-runtime-issue";
 export {
-  getMikaOnboarding,
-  type MikaContentLang,
-  type MikaOnboardingDefinition,
-} from "./mika";
+  getQuillOnboarding,
+  type QuillContentLang,
+  type QuillOnboardingDefinition,
+} from "./quill";
 type ContentLang = "en" | "zh" | "ko" | "ja";
 
 const CONTENT_LANG_BY_LOCALE: Record<SupportedLocale, ContentLang> = {

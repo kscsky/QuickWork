@@ -29,6 +29,9 @@ export default [
           "**/scripts/**",
           "**/src/main/**",
           "**/src/preload/**",
+          // The desktop renderer is bundled by Vite; its dependencies are
+          // build-time inputs, not runtime node_modules shipped alongside.
+          "**/src/renderer/**",
         ],
         peerDependencies: true,
       }],

@@ -121,8 +121,9 @@ if (hasGo()) {
     "go",
     [
       "build",
+      "-trimpath",
       "-ldflags",
-      ldflags,
+      `${ldflags} -s -w`,
       "-o",
       srcBinary,
       "./cmd/quickwork",

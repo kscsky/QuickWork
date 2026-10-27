@@ -11,7 +11,7 @@ import { CliInstallInstructions, OnboardingFlow } from "@quickwork/views/onboard
 /**
  * Creating a workspace runs the onboarding flow, entered at the workspace
  * step. A second workspace needs everything the first one needed — a runtime
- * connected to it, and its own Mika — so the only honest difference is that
+ * connected to it, and its own Quill — so the only honest difference is that
  * this member has already met the product. Running one flow is what keeps the
  * two paths from drifting apart.
  *
@@ -51,7 +51,7 @@ export default function Page() {
               paths.workspace(ws.slug).issueDetail(destination.issueId),
             );
           } else if (ws) {
-            router.push(paths.workspace(ws.slug).dispatch());
+            router.push(paths.workspace(ws.slug).tasks());
           } else {
             router.push(paths.root());
           }

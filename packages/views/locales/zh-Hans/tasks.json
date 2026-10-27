@@ -1,48 +1,88 @@
 {
   "title": "任务",
-  "subtitle": "每个任务是一条链路：按顺序在成员之间交接，轮到还没绑定智能体的人就会停住——停在哪里，看得见。",
-  "new_task": "新建任务",
+  "create": "新建任务",
+  "tagline": "单人任务派给一个人或智能体；小队任务按接力跑 —— 每一棒通过才轮到下一位。",
   "filter": {
     "all": "全部 {{count}}",
+    "single": "单人任务 {{count}}",
+    "squad": "小队任务 {{count}}",
     "mine": "我的 {{count}}",
-    "parked": "卡住 {{count}}"
+    "parked": "停着 {{count}}"
   },
-  "state": {
-    "pending": "未开始",
-    "doing": "进行中",
-    "done": "完成",
-    "parked": "卡住·等人",
-    "skipped": "已跳过",
-    "unknown": "未知"
+  "pager": {
+    "sum": "共 {{count}} 条 · 每页 {{size}} 条 · 第 {{page}} / {{pages}} 页",
+    "prev": "上一页",
+    "next": "下一页"
   },
   "row": {
-    "parked_at": "卡在 {{name}} · {{step}}",
-    "doing_at": "{{name}} 正在做 · {{step}}",
-    "waiting_at": "等 {{name}} 的机器接手 · {{step}}",
-    "running_at": "{{name}} 的机器上正在跑 · {{step}}",
-    "interrupted_at": "{{name}} 那边断掉了 · {{step}}",
-    "finished": "全部完成",
-    "head_pending": "等待开始 · {{step}}",
-    "no_chain": "没有链路",
-    "unassigned": "无负责人",
-    "assignee": "交给 {{name}}"
+    "leg_parent": "父任务",
+    "leg_seq": "第 {{seq}}/{{total}} 棒",
+    "type_single": "单人",
+    "type_squad": "小队",
+    "unassigned": "未分配",
+    "select_task": "选择 {{identifier}}",
+    "delete_task": "删除任务"
+  },
+  "bulk": {
+    "selected": "已选择 {{count}} 个",
+    "clear": "清除选择",
+    "select_page": "全选本页",
+    "delete": "删除",
+    "delete_title": "删除 {{count}} 个任务？",
+    "delete_desc": "此操作无法撤销，所选任务及其全部评论都会被永久删除。",
+    "delete_warning": "空间任何成员都可以删除任务。",
+    "cancel": "取消",
+    "delete_success": "已删除 {{count}} 个任务",
+    "delete_failed": "删除任务失败"
   },
   "empty": {
     "title": "还没有任务",
-    "body": "在任务调度里建的任务会出现在这里，带着它的链路。",
+    "body": "点「新建任务」创建一条 —— 单人任务派给一个人或一个智能体，小队任务按接力运行。",
     "filtered_title": "这个筛选下没有任务",
     "filtered_body": "换一个筛选看看。"
   },
-  "load_error": "任务加载失败",
   "chain": {
     "parked_dot": "卡住了",
-    "none": "还没有链路。把它排给一个小队，这里会出现每一步的交接。",
-    "parked_at": "停在 {{name}}，等他绑定智能体",
-    "delivered": "{{name}} 已交付",
-    "skipped_at": "{{name}} 被跳过",
-    "running": "{{name}} 正在跑",
-    "awaiting_pickup": "{{name}} 还没接手",
-    "waiting": "{{name}} 待命",
-    "open_task": "打开任务"
-  }
+    "none": "还没有接力",
+    "chip_done": "已交棒",
+    "chip_doing": "进行中",
+    "chip_queued": "等待接手",
+    "chip_review": "待审核",
+    "chip_parked": "卡住·等人",
+    "chip_skipped": "已跳过",
+    "chip_waiting": "等待中"
+  },
+  "mast": {
+    "running": "条在跑",
+    "review": "条等你",
+    "quiet": "条安静",
+    "sync_hint": "最后同步 · 刚刚",
+    "info": "单人任务派给一个人或智能体；小队任务按接力跑。卡住的一棒会停着等人补位。",
+    "sort_recent": "最近活动",
+    "sort_oldest": "最早活动",
+    "sort_label": "切换排序"
+  },
+  "filter_name": {
+    "all": "全部",
+    "single": "单人",
+    "squad": "小队",
+    "mine": "我的",
+    "parked": "停着"
+  },
+  "board": {
+    "task": "任务",
+    "state": "状态",
+    "actions": "操作"
+  },
+  "state": {
+    "open": "打开",
+    "view": "查看",
+    "review": "审核",
+    "fill": "补位",
+    "needs_fill": "需要补位",
+    "delivered": "已交付"
+  },
+  "quick_create_failed_banner": "{{count}} 个单人任务创建失败",
+  "quick_create_failed_view": "看通知台",
+  "quick_create_failed_fallback": "打开通知台查看错误详情。"
 }

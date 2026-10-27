@@ -26,11 +26,11 @@ waits — not skipped, and not a failure. Self-hostable, works with 26 agent CLI
 </div>
 
 <p align="center">
-  <img src="docs/assets/screens/control-tower.png" alt="The QuickWork control tower: 4 tasks running, 1 stopped on a teammate with no agent bound, 2 queued" width="100%">
+  <img src="docs/assets/screens/task-relay.png" alt="QuickWork task NW-101 stopped on Kai's leg with no agent bound" width="100%">
 </p>
 
 <p align="center">
-  <sub><em>Every task is a relay — it moves down the chain, and stops, visibly, when it reaches someone with no agent bound.</em></sub>
+  <sub><em>NW-101 in Nova's Northstar Studio is stopped on Kai's leg. The relay is parked, not failed — bind an agent and the same task continues.</em></sub>
 </p>
 
 <p align="center">
@@ -51,6 +51,37 @@ the next back to review. When a step lands on someone with no agent bound, the t
 their step and waits — not skipped, and not a failure. The intent, the run, the decisions, and
 the diff stay connected to the same issue — so nobody reconstructs context, and nothing ships
 without a human saying so.
+
+## See it on a real task
+
+The demo follows a fresh account, not the maintainer's:
+
+- **Nova** in **Northstar Studio**, working on **NW-101 · 发布秋季护肤内容包** — three notes, nine images, and a publish pack.
+- Route: **Nova (Quill) → Lin (Writer Agent) → Kai (publish) → Mira (Review Agent)**.
+- Kai has not bound an agent, so the relay **stops on Kai's leg**. It is not skipped and not marked failed; binding an agent resumes the same task from that step.
+
+That is the product in one view: a task is not a prompt, it is a route that survives the handoff.
+
+---
+
+## Configure a relay
+
+A relay is four decisions, all made once:
+
+1. **Connect a runtime.** Any real computer running Codex, Claude Code, Kimi, or one of the other supported CLIs. The daemon keeps the code and the execution on that machine.
+2. **Prepare the agents.** A new workspace starts with **Quill**, the built-in first agent. Add specialists — Writer Agent, Review Agent, or your own — with their own instructions and skills.
+3. **Assemble the squad.** People are members; each person lends the agent they choose. A person with no agent is still a valid member — that is exactly what parks a leg.
+4. **Save the route.** Order the legs, give each one a brief, and save the route as a playbook. The next task can reuse it without reconfiguring the squad.
+
+In the create dialog, choose **Squad**, pick the squad, confirm the route, and dispatch. Every leg records who held it, what they received, and what they handed over. When a leg has no bound agent, the board and the room both say **Stopped · waiting** — the state is visible before anyone has to chase it.
+
+<p align="center">
+  <img src="docs/assets/screens/dispatch-route.png" alt="Squad dispatch dialog with a four-leg route and Kai's parked leg" width="86%">
+</p>
+
+<p align="center">
+  <sub><em>The route is the task. Nova leads through Quill, Lin writes, Kai publishes, Mira reviews — and Kai's leg parks until an agent is bound.</em></sub>
+</p>
 
 ---
 
@@ -129,7 +160,7 @@ fall back to `make selfhost-build` from a checkout.
 
 ---
 
-## Your first agent in five minutes
+## Your first relay in five minutes
 
 **1. Sign in.** [quickwork.ai](https://quickwork.ai) in the browser, or open
 [QuickWork Desktop](https://quickwork.ai/download).
@@ -139,12 +170,14 @@ cloud box. Desktop registers the computer it's running on automatically and dete
 CLIs installed there. On the web — or to add another machine — open **Runtimes** in the sidebar,
 click **Add a computer**, and paste the two commands it shows into a terminal on that machine.
 
-**3. Create an agent.** Open **Agents** in the sidebar and click **New agent**. Pick the runtime
-you just connected, pick a provider, and give it a name — or let **Build with AI** generate the
-configuration from a description. That name is how it shows up on the board and in comments.
+**3. Meet Quill, then add specialists.** A new workspace starts with **Quill**, the built-in
+chief-of-staff agent. Talk to Quill in chat and it can turn a goal into a task, or open **Agents**
+and create the specialists your work needs — a writer, a researcher, a reviewer. Every agent is
+renameable; Quill is a starting point, not a fixed role.
 
-**4. Assign it something.** File an issue and set the agent as assignee. It picks the task up,
-runs it on your machine, comments as it goes, and moves the issue to review when it's done.
+**4. Dispatch a solo task or a squad relay.** File a task and choose **Solo** for one person or
+agent, or **Squad** to pick a saved route. The first leg starts immediately; each handoff waits
+for acceptance, and a leg with no bound agent stays parked until someone binds one.
 
 Full walkthrough: [Quickstart](https://quickwork.ai/docs/cloud-quickstart) · [Tutorial](https://quickwork.ai/docs/tutorial)
 

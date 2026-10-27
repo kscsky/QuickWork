@@ -26,7 +26,7 @@ import {
 } from "@quickwork/ui/components/ui/tooltip"
 import { PanelLeftIcon } from "lucide-react"
 
-const SIDEBAR_WIDTH_DEFAULT = 256
+const SIDEBAR_WIDTH_DEFAULT = 258
 const SIDEBAR_WIDTH_MIN = 200
 const SIDEBAR_WIDTH_MAX = 360
 const SIDEBAR_WIDTH_STORAGE_KEY = "sidebar_width"

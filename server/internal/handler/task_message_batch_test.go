@@ -218,3 +218,57 @@ func TestCreateTaskMessagesBatchIsAtomic(t *testing.T) {
 			"the batch persisted a prefix instead of rolling back", count)
 	}
 }
+
+// TestReportTaskMessagesPersistsTurnUsage pins the per-turn token delta that
+// rides the message closing an assistant turn (执行实况's per-环节 tokens):
+// stored on the row, carried back in the realtime/read payload unchanged, and
+// omitted entirely when the turn reported none (older daemons, unmetered
+// providers) so the UI never renders a fake zero.
+func TestReportTaskMessagesPersistsTurnUsage(t *testing.T) {
+	if testHandler == nil {
+		t.Skip("database not available")
+	}
+	ctx := context.Background()
+	taskID := seedBatchTask(t, "batch-usage")
+
+	testutil.Call(t, testHandler.ReportTaskMessages, batchMessagesRequest(t, taskID, []any{
+		map[string]any{"seq": 1, "type": "tool_use", "tool": "Bash", "input": map[string]any{"command": "ls"}},
+		map[string]any{
+			"seq": 2, "type": "text", "content": "done",
+			"usage": map[string]any{
+				"input_tokens":       1200,
+				"output_tokens":      324,
+				"cache_read_tokens":  8800,
+				"cache_write_tokens": 64,
+			},
+		},
+	})).Want(http.StatusOK)
+
+	stored, err := testHandler.Queries.ListTaskMessages(ctx, util.MustParseUUID(taskID))
+	if err != nil {
+		t.Fatalf("list persisted task messages: %v", err)
+	}
+	if len(stored) != 2 {
+		t.Fatalf("persisted %d task messages, want 2", len(stored))
+	}
+	if stored[0].InputTokens != 0 || stored[0].OutputTokens != 0 {
+		t.Fatalf("usage-less message stored tokens: %+v", stored[0])
+	}
+	if stored[1].InputTokens != 1200 || stored[1].OutputTokens != 324 ||
+		stored[1].CacheReadTokens != 8800 || stored[1].CacheWriteTokens != 64 {
+		t.Fatalf("stored turn usage = in %d/out %d/read %d/write %d, want 1200/324/8800/64",
+			stored[1].InputTokens, stored[1].OutputTokens, stored[1].CacheReadTokens, stored[1].CacheWriteTokens)
+	}
+
+	withUsage := taskMessageToPayload(stored[1], taskID, "")
+	if withUsage.Usage == nil {
+		t.Fatal("payload dropped the turn usage")
+	}
+	if withUsage.Usage.InputTokens != 1200 || withUsage.Usage.OutputTokens != 324 {
+		t.Fatalf("payload usage = %+v, want 1200/324", withUsage.Usage)
+	}
+	// Absent must stay absent, not become a zeroed object.
+	if without := taskMessageToPayload(stored[0], taskID, ""); without.Usage != nil {
+		t.Fatalf("usage-less message gained a usage object: %+v", without.Usage)
+	}
+}

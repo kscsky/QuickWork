@@ -1,5 +1,5 @@
 {
-  "title": "분석",
+  "title": "사용량",
   "tab_usage": "사용량",
   "header": {
     "timezone_and_updated": "{{tz}} · {{time}} 업데이트",
@@ -104,5 +104,200 @@
   },
   "duration": {
     "less_than_minute": "1분 미만"
+  },
+  "subtitle": "모델, 에이전트, 프로젝트별로 Token 사용량과 비용을 확인합니다.",
+  "tabs": {
+    "overview": "개요",
+    "logs": "호출 로그"
+  },
+  "range": {
+    "label": "기간",
+    "days": "{{days}}일"
+  },
+  "overview": {
+    "empty_title": "이 기간에 사용량이 없습니다",
+    "empty_body": "다른 기간이나 프로젝트를 선택해 보세요.",
+    "error_title": "사용량을 불러오지 못했습니다",
+    "error_body": "잠시 후 다시 시도하세요.",
+    "error_retry": "다시 시도",
+    "hero": {
+      "label": "총 비용 · {{range}}",
+      "vs_previous": "이전 대비",
+      "daily_avg": "일평균 {{value}}",
+      "last7": "최근 7일 {{value}}/일"
+    },
+    "kpi": {
+      "calls": "호출 횟수",
+      "calls_hint": "성공 {{success}} · 실패 {{failed}} · 취소 {{cancelled}}",
+      "tokens": "총 Token",
+      "tokens_hint": "입력 {{input}} · 출력 {{output}} · 캐시 {{cache}}",
+      "cache": "캐시 적중률",
+      "cache_hint": "환산 절감 {{saved}} · 이전 대비 {{delta}}pp",
+      "avg_cost": "평균 단가",
+      "avg_cost_hint": "모델 {{models}}개 · 에이전트 {{agents}}개",
+      "cache_hint_plain": "환산 절감 {{saved}}"
+    },
+    "trend": {
+      "title_cost": "비용 추이",
+      "title_tokens": "Token 추이",
+      "title_calls": "호출 추이",
+      "subtitle": "모델별 누적 · {{range}}",
+      "total_label": "합계",
+      "total_value": "합계 {{value}}",
+      "average": "평균 {{value}}",
+      "metric_label": "지표",
+      "metric_cost": "비용",
+      "metric_tokens": "Token",
+      "metric_calls": "호출",
+      "other": "기타"
+    },
+    "models": {
+      "title": "모델 비중",
+      "subtitle": "{{range}} · 비용 기준",
+      "total_label": "총 비용",
+      "footer": "모델 {{count}}개. 공급자가 보고한 비용을 우선 사용하고, 없으면 현재 요금표로 추정합니다.",
+      "detail_title": "모델 상세",
+      "detail_subtitle": "{{range}} 모델별 집계. 행을 선택하면 호출 로그가 열립니다",
+      "view_logs": "전체 로그 보기",
+      "col_model": "모델",
+      "col_calls": "호출",
+      "col_input": "입력",
+      "col_output": "출력",
+      "col_cache_read": "캐시 읽기",
+      "col_cache_write": "캐시 쓰기",
+      "col_hit": "적중률",
+      "col_avg": "평균",
+      "col_cost": "비용",
+      "col_share": "비중",
+      "row_action": "{{model}} 호출 로그 보기",
+      "footnote": "비용은 공급자가 보고한 금액을 우선하고, 없으면 현재 요금표로 추정해 ≈를 붙입니다. 적중률 = 캐시 읽기 ÷ (캐시 읽기 + 입력). 항목은 반올림되어 표시되며 합계는 집계값을 기준으로 합니다.",
+      "subtitle_tokens": "{{range}} · Token 기준",
+      "total_label_tokens": "총 Token"
+    },
+    "agents": {
+      "title": "에이전트 소비",
+      "subtitle": "{{range}} · 비용 순",
+      "row_hint": "호출 {{calls}}회 · 실패율 {{rate}}",
+      "footnote": "실패율 = 실패 호출 ÷ 전체 호출. 취소는 실패에 포함하지 않습니다.",
+      "restricted": "제한된 에이전트",
+      "deleted": "삭제된 에이전트"
+    },
+    "composition": {
+      "title": "비용 구성",
+      "subtitle": "{{range}} · Token 유형별",
+      "input": "입력 Token",
+      "output": "출력 Token",
+      "cache_read": "캐시 읽기",
+      "cache_write": "캐시 쓰기",
+      "saved_label": "캐시 읽기 · 환산 절감",
+      "saved_hint": "입력 단가 기준 · 적중률 {{rate}}",
+      "saved_hint_delta": "입력 단가 기준 · 적중률 {{rate}} (이전 대비 {{delta}}pp)"
+    },
+    "unpriced_title": "요금표에 없는 모델이 있습니다",
+    "unpriced_body": "비용에 {{models}}이(가) 포함되지 않았습니다. 런타임 페이지에서 단가를 추가하면 반영됩니다."
+  },
+  "logs": {
+    "title": "모델 호출 로그",
+    "subtitle": "task × 모델당 한 행. 개요와 같은 범위: {{range}} · {{project}}.",
+    "export": "CSV 내보내기",
+    "summary": {
+      "calls": "호출 횟수",
+      "calls_hint": "성공 {{success}} · 실패 {{failed}} · 취소 {{cancelled}}",
+      "cost": "총 비용",
+      "cost_hint": "현재 필터와 기간 기준",
+      "avg": "평균 단가",
+      "avg_hint": "모델 호출당",
+      "fail_rate": "실패율",
+      "fail_hint": "{{failed}}건 실패"
+    },
+    "search_placeholder": "작업, 모델 또는 task ID 검색",
+    "status": {
+      "all": "전체",
+      "success": "성공",
+      "failed": "실패",
+      "cancelled": "취소",
+      "running": "실행 중",
+      "unknown": "알 수 없음"
+    },
+    "filters": {
+      "all_models": "모든 모델",
+      "all_agents": "모든 에이전트",
+      "reset": "초기화",
+      "model_label": "모델 필터",
+      "agent_label": "에이전트 필터"
+    },
+    "table": {
+      "time": "시간",
+      "status": "상태",
+      "agent": "에이전트",
+      "issue": "작업",
+      "model": "모델 / 공급자",
+      "input": "입력",
+      "output": "출력",
+      "cache": "캐시 읽기 / 쓰기",
+      "duration": "소요 시간",
+      "cost": "비용",
+      "trigger": "트리거"
+    },
+    "trigger": {
+      "comment": "댓글",
+      "autopilot": "자동화",
+      "direct": "자동",
+      "retry": "재시도",
+      "rerun": "재실행",
+      "chat": "채팅",
+      "quick_create": "빠른 생성",
+      "other": "기타"
+    },
+    "no_issue": "연결된 작업 없음",
+    "restricted_agent": "제한된 에이전트",
+    "unknown_agent": "알 수 없는 에이전트",
+    "detail": {
+      "tokens": "Token 구성",
+      "input": "입력",
+      "output": "출력",
+      "cache_read": "캐시 읽기",
+      "cache_write": "캐시 쓰기",
+      "task_id": "task ID",
+      "started": "시작",
+      "completed": "종료",
+      "agent_project": "에이전트 / 프로젝트",
+      "trigger": "트리거",
+      "failure": "실패 이유",
+      "cost": "비용 분석",
+      "reported": "공급자 보고",
+      "estimated": "요금표 추정",
+      "pending": "대기",
+      "total": "합계",
+      "view_run": "작업에서 보기 →",
+      "no_usage": "이 실패한 실행은 사용량을 보고하지 않았습니다.",
+      "running_usage": "실행 중이며 사용량은 종료 시 보고됩니다.",
+      "unpriced": "이 모델의 요금표가 없어 비용에 포함되지 않았습니다."
+    },
+    "pagination": {
+      "showing": "{{from}}–{{to}} / {{total}}건",
+      "per_page": "페이지당 {{count}}건",
+      "per_page_label": "페이지당 행 수",
+      "prev": "이전 페이지",
+      "next": "다음 페이지"
+    },
+    "empty_title": "일치하는 호출이 없습니다",
+    "empty_body": "필터를 조정하거나 기간을 넓혀 보세요.",
+    "empty_reset": "필터 초기화",
+    "error_title": "호출 로그를 불러오지 못했습니다",
+    "error_body": "잠시 후 다시 시도하세요.",
+    "error_retry": "다시 시도",
+    "note": "한 행은 하나의 task가 하나의 모델에 사용한 사용량입니다. 모델 폴백이나 재시도로 같은 task에 여러 행이 생길 수 있습니다. 비용은 공급자가 보고한 금액을 우선하고, 없으면 현재 요금표로 추정해 ≈를 붙입니다. 시간은 사용량 보고 시각이며 시간대는 {{tz}}입니다. 페이지네이션은 표에만 영향을 주며 요약은 항상 필터된 전체 행을 대상으로 합니다.",
+    "export_empty": "현재 필터에 내보낼 호출이 없습니다.",
+    "export_failed": "내보내기에 실패했습니다. 잠시 후 다시 시도하세요.",
+    "export_success": "호출 {{count}}건을 내보냈습니다.",
+    "export_too_large": "{{limit}}건을 초과했습니다. 필터를 좁힌 뒤 내보내세요."
+  },
+  "console": {
+    "days_near": "최근 {{days}}일",
+    "calls_unit": "회 호출",
+    "tokens_unit": "tokens",
+    "top5": "TOP 5",
+    "chart_title": "일별 사용량"
   }
 }

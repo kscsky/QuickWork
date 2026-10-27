@@ -11,37 +11,82 @@
 @source "../../../packages/core/**/*.{ts,tsx}";
 @source "../../../packages/views/**/*.{ts,tsx}";
 
-/* Font stack. `--font-inter` is the next/font Inter family (+ its synthetic
-   size-adjusted fallback), set on <html> by inter.variable in app/layout.tsx.
-   We compose `--font-sans` here in static CSS — rather than baking the CJK tail
-   into next/font's `fallback` — so it can be overridden per `<html lang>` and
-   stays CSP-safe (no inline <style>). Tailwind's `font-sans` utility resolves
-   `var(--font-sans)` (see packages/ui/styles/tokens.css `@theme inline`).
+/* The refresh world's faces. These are the exact files used by
+   docs/mockups/refresh: Space Grotesk for Latin UI, Noto Sans SC for CJK,
+   Instrument Serif + Noto Serif SC for editorial headings, and Geist Mono
+   for identifiers. Served from /fonts so the stack is deterministic and
+   network-free. */
+@font-face {
+  font-family: "Space Grotesk";
+  src: url("/fonts/space-grotesk-latin.woff2") format("woff2");
+  font-weight: 400 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Instrument Serif";
+  src: url("/fonts/instrument-serif-normal.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Instrument Serif";
+  src: url("/fonts/instrument-serif-italic.woff2") format("woff2");
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Noto Serif SC";
+  src: url("/fonts/noto-serif-sc.woff2") format("woff2");
+  font-weight: 500 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Noto Sans SC";
+  src: url("/fonts/noto-sans-sc.woff2") format("woff2");
+  font-weight: 400 600;
+  font-style: normal;
+  font-display: swap;
+}
 
-   Default (en / zh / ko): Latin chars render with Inter; CJK chars fall through
-   to the platform Chinese fonts, then Korean. Chinese MUST stay before Korean so
-   zh users never get Korean Hanja glyph shapes (Hangul is a separate Unicode
-   block, so ko users still get Korean fonts for Hangul). Kept in sync with
-   apps/desktop/src/renderer/src/globals.css. */
+/* Font stack. Space Grotesk leads Latin; Noto Sans SC is the Chinese tail.
+   The CJK chain keeps Chinese before Korean for the same reason as before:
+   Han glyph shapes must not come from a Korean font. */
 :root {
-  --font-sans: var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI",
-    "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", "Apple SD Gothic Neo",
+  --font-sans: "Space Grotesk", var(--font-inter), "Noto Sans SC",
+    "Microsoft YaHei", "PingFang SC", "Noto Sans CJK SC", "Apple SD Gothic Neo",
     "Malgun Gothic", "Noto Sans CJK KR", sans-serif;
+  --font-serif: "Instrument Serif", "Noto Serif SC", "Songti SC", SimSun,
+    ui-serif, serif;
+}
+
+/* Instrument Serif ships one weight. The mockup sets headings at 600 and
+   gets the display face's synthesized weight; allow it for display only. */
+.font-serif {
+  font-synthesis-weight: auto;
+}
+
+/* Keep the display stack immune to the hashed next/font family assigned on
+   <html>; the mockup's mastheads are Instrument Serif, not Source Serif. */
+:root:root {
+  --font-serif: "Instrument Serif", "Noto Serif SC", "Songti SC", SimSun,
+    ui-serif, serif;
 }
 
 /* Japanese: Kanji are Han ideographs sharing the same Unicode block as Chinese,
-   and CSS font-fallback order is NOT affected by `<html lang>` — so the
-   Chinese-first default above would hand Japanese users Chinese glyph shapes
-   for shared ideographs. Promote a Japanese-first CJK chain only for Japanese.
-   `[lang|="ja"]` is the BCP-47 language-range selector: it matches exactly `ja`
-   or `ja-<region>` (layout.tsx emits `ja-JP`), never unrelated 3-letter subtags
-   such as `jam`. Inter still leads for Latin; zh/ko remain as a deep fallback. */
+   and CSS font-fallback order is NOT affected by `<html lang>`. Promote a
+   Japanese-first CJK chain only for Japanese; Space Grotesk still leads Latin. */
 html[lang|="ja"] {
-  --font-sans: var(--font-inter), "Hiragino Sans", "Hiragino Kaku Gothic ProN",
-    "Yu Gothic", "YuGothic", "Meiryo", "Noto Sans CJK JP", "Noto Sans JP",
-    -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
-    "Microsoft YaHei", "Noto Sans CJK SC", "Apple SD Gothic Neo", "Malgun Gothic",
+  --font-sans: "Space Grotesk", var(--font-inter), "Hiragino Sans",
+    "Hiragino Kaku Gothic ProN", "Yu Gothic", "YuGothic", "Meiryo",
+    "Noto Sans CJK JP", "Noto Sans JP", "Noto Sans SC",
+    "Microsoft YaHei", "PingFang SC", "Apple SD Gothic Neo", "Malgun Gothic",
     "Noto Sans CJK KR", sans-serif;
+  --font-serif: "Instrument Serif", "Noto Serif SC", "Yu Mincho", "YuMincho",
+    "Hiragino Mincho ProN", serif;
 }
 
 /* The landing tree overrides `--font-serif` with its own Instrument Serif +

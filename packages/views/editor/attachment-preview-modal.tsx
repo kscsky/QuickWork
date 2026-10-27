@@ -41,10 +41,13 @@ import {
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { toast } from "sonner";
 import {
   PreviewTooLargeError,
   PreviewUnsupportedError,
+  api,
 } from "@quickwork/core/api";
 import {
   ChevronLeft,
@@ -53,9 +56,11 @@ import {
   ExternalLink,
   FileText,
   Loader2,
+  Pencil,
   X,
 } from "lucide-react";
 import type { Attachment } from "@quickwork/core/types";
+import { Button } from "@quickwork/ui/components/ui/button";
 import { paths, useWorkspaceSlug } from "@quickwork/core/paths";
 import { cn } from "@quickwork/ui/lib/utils";
 import { resolvePublicFileUrl } from "@quickwork/core/workspace/avatar-url";
@@ -72,6 +77,11 @@ import {
   getPreviewKind,
   type PreviewKind,
 } from "./utils/preview";
+import { useConfigStore } from "@quickwork/core/config";
+import {
+  absolutizeMediaURL,
+  pickInlineMediaURL,
+} from "./utils/inline-media-url";
 import { useDownloadAttachment } from "./use-download-attachment";
 import { useAttachmentHtmlText } from "./hooks/use-attachment-html-text";
 import { useResignedInlineMediaURL } from "./hooks/use-inline-media-url";
@@ -113,13 +123,36 @@ interface PreviewState {
   attachmentId: string | null;
 }
 
-function resolvePreviewMediaUrl(attachment: Attachment): string {
-  const raw =
-    attachment.download_url || attachment.markdown_url || attachment.url;
-  return resolvePublicFileUrl(raw) ?? raw;
+function resolvePreviewMediaUrl(
+  attachment: Attachment,
+  cdnDomain: string,
+  cdnSigned: boolean,
+): string {
+  const dl = attachment.download_url ?? "";
+  // The bare API download endpoint needs the Bearer token, which a native
+  // <img> cannot send. Local storage also exposes a public /uploads path —
+  // prefer it for that deployment instead of the auth-gated endpoint.
+  const apiGated =
+    dl.startsWith("/api/attachments/") ||
+    /^https?:\/\/[^/]+\/api\/attachments\//i.test(dl);
+  const localUpload = /^\/uploads(\/|$)/.test(attachment.url ?? "");
+  if (apiGated && localUpload) {
+    return absolutizeMediaURL(attachment.url);
+  }
+  if (dl) return resolvePublicFileUrl(dl) ?? dl;
+  // No click-time download URL: mirror the inline image's pick so the modal
+  // and the rendered figure agree (CDN/public storage before the stable API
+  // markdown URL).
+  return absolutizeMediaURL(
+    pickInlineMediaURL(attachment, attachment.url, cdnDomain, cdnSigned),
+  );
 }
 
-function normalize(source: PreviewSource): PreviewState {
+function normalize(
+  source: PreviewSource,
+  cdnDomain = "",
+  cdnSigned = false,
+): PreviewState {
   // Resolve any server-relative URL (e.g. `/api/attachments/{id}/download`
   // returned by the unified-endpoint metadata path when no CloudFront
   // signer is configured) against the configured API base. Web with the
@@ -132,7 +165,7 @@ function normalize(source: PreviewSource): PreviewState {
     return {
       filename: source.attachment.filename,
       contentType: source.attachment.content_type,
-      mediaUrl: resolvePreviewMediaUrl(source.attachment),
+      mediaUrl: resolvePreviewMediaUrl(source.attachment, cdnDomain, cdnSigned),
       attachmentId: source.attachment.id,
     };
   }
@@ -171,6 +204,8 @@ interface AttachmentPreviewModalProps {
   sequence?: PreviewSequence;
   /** Fired when the image kind fails to load — lets a gallery skip the frame. */
   onImageError?: () => void;
+  /** See PreviewOpenOptions.editable. Threaded to the text renderers only. */
+  editable?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -190,40 +225,58 @@ export interface AttachmentPreviewHandle {
    *  isn't previewable, OR when the source is URL-only but the kind requires
    *  a full attachment (text/markdown/html). Callers can fall back to a
    *  download flow. */
-  tryOpen: (source: PreviewSource) => boolean;
+  tryOpen: (source: PreviewSource, options?: PreviewOpenOptions) => boolean;
   /** Force-open a preview, skipping the previewable() guard. Use for cases
    *  where the caller has already filtered. */
-  open: (source: PreviewSource) => void;
+  open: (source: PreviewSource, options?: PreviewOpenOptions) => void;
   /** Modal node to render somewhere in the caller's tree. Resolves to `null`
    *  when no preview is active. Safe to render inside any container — the
    *  modal portals to document.body. */
   modal: ReactNode;
 }
 
+export interface PreviewOpenOptions {
+  /**
+   * Offer in-place editing for text kinds (markdown / text). Only surfaces
+   * that mean "this document is yours to work on" — the handoff package's
+   * files — pass it; a preview opened from a chat message stays read-only.
+   */
+  editable?: boolean;
+}
+
 export function useAttachmentPreview(): AttachmentPreviewHandle {
-  const [current, setCurrent] = useState<PreviewSource | null>(null);
+  const [current, setCurrent] = useState<
+    { source: PreviewSource; editable: boolean } | null
+  >(null);
   const [previewOpen, setPreviewOpen] = useState(false);
 
-  const open = useCallback((source: PreviewSource) => {
-    setCurrent(source);
-    setPreviewOpen(true);
-  }, []);
-  const tryOpen = useCallback((source: PreviewSource) => {
-    const state = normalize(source);
-    const kind = getPreviewKind(state.contentType, state.filename);
-    if (!kind) return false;
-    // URL-only sources cannot drive text kinds — the /content proxy is ID-keyed.
-    if (source.kind === "url" && !URL_ONLY_KINDS.has(kind)) return false;
-    setCurrent(source);
-    setPreviewOpen(true);
-    return true;
-  }, []);
+  const open = useCallback(
+    (source: PreviewSource, options?: PreviewOpenOptions) => {
+      setCurrent({ source, editable: !!options?.editable });
+      setPreviewOpen(true);
+    },
+    [],
+  );
+  const tryOpen = useCallback(
+    (source: PreviewSource, options?: PreviewOpenOptions) => {
+      const state = normalize(source);
+      const kind = getPreviewKind(state.contentType, state.filename);
+      if (!kind) return false;
+      // URL-only sources cannot drive text kinds — the /content proxy is ID-keyed.
+      if (source.kind === "url" && !URL_ONLY_KINDS.has(kind)) return false;
+      setCurrent({ source, editable: !!options?.editable });
+      setPreviewOpen(true);
+      return true;
+    },
+    [],
+  );
 
   const modal = useMemo(
     () =>
       current ? (
         <AttachmentPreviewModal
-          source={current}
+          source={current.source}
+          editable={current.editable}
           open={previewOpen}
           onClose={() => setPreviewOpen(false)}
           onExitComplete={() => setCurrent(null)}
@@ -293,7 +346,9 @@ function useSettledImageURL(
 // without a visible wait: runs the same URL re-sign the panel itself would,
 // then fetches the bytes through a detached <img>. Renders nothing.
 export function PreviewImagePrefetch({ source }: { source: PreviewSource }) {
-  const state = normalize(source);
+  const cdnDomain = useConfigStore((s) => s.cdnDomain);
+  const cdnSigned = useConfigStore((s) => s.cdnSigned);
+  const state = normalize(source, cdnDomain, cdnSigned);
   const url = useResignedInlineMediaURL(
     state.attachmentId ?? undefined,
     state.mediaUrl,
@@ -320,10 +375,13 @@ export function AttachmentPreviewModal({
   onExitComplete,
   sequence,
   onImageError,
+  editable,
 }: AttachmentPreviewModalProps & { onExitComplete?: () => void }) {
   const download = useDownloadAttachment();
   const shouldReduceMotion = useReducedMotion() ?? false;
-  const state = normalize(source);
+  const cdnDomain = useConfigStore((s) => s.cdnDomain);
+  const cdnSigned = useConfigStore((s) => s.cdnSigned);
+  const state = normalize(source, cdnDomain, cdnSigned);
   // useWorkspaceSlug (not useWorkspacePaths) — returns null outside a
   // workspace route instead of throwing, so the new-tab button just hides.
   const slug = useWorkspaceSlug();
@@ -470,6 +528,7 @@ export function AttachmentPreviewModal({
               onOpenInNewTab={canOpenInNewTab ? handleOpenInNewTab : undefined}
               sequence={sequence}
               onImageError={onImageError}
+              editable={editable}
             />
           </motion.div>
         </motion.div>
@@ -495,6 +554,7 @@ function PreviewPanel({
   onOpenInNewTab,
   sequence,
   onImageError,
+  editable,
 }: {
   kind: PreviewKind | null;
   source: PreviewSource;
@@ -504,6 +564,7 @@ function PreviewPanel({
   onOpenInNewTab?: () => void;
   sequence?: PreviewSequence;
   onImageError?: () => void;
+  editable?: boolean;
 }) {
   const { t } = useT("editor");
 
@@ -660,6 +721,7 @@ function PreviewPanel({
             source={source}
             state={state}
             onDownload={onDownload}
+            editable={editable}
           />
         )}
       </div>
@@ -780,11 +842,13 @@ function PreviewContent({
   source,
   state,
   onDownload,
+  editable,
 }: {
   kind: Exclude<PreviewKind, "image"> | null;
   source: PreviewSource;
   state: PreviewState;
   onDownload: () => void;
+  editable?: boolean;
 }) {
   const { t } = useT("editor");
 
@@ -844,6 +908,7 @@ function PreviewContent({
         <TextBackedPreview
           attachmentId={state.attachmentId!}
           onDownload={onDownload}
+          editable={editable}
           render={(text) => (
             <ReadonlyContent
               content={text}
@@ -873,6 +938,7 @@ function PreviewContent({
         <TextBackedPreview
           attachmentId={state.attachmentId!}
           onDownload={onDownload}
+          editable={editable}
           render={(text) => (
             <CodeBlockStatic
               language={extensionToLanguage(state.filename)}
@@ -893,17 +959,28 @@ function PreviewContent({
 // same attachment hits the cache instead of re-fetching. Query is keyed on
 // the attachment id alone — the 30 min TTL on the server-side signed URL
 // is much longer than any plausible preview session.
+//
+// `editable` turns the same fetch into an editor: the toolbar toggles between
+// the rich read view and a raw textarea, and 保存 writes the draft back to
+// the same attachment id (the server re-uploads under a fresh storage key; the
+// id — which handoff packages reference — is what stays stable).
 function TextBackedPreview({
   attachmentId,
   onDownload,
   render,
+  editable,
 }: {
   attachmentId: string;
   onDownload: () => void;
   render: (text: string) => ReactNode;
+  editable?: boolean;
 }) {
   const { t } = useT("editor");
+  const qc = useQueryClient();
   const query = useAttachmentHtmlText(attachmentId);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState("");
+  const [saving, setSaving] = useState(false);
 
   if (query.isLoading) {
     return (
@@ -914,36 +991,113 @@ function TextBackedPreview({
     );
   }
   if (query.error) {
-    if (query.error instanceof PreviewTooLargeError) {
-      return (
-        <UnsupportedFallback
-          message={t(($) => $.attachment.preview_too_large)}
-          onDownload={onDownload}
-        />
-      );
+    return <PreviewErrorFallback error={query.error} onDownload={onDownload} />;
+  }
+  if (!query.data) return null;
+
+  if (!editable) return <>{render(query.data.text)}</>;
+
+  const beginEdit = () => {
+    setDraft(query.data.text);
+    setEditing(true);
+  };
+  const cancelEdit = () => {
+    setEditing(false);
+    setDraft("");
+  };
+  const save = async () => {
+    if (draft === query.data.text) {
+      setEditing(false);
+      return;
     }
-    if (query.error instanceof PreviewUnsupportedError) {
-      return (
-        <UnsupportedFallback
-          message={t(($) => $.attachment.preview_unsupported)}
-          onDownload={onDownload}
-        />
-      );
+    setSaving(true);
+    try {
+      await api.updateAttachmentContent(attachmentId, draft);
+      // Show the saved text immediately; the next open re-fetches anyway
+      // (staleTime), and other clients pick the change up via the issue
+      // attachments realtime event.
+      qc.setQueryData(["attachment-content", attachmentId], {
+        text: draft,
+        originalContentType: query.data.originalContentType,
+      });
+      toast.success(t(($) => $.attachment.edit_saved));
+      setEditing(false);
+    } catch {
+      toast.error(t(($) => $.attachment.edit_failed));
+    } finally {
+      setSaving(false);
     }
+  };
+
+  return (
+    <div className="flex h-full flex-col">
+      <div className="flex items-center gap-2 border-b border-border bg-muted/30 px-4 py-1.5">
+        <span className="grow" />
+        {editing ? (
+          <>
+            <Button size="sm" variant="ghost" onClick={cancelEdit} disabled={saving}>
+              {t(($) => $.attachment.edit_cancel)}
+            </Button>
+            <Button size="sm" onClick={save} disabled={saving}>
+              {saving ? <Loader2 className="size-3.5 animate-spin" /> : null}
+              {t(($) => $.attachment.edit_save)}
+            </Button>
+          </>
+        ) : (
+          <Button size="sm" variant="outline" onClick={beginEdit}>
+            <Pencil className="size-3.5" />
+            {t(($) => $.attachment.edit)}
+          </Button>
+        )}
+      </div>
+      <div className="min-h-0 flex-1 overflow-auto">
+        {editing ? (
+          <textarea
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+            spellCheck={false}
+            className="h-full min-h-full w-full resize-none bg-background px-6 py-4 font-mono text-caption leading-relaxed outline-none"
+          />
+        ) : (
+          render(query.data.text)
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** Shared failure renderer for text-backed previews (413 / 415 / other). */
+function PreviewErrorFallback({
+  error,
+  onDownload,
+}: {
+  error: unknown;
+  onDownload: () => void;
+}) {
+  const { t } = useT("editor");
+  if (error instanceof PreviewTooLargeError) {
     return (
       <UnsupportedFallback
-        message={t(($) => $.attachment.preview_failed)}
+        message={t(($) => $.attachment.preview_too_large)}
         onDownload={onDownload}
       />
     );
   }
-  if (!query.data) return null;
-  return <>{render(query.data.text)}</>;
+  if (error instanceof PreviewUnsupportedError) {
+    return (
+      <UnsupportedFallback
+        message={t(($) => $.attachment.preview_unsupported)}
+        onDownload={onDownload}
+      />
+    );
+  }
+  return (
+    <UnsupportedFallback
+      message={t(($) => $.attachment.preview_failed)}
+      onDownload={onDownload}
+    />
+  );
 }
-
-// ---------------------------------------------------------------------------
-// Fallback — used for 413 / 415 / unknown kinds
-// ---------------------------------------------------------------------------
 
 function UnsupportedFallback({
   message,

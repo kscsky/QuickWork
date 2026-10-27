@@ -191,9 +191,7 @@ describe("AutopilotDialog project section", () => {
   it("says the project also decides where runs execute", () => {
     renderEditDialog("run_only", null);
 
-    expect(
-      screen.getByText("Also sets where runs execute — the project's repository or local directory"),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Sets the run environment")).toBeInTheDocument();
   });
 
   it("keeps a run_only autopilot's project on save instead of clearing it", async () => {

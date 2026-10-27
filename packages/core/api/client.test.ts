@@ -1564,6 +1564,59 @@ describe("ApiClient", () => {
     });
   });
 
+  describe("updateAttachmentContent", () => {
+    it("PUTs the new content and returns the updated attachment", async () => {
+      const fetchMock = vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            id: "att-1",
+            workspace_id: "ws-1",
+            issue_id: null,
+            comment_id: null,
+            uploader_type: "member",
+            uploader_id: "u-1",
+            filename: "plan.md",
+            url: "https://static.example.test/ws/att-2.md",
+            download_url: "https://static.example.test/ws/att-2.md?sig=x",
+            content_type: "text/markdown",
+            size_bytes: 9,
+            created_at: "2026-05-11T00:00:00Z",
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+      );
+      vi.stubGlobal("fetch", fetchMock);
+
+      const client = new ApiClient("https://api.example.test");
+      const att = await client.updateAttachmentContent("att-1", "# v2\ntext");
+
+      const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+      expect(url).toBe("https://api.example.test/api/attachments/att-1/content");
+      expect(init.method).toBe("PUT");
+      expect(JSON.parse(init.body as string)).toEqual({ content: "# v2\ntext" });
+      expect(att.filename).toBe("plan.md");
+      expect(att.size_bytes).toBe(9);
+    });
+
+    it("falls back to an empty attachment when the response is malformed", async () => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue(
+          new Response(JSON.stringify({ id: "att-1" }), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          }),
+        ),
+      );
+
+      const client = new ApiClient("https://api.example.test");
+      const att = await client.updateAttachmentContent("att-1", "x");
+
+      expect(att.id).toBe("");
+      expect(att.download_url).toBe("");
+    });
+  });
+
   describe("getAttachmentTextContent", () => {
     it("returns body text and the original content type from the X-* header", async () => {
       vi.stubGlobal(
@@ -2093,9 +2146,9 @@ describe("ApiClient explicit workspace targeting", () => {
     return (init.headers as Record<string, string>)["X-Workspace-Slug"];
   }
 
-  it("sends the given slug on Mika creation", async () => {
+  it("sends the given slug on Quill creation", async () => {
     const fetchMock = stubOk({ id: "agent-1" });
-    await new ApiClient("https://api.example.test").createMikaAgent(
+    await new ApiClient("https://api.example.test").createQuillAgent(
       { runtime_id: "runtime-1", language: "en" },
       "proxima-centauri",
     );
@@ -2269,7 +2322,7 @@ describe("ApiClient unsubscribe endpoints", () => {
   });
 });
 
-describe("ApiClient startMikaOnboarding", () => {
+describe("ApiClient startQuillOnboarding", () => {
   it("returns the opening a well-formed response reports", async () => {
     vi.stubGlobal(
       "fetch",
@@ -2286,7 +2339,7 @@ describe("ApiClient startMikaOnboarding", () => {
     );
 
     await expect(
-      new ApiClient("https://api.example.test").startMikaOnboarding("session-1", {
+      new ApiClient("https://api.example.test").startQuillOnboarding("session-1", {
         language: "en",
       }),
     ).resolves.toEqual({
@@ -2311,7 +2364,7 @@ describe("ApiClient startMikaOnboarding", () => {
     // already opened this conversation" and navigates, rather than acting on a
     // body it could not understand.
     await expect(
-      new ApiClient("https://api.example.test").startMikaOnboarding("session-1", {
+      new ApiClient("https://api.example.test").startQuillOnboarding("session-1", {
         language: "en",
       }),
     ).resolves.toEqual({ started: false });
@@ -2329,7 +2382,7 @@ describe("ApiClient startMikaOnboarding", () => {
     );
 
     await expect(
-      new ApiClient("https://api.example.test").startMikaOnboarding("session-1", {
+      new ApiClient("https://api.example.test").startQuillOnboarding("session-1", {
         language: "en",
       }),
     ).resolves.toEqual({ started: false });

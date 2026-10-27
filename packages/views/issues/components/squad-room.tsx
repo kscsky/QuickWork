@@ -1,47 +1,34 @@
 "use client";
 
-import { ChevronRight } from "lucide-react";
+import { Lock } from "lucide-react";
 import { Button, buttonVariants } from "@quickwork/ui/components/ui/button";
 import { ReactionBar, type ReactionItem } from "@quickwork/ui/components/common/reaction-bar";
 import { cn } from "@quickwork/ui/lib/utils";
-import type { AgentTask, IssueChain, IssueChainStep, TimelineEntry } from "@quickwork/core/types";
+import type { IssueChainStep, TimelineEntry } from "@quickwork/core/types";
 
 import { ActorAvatar } from "../../common/actor-avatar";
 import { ReadonlyContent } from "../../editor";
 import { useT, useTimeAgo } from "../../i18n";
 import { AppLink } from "../../navigation";
-import { stepRunState, type StepRunState } from "./chain-run-state";
+import { chainStateKey, type StepRunState } from "./chain-run-state";
 
 /**
  * The room a squad task runs in.
  *
- * A task handed to a squad is shared: every member sees the same timeline, the
- * agent reports land in it beside the people's messages, and the relay's
- * current holder is always visible. These pieces render that — the parked bar
- * is the action center when the relay has reached someone with no agent.
+ * A task handed to a squad is a relay: the task detail page is the holder's
+ * workbench while the baton is with them — plan, chat, and the 审核通过 that
+ * ends their leg — and everyone else sees the same page as the place to
+ * follow the relay and read the shared context. These pieces render that.
  */
 
 const STATE_TONE: Record<string, string> = {
   pending: "bg-muted text-faint-foreground",
   doing: "bg-inflight-surface text-inflight font-medium",
+  reviewing: "bg-brand/10 text-brand font-medium",
   done: "bg-success/15 text-success",
   parked: "bg-warning/20 text-warning font-medium",
   skipped: "bg-muted text-faint-foreground line-through",
 };
-
-/** Keeps a state from a newer backend renderable instead of blank. */
-export function chainStateKey(state: string): "pending" | "doing" | "done" | "parked" | "skipped" | "unknown" {
-  switch (state) {
-    case "pending":
-    case "doing":
-    case "done":
-    case "parked":
-    case "skipped":
-      return state;
-    default:
-      return "unknown";
-  }
-}
 
 export function ChainStateTag({
   state,
@@ -57,6 +44,7 @@ export function ChainStateTag({
   const labels: Record<string, string> = {
     pending: t(($) => $.room.state_pending),
     doing: t(($) => $.room.state_doing),
+    reviewing: t(($) => $.room.state_reviewing),
     done: t(($) => $.room.state_done),
     parked: t(($) => $.room.state_parked),
     skipped: t(($) => $.room.state_skipped),
@@ -80,45 +68,6 @@ export function ChainStateTag({
     >
       {text}
     </span>
-  );
-}
-
-/** Where the relay stands: one node per step, left to right. */
-export function ChainStepsStrip({
-  chain,
-  issueId,
-  tasks = [],
-  nameOf,
-}: {
-  chain: IssueChain;
-  /** Whose tasks the run states are read from (see stepRunState). */
-  issueId?: string;
-  tasks?: readonly AgentTask[];
-  nameOf: (userId: string) => string;
-}) {
-  return (
-    <div className="flex items-center gap-1.5 overflow-x-auto py-2.5">
-      {chain.steps.map((step, i) => (
-        <span key={step.id} className="flex shrink-0 items-center gap-1.5">
-          {i > 0 && (
-            <ChevronRight aria-hidden="true" className="size-3 text-faint-foreground" />
-          )}
-          <span className="flex items-center gap-1.5">
-            <ActorAvatar
-              actorType="member"
-              actorId={step.holder_user_id}
-              size="sm"
-              profileLink={false}
-            />
-            <span className="text-caption">{nameOf(step.holder_user_id)}</span>
-            <ChainStateTag
-              state={step.state}
-              runState={issueId ? stepRunState(issueId, step, tasks) : "none"}
-            />
-          </span>
-        </span>
-      ))}
-    </div>
   );
 }
 
@@ -165,9 +114,11 @@ export function ChainParkedBar({
 /**
  * One person's message in the room.
  *
- * A member speaks in a bubble — their own line sits on the right in the brand
- * fill, so "what did I say" reads at a glance. An agent speaks in its own
- * card, because a run reporting back is not the same act as a person talking.
+ * One row per message: avatar on the left, then a name + time line and the
+ * bubble under it. The reader's own words keep the primary fill and sit to
+ * the right of the row, so "what did I say" reads at a glance without the
+ * whole row flipping sides. An agent reports in its own inflight card,
+ * because a run reporting back is not the same act as a person talking.
  * Replies hang under their root at a smaller size; the room does not need a
  * second fold layer, it needs to be readable top to bottom.
  */
@@ -186,6 +137,7 @@ export function RoomMessage({
   getActorName: (type: string, id: string) => string;
   onToggleReaction: (commentId: string, emoji: string) => void;
 }) {
+  const { t } = useT("issues");
   const timeAgo = useTimeAgo();
   const isAgent = entry.actor_type === "agent";
   const own = !isAgent && entry.actor_type === "member" && entry.actor_id === currentUserId;
@@ -193,16 +145,16 @@ export function RoomMessage({
   const identity = !isAgent && entry.actor_type === "member" ? identityOf(entry.actor_id) : undefined;
 
   return (
-    <div className={cn("flex gap-2.5 pb-1", own ? "flex-row-reverse" : "flex-row")}>
+    <div className="flex gap-2.5 py-1.5">
       <ActorAvatar
         actorType={entry.actor_type}
         actorId={entry.actor_id}
         size="md"
-        className="mt-4 shrink-0"
+        className="shrink-0"
         profileLink={false}
       />
-      <div className={cn("flex min-w-0 max-w-[78%] flex-col", own ? "items-end" : "items-start")}>
-        <div className={cn("mb-1 flex items-center gap-1.5", own && "flex-row-reverse")}>
+      <div className="min-w-0 flex-1">
+        <div className="mb-1 flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
           <span className="text-caption font-semibold text-foreground">{name}</span>
           {identity ? (
             <span className="rounded-full bg-muted px-1.5 text-micro text-muted-foreground">
@@ -210,15 +162,23 @@ export function RoomMessage({
             </span>
           ) : null}
           <span className="text-micro text-faint-foreground">{timeAgo(entry.created_at)}</span>
+          {/* Only the leg's holder ever receives a leg-scoped entry, so the
+              tag always means "this one stays inside my leg". */}
+          {entry.chain_step_id ? (
+            <span className="inline-flex items-center gap-1 rounded-full bg-muted px-1.5 text-micro text-muted-foreground">
+              <Lock className="size-2.5" />
+              {t(($) => $.room.leg_tag)}
+            </span>
+          ) : null}
           {entry.resolved_at ? <ResolvedTag /> : null}
         </div>
         <div
           className={cn(
-            "min-w-0 rounded-[2px_10px_10px_10px] border px-3 py-2",
+            "w-fit max-w-[92%] rounded-lg border px-3 py-2 text-body leading-relaxed",
             own
-              ? "rounded-[10px_2px_10px_10px] border-transparent bg-brand-surface text-brand-surface-foreground"
+              ? "ml-auto border-primary bg-primary text-primary-foreground"
               : "border-surface-border bg-surface",
-            isAgent && "border-inflight/35 bg-inflight-surface",
+            isAgent && !own && "border-inflight/35 bg-inflight-surface",
           )}
         >
           <ReadonlyContent content={entry.content ?? ""} attachments={entry.attachments} />
@@ -228,7 +188,7 @@ export function RoomMessage({
           currentUserId={currentUserId}
           onToggle={(emoji) => onToggleReaction(entry.id, emoji)}
           getActorName={getActorName}
-          className="mt-1"
+          className={cn("mt-1", own && "justify-end")}
         />
         {replies.length > 0 ? (
           <div className="mt-1.5 flex w-full flex-col gap-2 border-l pl-3">
@@ -292,64 +252,45 @@ function RoomReply({
 }
 
 /**
- * The right rail's room roster: everyone in the relay, and whether the agent
- * they would run on is actually there. The warning line is the whole point —
- * it names the person the task will stop on before it stops.
+ * The locked placeholder for a leg whose work is not the reader's (单流分界).
+ *
+ * The room is shared; the work inside a leg is not. This block stands where
+ * that leg's messages would be, naming exactly what stays hidden — the counts
+ * are the honest minimum (it happened, this much of it), not a teaser: the
+ * content reads back only for the leg's holder, forever.
  */
-export function RoomMembersCard({
-  chain,
-  nameOf,
-  identityOf,
-  agentNameOf,
+export function LockedLegBlock({
+  seq,
+  holderName,
+  commentCount,
+  runCount,
+  active,
 }: {
-  chain: IssueChain;
-  nameOf: (userId: string) => string;
-  identityOf: (userId: string) => string | undefined;
-  agentNameOf: (agentId: string) => string;
+  seq: number;
+  holderName: string;
+  commentCount: number;
+  runCount: number;
+  active: boolean;
 }) {
   const { t } = useT("issues");
   return (
-    <section className="flex flex-col gap-1">
-      <h3 className="px-1 text-caption font-semibold text-foreground">
-        {t(($) => $.room.members_title)}
-      </h3>
-      <div className="flex flex-col">
-        {chain.steps.map((step) => {
-          const name = nameOf(step.holder_user_id);
-          const identity = identityOf(step.holder_user_id);
-          return (
-            <div key={step.id} className="flex items-start gap-2.5 rounded-md px-1 py-1.5">
-              <ActorAvatar
-                actorType="member"
-                actorId={step.holder_user_id}
-                size="md"
-                className="shrink-0"
-                profileLink={false}
-              />
-              <div className="flex min-w-0 flex-col gap-0.5">
-                <div className="flex items-center gap-1.5">
-                  <span className="truncate text-caption font-medium">{name}</span>
-                  {identity ? (
-                    <span className="shrink-0 rounded-full bg-muted px-1.5 text-micro text-muted-foreground">
-                      {identity}
-                    </span>
-                  ) : null}
-                </div>
-                <span
-                  className={cn(
-                    "truncate text-micro",
-                    step.agent_id ? "text-muted-foreground" : "text-warning",
-                  )}
-                >
-                  {step.agent_id
-                    ? t(($) => $.room.member_agent, { agent: agentNameOf(step.agent_id!) })
-                    : t(($) => $.room.member_no_agent)}
-                </span>
-              </div>
-            </div>
-          );
-        })}
+    <div className="my-2 flex items-start gap-2.5 rounded-lg border border-dashed border-foreground/25 bg-muted/40 px-3.5 py-3">
+      <Lock className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
+      <div className="min-w-0 text-caption leading-relaxed text-muted-foreground">
+        <div className="font-semibold text-foreground">
+          {t(($) => $.room.lock_block_title, { seq, name: holderName })}
+        </div>
+        <div className="mt-0.5">
+          {commentCount > 0 || runCount > 0
+            ? t(($) => $.room.lock_block_hint_counts, {
+                count: commentCount,
+                runs: runCount,
+              })
+            : active
+              ? t(($) => $.room.lock_block_hint_active)
+              : t(($) => $.room.lock_block_hint_counts, { count: 0, runs: 0 })}
+        </div>
       </div>
-    </section>
+    </div>
   );
 }

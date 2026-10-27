@@ -1,4 +1,4 @@
-import { type RefObject, type CSSProperties, useEffect, useState, useCallback } from "react";
+import { type RefObject, type CSSProperties, useEffect, useState, useCallback, useRef } from "react";
 
 export type ScrollFadeAxis = "vertical" | "horizontal";
 
@@ -26,42 +26,56 @@ export function useScrollFade(
     const scrollable = scrollSize - clientSize;
 
     if (scrollable <= 0) {
-      setFade("none");
+      setFade((current) => (current === "none" ? current : "none"));
       return;
     }
 
     const atStart = position <= 1;
     const atEnd = position >= scrollable - 1;
 
-    if (atStart && atEnd) setFade("none");
-    else if (atStart) setFade("end");
-    else if (atEnd) setFade("start");
-    else setFade("both");
+    const next = atStart && atEnd ? "none" : atStart ? "end" : atEnd ? "start" : "both";
+    setFade((current) => (current === next ? current : next));
   }, [axis, ref]);
+
+  // Scroll, resize, and subtree mutations can arrive in bursts (a route's
+  // first commit inserts many nodes at once). Each update reads layout
+  // metrics, so running it per event forces synchronous layout repeatedly
+  // during the same frame. Coalesce them into one read per animation frame.
+  const frameRef = useRef<number | null>(null);
+  const schedule = useCallback(() => {
+    if (frameRef.current !== null) return;
+    frameRef.current = requestAnimationFrame(() => {
+      frameRef.current = null;
+      update();
+    });
+  }, [update]);
 
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
 
-    const frame = requestAnimationFrame(update);
+    schedule();
 
-    el.addEventListener("scroll", update, { passive: true });
-    const ro = new ResizeObserver(update);
+    el.addEventListener("scroll", schedule, { passive: true });
+    const ro = new ResizeObserver(schedule);
     ro.observe(el);
     // ResizeObserver only fires on the container's own box. When children
     // grow inside a flex/auto-sized parent, the scroll extent can change while
     // the viewport does not — the mask would stay "none" until the user scrolls.
     // MutationObserver on childList catches those content insertions.
-    const mo = new MutationObserver(update);
+    const mo = new MutationObserver(schedule);
     mo.observe(el, { childList: true, subtree: true });
 
     return () => {
-      cancelAnimationFrame(frame);
-      el.removeEventListener("scroll", update);
+      if (frameRef.current !== null) {
+        cancelAnimationFrame(frameRef.current);
+        frameRef.current = null;
+      }
+      el.removeEventListener("scroll", schedule);
       ro.disconnect();
       mo.disconnect();
     };
-  }, [ref, update]);
+  }, [ref, schedule]);
 
   if (fade === "none") return undefined;
 

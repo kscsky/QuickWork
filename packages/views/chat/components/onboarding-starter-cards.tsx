@@ -12,13 +12,13 @@ import type { ChatQuickAction } from "@quickwork/core/types";
 import { useT } from "../../i18n";
 
 /**
- * Product-fixed starter cards rendered under Mika's onboarding opening (the
+ * Product-fixed starter cards rendered under Quill's onboarding opening (the
  * first assistant reply after the hidden `onboarding_kickoff`). They replace
  * that one message's LLM quick-action chips with three concrete ways to start,
  * so a new member never faces a blank canvas (MUL-5765).
  *
  * Clicking a card goes through the same path as a quick-action chip: the
- * card's prompt is sent as a visible member message and Mika starts working.
+ * card's prompt is sent as a visible member message and Quill starts working.
  * The cards stay in the session history and remain clickable; while any task
  * is running they follow the chips' disabled rule via `disabled`.
  */
@@ -150,7 +150,7 @@ function MiniCard({
   );
 }
 
-// Three tiny kanban columns; the middle card carries Mika and a brand accent.
+// Three tiny kanban columns; the middle card carries Quill and a brand accent.
 function BoardVignette() {
   return (
     <div aria-hidden="true" className="flex w-49 gap-1.5">
@@ -170,7 +170,7 @@ function BoardVignette() {
           <Bar className="w-3/4" />
           <div className="flex items-center gap-1">
             <span className="flex size-3.5 items-center justify-center rounded-full bg-muted text-micro leading-none">
-              🦄
+              🪶
             </span>
             <Bar className="w-6 bg-brand/55" />
           </div>
@@ -189,13 +189,13 @@ function BoardVignette() {
   );
 }
 
-// A task running under Mika, and a delivered result beneath it.
+// A task running under Quill, and a delivered result beneath it.
 function DelegateVignette() {
   return (
     <div aria-hidden="true" className="flex w-45 flex-col gap-1.5">
       <MiniCard className="flex-row items-center gap-1.5 px-2 py-1.5">
         <span className="flex size-4.5 shrink-0 items-center justify-center rounded-full bg-muted text-micro leading-none">
-          🦄
+          🪶
         </span>
         <div className="flex flex-1 flex-col gap-1">
           <Bar className="w-5/6" />

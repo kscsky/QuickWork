@@ -59,6 +59,12 @@ export interface ComposerSubmitOptions {
   /** Normalize the raw markdown before the empty-guard and `onSubmit`. */
   normalize?: (raw: string) => string;
   /**
+   * Permit a submit whose editor is empty because the surface carries its own
+   * required content elsewhere (the create dialog's title field). The caller's
+   * onSubmit merges that external content into the payload.
+   */
+  allowEmpty?: () => boolean;
+  /**
    * Focus handling once `onAccepted` has cleared the composer. Defaults to
    * `none`.
    *
@@ -150,7 +156,7 @@ export function useComposerSubmit(opts: ComposerSubmitOptions): ComposerSubmit {
     const o = optsRef.current;
     const raw = o.editorRef.current?.getMarkdown() ?? "";
     const content = (o.normalize ?? defaultNormalize)(raw);
-    if (!content || inFlight.current) return;
+    if ((!content && !o.allowEmpty?.()) || inFlight.current) return;
     // Submit-time upload re-check: the disabled button is a frame behind, and
     // Cmd+Enter / Enter-on-title bypass the button entirely.
     if (o.uploadGate.isBlocked()) return;

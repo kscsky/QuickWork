@@ -100,7 +100,7 @@ const BASE_ISSUE: Issue = {
   priority: "none",
 };
 
-const NOT_FOUND_TEXT = "This issue does not exist or has been deleted in this workspace.";
+const NOT_FOUND_TEXT = "This issue does not exist or has been deleted in this space.";
 
 /** The three query states the card body branches on, as react-query reports them. */
 type DetailState =
@@ -292,12 +292,12 @@ describe("IssueHoverCard", () => {
   it("shows a flattened description snippet clamped to two lines", async () => {
     mockIssue({
       ...BASE_ISSUE,
-      description: "**Set up** your first runtime so [Mika](/agents/mika) can pick up work",
+      description: "**Set up** your first runtime so [Quill](/agents/quill) can pick up work",
     });
 
     await openCard();
 
-    const snippet = screen.getByText("Set up your first runtime so Mika can pick up work");
+    const snippet = screen.getByText("Set up your first runtime so Quill can pick up work");
     expect(snippet).toHaveClass("line-clamp-2");
   });
 

@@ -40,6 +40,11 @@ RETURNING *;
 -- name: GetIssueChainStepAt :one
 SELECT * FROM issue_chain_step WHERE issue_id = $1 AND position = $2;
 
+-- name: SetIssueChainStepPlan :one
+-- The holder writes their own leg's brief. Nothing else changes: the plan is
+-- narrative for the room, not an instruction row the relay reads.
+UPDATE issue_chain_step SET plan = $3 WHERE issue_id = $1 AND position = $2 RETURNING *;
+
 -- name: SetIssueChainStepState :one
 UPDATE issue_chain_step
    SET state = $3,
@@ -47,6 +52,23 @@ UPDATE issue_chain_step
        completed_at = CASE WHEN $3 IN ('done', 'skipped') THEN now() ELSE completed_at END
  WHERE issue_id = $1 AND position = $2
 RETURNING *;
+
+-- name: SetIssueChainStepHandoff :one
+-- The package the holder publishes with their 通过. Written before the state
+-- moves to done so the approve response already carries it.
+UPDATE issue_chain_step
+   SET handoff_summary = $3,
+       handoff_files = $4
+ WHERE issue_id = $1 AND position = $2
+RETURNING *;
+
+-- name: CountIssueChainStepComments :many
+-- How many leg-scoped comments each step carries. Readers who are not the
+-- holder render "3 条对话 · 对你们不可见" from this count instead of content.
+SELECT chain_step_id, COUNT(*)::int AS comment_count
+FROM comment
+WHERE issue_id = $1 AND chain_step_id IS NOT NULL
+GROUP BY chain_step_id;
 
 -- name: DeleteIssueChain :exec
 DELETE FROM issue_chain_step WHERE issue_id = $1;

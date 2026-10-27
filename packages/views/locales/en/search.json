@@ -33,5 +33,32 @@
   },
   "trigger": {
     "label": "Search..."
+  },
+  "caps": {
+    "pages": "PAGES",
+    "commands": "COMMANDS",
+    "members": "MEMBERS",
+    "projects": "PROJECTS",
+    "issues": "ISSUES",
+    "cancelled": "CANCELLED",
+    "recent": "RECENT"
+  },
+  "palette": {
+    "placeholder": "Search tasks, projects, agents, members, and settings…",
+    "close": "Close search",
+    "scope": "WORKSPACE / {{slug}} · {{count}} INDEXES",
+    "result_count_one": "{{count}} result",
+    "result_count_other": "{{count}} results",
+    "no_results_count": "No results",
+    "recent_count": "Recent {{count}}",
+    "no_results_title": "No matches for \"{{query}}\"",
+    "no_results_hint": "Try a task ID, project, agent, member, or setting",
+    "idle_title": "Search the whole workspace",
+    "idle_hint": "Type a task ID, project name, agent, or setting…",
+    "mark": "QUICKWORK / SEARCH",
+    "hint_select": "Select",
+    "hint_open": "Open",
+    "hint_close": "Close",
+    "esc": "esc"
   }
 }

@@ -40,6 +40,7 @@ export type WSEventType =
   | "inbox:unarchived"
   | "inbox:batch-read"
   | "inbox:batch-archived"
+  | "inbox:batch-deleted"
   | "workspace:updated"
   | "workspace:deleted"
   | "member:added"
@@ -287,6 +288,14 @@ export interface ActivityCreatedPayload {
   entry: TimelineEntry;
 }
 
+/** One assistant turn's token delta — how much the step that closed here cost. */
+export interface TaskMessageUsage {
+  input_tokens: number;
+  output_tokens: number;
+  cache_read_tokens: number;
+  cache_write_tokens: number;
+}
+
 export interface TaskMessagePayload {
   task_id: string;
   issue_id: string;
@@ -298,6 +307,8 @@ export interface TaskMessagePayload {
   input?: Record<string, unknown>;
   output?: string;
   created_at?: string;
+  /** Absent when the turn reported no usage (older daemons, unmetered providers). */
+  usage?: TaskMessageUsage;
 }
 
 export interface TaskQueuedPayload {

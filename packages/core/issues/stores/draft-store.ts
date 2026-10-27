@@ -59,6 +59,8 @@ export interface IssueCreateManual {
 }
 
 export interface IssueCreateAgent {
+  /** The dispatch note's headline. Sent as the prompt's first line. */
+  title?: string;
   prompt: string;
   actorType?: QuickCreateActorType;
   actorId?: string;
@@ -90,6 +92,7 @@ const emptyManual = (): IssueCreateManual => ({
 });
 
 const emptyAgent = (): IssueCreateAgent => ({
+  title: "",
   prompt: "",
   actorType: undefined,
   actorId: undefined,
@@ -233,6 +236,7 @@ export const useIssueDraftStore = create<IssueDraftStore>()(
         return !!(
           manual.title ||
           manual.description ||
+          agent.title ||
           agent.prompt ||
           Object.keys(manual.propertyValues).length > 0 ||
           // Recoverable uploads only: a failed/interrupted remnant the user

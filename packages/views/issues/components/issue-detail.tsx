@@ -11,33 +11,37 @@ import { priorityLabel } from "../utils/priority-label";
 import { useIssueStatuses } from "@quickwork/core/issue-statuses/hooks";
 import { useState, useEffect, useCallback, useMemo, useRef, Fragment, type ReactNode } from "react";
 import { Virtuoso, type VirtuosoHandle } from "react-virtuoso";
-import { useDefaultLayout, usePanelRef } from "react-resizable-panels";
 import { AppLink, useBackOrReplace } from "../../navigation";
 import {
   Archive,
+  ArrowUpRight,
   Calendar,
   CalendarClock,
   CalendarDays,
   ChevronDown,
+  Box,
+  Bot,
   ChevronLeft,
   ChevronRight,
   CircleCheck,
-  Milestone,
+  FileText,
+  Flag,
+  Loader2,
+  Lock,
+  Sparkles,
   MoreHorizontal,
-  PanelRight,
+  Pencil,
+  ChevronUp,
+  Link2,
   Pin,
   PinOff,
   Plus,
   SlidersHorizontal,
-  Tag,
-  Unlink,
   Users,
 } from "lucide-react";
 import { BreadcrumbHeader, type BreadcrumbSegment } from "../../layout/breadcrumb-header";
 import { Skeleton } from "@quickwork/ui/components/ui/skeleton";
-import { Button } from "@quickwork/ui/components/ui/button";
-import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@quickwork/ui/components/ui/resizable";
-import { Sheet, SheetContent } from "@quickwork/ui/components/ui/sheet";
+import { Button, buttonVariants } from "@quickwork/ui/components/ui/button";
 import { useIsMobile } from "@quickwork/ui/hooks/use-mobile";
 import { ContentEditor, type ContentEditorRef, TitleEditor, type TitleEditorRef, useFileDropZone, FileDropOverlay, useLazyEditor, useEditorUpload, ImageSequenceProvider } from "../../editor";
 import { collectImageSequence, type ImageSequenceBlock } from "@quickwork/core/attachments/image-sequence";
@@ -54,37 +58,61 @@ import {
   DropdownMenuItem,
 } from "@quickwork/ui/components/ui/dropdown-menu";
 import { Popover, PopoverTrigger, PopoverContent } from "@quickwork/ui/components/ui/popover";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@quickwork/ui/components/ui/dialog";
 import { Checkbox } from "@quickwork/ui/components/ui/checkbox";
 import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from "@quickwork/ui/components/ui/command";
 import { AvatarGroup, AvatarGroupCount } from "@quickwork/ui/components/ui/avatar";
 import { ActorAvatar } from "../../common/actor-avatar";
-import { PropRow } from "../../common/prop-row";
 import { PropertyIcon } from "../../common/property-icon";
 import type { Attachment, Issue, IssueProperty, IssueStatus, IssueStatusCategory, IssuePriority, TimelineEntry, UpdateIssueRequest } from "@quickwork/core/types";
 import { contentReferencesAttachment } from "@quickwork/core/types";
 import { STATUS_CONFIG } from "@quickwork/core/issues/config";
 import { formatDateOnly, isPastDateOnly } from "@quickwork/core/issues/date";
-import { useSkipChainStep, useUpdateIssue } from "@quickwork/core/issues/mutations";
+import {
+  useApproveChainStep,
+  useGenerateChainLegOutput,
+  useSetChainStepPlan,
+  useSkipChainStep,
+  useUpdateIssue,
+} from "@quickwork/core/issues/mutations";
 import { toast } from "sonner";
-import { errorCode } from "@quickwork/core/api";
-import { StatusIcon, PriorityIcon, StatusPicker, PriorityPicker, StagePicker, StartDatePicker, DueDatePicker, AssigneePicker, LabelPicker } from ".";
-import { maxSiblingStage } from "./pickers/stage-picker";
-import { CustomPropertyValueEditor, CustomPropertyValueDisplay } from "./pickers/custom-property-picker";
+import { api, errorCode } from "@quickwork/core/api";
+import { formatDuration } from "../../agents/components/agent-activity-hover-content";
+import { copyText } from "@quickwork/ui/lib/clipboard";
+import { SoloIssueView } from "./solo/solo-issue-view";
+import { SoloPropertyStrip } from "./solo/solo-property-strip";
+import { SoloDeliverySection } from "./solo/solo-delivery-section";
+import { useFileUpload } from "@quickwork/core/hooks/use-file-upload";
+import { useDownloadAttachment } from "../../editor/use-download-attachment";
+import { RefreshRunLogCard } from "./refresh-run-log";
+import { useNow } from "./use-now";
+import { StatusIcon, PriorityIcon, DueDatePicker, AssigneePicker, StatusPicker } from ".";
+import { CustomPropertyValueDisplay } from "./pickers/custom-property-picker";
 import { Switch } from "@quickwork/ui/components/ui/switch";
 import { IssueActionsDropdown, useIssueActions, IssueActionsContextMenu, IssueContextMenuProvider } from "../actions";
 import { LabelChip } from "../../labels/label-chip";
 import { IssueAgentActivityIndicator } from "./issue-agent-activity-indicator";
 import { SubIssuesAgentWorkingChip } from "./sub-issues-agent-working-chip";
-import { ProjectPicker } from "../../projects/components/project-picker";
 import { LocalDirectoryHint } from "../../projects/components/local-directory-hint";
 import { CommentCard } from "./comment-card";
+import { ChainParkedBar, ChainStateTag, LockedLegBlock, RoomMessage } from "./squad-room";
+import { chainStateKey, latestLegRun, legRunTasks, selectProducedLegComment, stepRunState } from "./chain-run-state";
+import { LegRunLive } from "./leg-run-live";
+import { deriveRelayView } from "./chain-run-state";
 import {
-  ChainParkedBar,
-  ChainStepsStrip,
-  RoomMembersCard,
-  RoomMessage,
-} from "./squad-room";
+  RelayFlowRail,
+  RelayLogSection,
+  RelayMetaRow,
+  SeatMark,
+  SubtaskList,
+} from "./relay-chapters";
+import {
+  HandoffCard,
+  HandoffFileChip,
+  LegPlanSection,
+  LegResourcesSection,
+  type HandoffCandidate,
+  type HandoffDraft,
+} from "./relay-leg-rail";
 import { SourceContextBadge } from "./source-context-viewer";
 import { RevisionConflictCompare } from "./revision-conflict-compare";
 import { CommentInput } from "./comment-input";
@@ -96,11 +124,8 @@ import { ThreadMinimap } from "./thread-minimap";
 import { ThreadNavPanel, mentionsUser, type ThreadNavThread } from "./thread-nav-panel";
 import { collectThreadReplies, deriveThreadResolution } from "./thread-utils";
 import { IssueAgentHeaderChip } from "./issue-agent-header-chip";
-import { ExecutionLogSection } from "./execution-log-section";
-import { QuickActionsSection } from "./quick-actions-section";
-import { PluginPanelSection } from "../../plugins";
-import { PullRequestList } from "./pull-request-list";
-import { useGitHubSettings } from "@quickwork/core/github";
+import { RequirementClarificationCard } from "./requirement-clarification-card";
+import { SoloRunLog } from "./solo-run-log";
 import { useQuery } from "@tanstack/react-query";
 import { useAuthStore } from "@quickwork/core/auth";
 import { useWorkspacePaths } from "@quickwork/core/paths";
@@ -108,10 +133,9 @@ import { useActorName } from "@quickwork/core/workspace/hooks";
 import { useWorkspaceId } from "@quickwork/core/hooks";
 import { useRecentContextStore } from "@quickwork/core/chat";
 import { useModalStore } from "@quickwork/core/modals";
-import { issueListOptions, issueDetailOptions, childIssuesOptions, childIssueProgressOptions, issueAttachmentsOptions, issueChainOptions } from "@quickwork/core/issues/queries";
+import { issueKeys, issueListOptions, issueDetailOptions, childIssuesOptions, childIssueProgressOptions, issueAttachmentsOptions, issueChainOptions } from "@quickwork/core/issues/queries";
 import { projectDetailOptions } from "@quickwork/core/projects/queries";
 import { ProjectIcon } from "../../projects/components/project-icon";
-import { issueLabelsOptions } from "@quickwork/core/labels";
 import { propertyListOptions } from "@quickwork/core/properties";
 import { memberListOptions, agentListOptions } from "@quickwork/core/workspace/queries";
 import { agentTaskSnapshotOptions } from "@quickwork/core/agents/queries";
@@ -148,13 +172,6 @@ import { useIssueDetailScrollRestore } from "../hooks/use-issue-detail-scroll-re
 import { useInPageFind } from "../hooks/use-in-page-find";
 import { useStickyComposer } from "../hooks/use-sticky-composer";
 import { FindBar } from "./find-bar";
-import {
-  AnimatedRightSidebar,
-  getAnimatedRightSidebarInitialOpen,
-  rightSidebarPanelMotionProps,
-  useAnimatedRightSidebarState,
-  useRightSidebarShortcut,
-} from "../../layout/animated-right-sidebar";
 
 /**
  * Memento entry recording that the comment-highlight deep link for this
@@ -273,6 +290,7 @@ function shortDate(date: string | null, locale: string): string {
   return formatDateOnly(date, { month: "short", day: "numeric" }, locale);
 }
 
+
 type ActivityT = ReturnType<typeof useT<"issues">>["t"];
 
 /**
@@ -378,47 +396,26 @@ function formatActivity(
 // new array on every render and bust React.memo on CommentCard / ResolvedThreadBar.
 const EMPTY_REPLIES: TimelineEntry[] = [];
 
-// ---------------------------------------------------------------------------
-// Sidebar progressive disclosure
-// ---------------------------------------------------------------------------
-//
-// Properties shown in the sidebar split into two groups:
-//   - core: always rendered (status / assignee / project)
-//   - optional: rendered only when the issue has a value for that field OR
-//     the user explicitly added it via "+ Add property" in this session
-//     (priority / due_date / labels)
-//
-// Parent is not in either group — it has its own standalone section below
-// the Properties block, rendered only when the issue actually has a parent.
-//
-// `OPTIONAL_PROP_KEYS` is the open set — adding a new optional field
-// means appending here, wiring its row in the JSX switch below, and
-// adding a locale key. The picker, visibility rules, and add-property
-// menu all flow from this one list.
-// `stage` is only meaningful for a sub-issue (relative to its siblings), so
-// its row and add-property entry are gated on `issue.parent_issue_id` at the
-// render site below — it stays in this list so seeding/visibility flow through
-// the same machinery as the other optional props.
-const OPTIONAL_PROP_KEYS = ["priority", "stage", "start_date", "due_date", "labels"] as const;
-type OptionalPropKey = (typeof OPTIONAL_PROP_KEYS)[number];
+const SOLO_ACTIVE_TASK_STATUSES = new Set([
+  "queued",
+  "dispatched",
+  "running",
+  "waiting_local_directory",
+]);
 
-function isOptionalPropSet(
-  issue: Issue,
-  key: OptionalPropKey,
-  attachedLabelsCount: number,
-): boolean {
-  switch (key) {
-    case "priority":
-      return issue.priority !== "none";
-    case "stage":
-      return issue.stage !== null && issue.stage !== undefined;
-    case "start_date":
-      return !!issue.start_date;
-    case "due_date":
-      return !!issue.due_date;
-    case "labels":
-      return attachedLabelsCount > 0;
-  }
+/** A run duration that ticks while the task is still executing. */
+function LiveDuration({
+  started,
+  completed,
+  active,
+}: {
+  started: string | null | undefined;
+  completed: string | null | undefined;
+  active: boolean;
+}) {
+  const now = useNow(active);
+  if (!started) return null;
+  return <>{formatDuration(started, completed ? Date.parse(completed) : now)}</>;
 }
 
 // groupSubIssuesByStage orders a parent's children for display: staged groups
@@ -982,11 +979,14 @@ function SubIssueDisplayPopover({
 
 interface IssueDetailProps {
   issueId: string;
+  /**
+   * Full-route pages use the refresh archive layout; embedded panes (the
+   * inbox) keep the denser legacy reading layout.
+   */
+  layout?: "legacy" | "refresh";
   onDelete?: () => void;
   /** Called after the issue is marked as done via the toolbar button. */
   onDone?: () => void;
-  defaultSidebarOpen?: boolean;
-  layoutId?: string;
   /** When set, the issue detail will auto-scroll to this comment and briefly highlight it. */
   highlightCommentId?: string;
   /**
@@ -1043,7 +1043,7 @@ export function IssueNotFound({
       <div className="flex flex-1 min-h-0 flex-col items-center justify-center gap-3 text-body text-muted-foreground">
         <p>{t(($) => $.detail.not_found)}</p>
         {showBackLink && (
-          <Button variant="outline" size="sm" onClick={() => backOrReplace(paths.issues())}>
+          <Button variant="outline" size="sm" onClick={() => backOrReplace(paths.tasks())}>
             <ChevronLeft className="mr-1 h-3.5 w-3.5" />
             {t(($) => $.detail.back)}
           </Button>
@@ -1083,7 +1083,7 @@ export function IssueDetailSkeleton({ leading }: { leading?: ReactNode } = {}) {
         <div className="flex-1 overflow-y-auto [scrollbar-gutter:stable_both-edges]">
           {/* Gutters match the loaded column exactly (see its comment), so the
               skeleton doesn't reflow sideways when real content mounts. */}
-          <div className="mx-auto w-full max-w-4xl px-3 py-6 space-y-6 md:px-8 md:py-8">
+          <div data-issue-column className="mx-auto w-full max-w-none px-3 py-6 space-y-6 md:px-8 md:py-8">
             <Skeleton className="h-8 w-3/4" />
             <div className="space-y-2">
               <Skeleton className="h-4 w-full" />
@@ -1103,7 +1103,7 @@ export function IssueDetailSkeleton({ leading }: { leading?: ReactNode } = {}) {
             </div>
           </div>
         </div>
-        <div className="hidden md:block w-80 border-l p-4 space-y-5">
+        <div className="hidden md:block w-[356px] border-l p-4 space-y-5">
           {Array.from({ length: 4 }).map((_, i) => (
             <div key={i} className="flex items-center gap-2">
               <Skeleton className="h-3 w-16 shrink-0" />
@@ -1127,7 +1127,7 @@ export function IssueDetailSkeleton({ leading }: { leading?: ReactNode } = {}) {
 // IssueDetail
 // ---------------------------------------------------------------------------
 
-export function IssueDetail({ issueId, onDelete, onDone, defaultSidebarOpen = true, layoutId = "quickwork_issue_detail_layout", highlightCommentId, highlightRequestToken, leadingAction }: IssueDetailProps) {
+export function IssueDetail({ issueId, layout = "legacy", onDelete, onDone, highlightCommentId, highlightRequestToken, leadingAction }: IssueDetailProps) {
   const { t } = useT("issues");
   const locale = useLocale();
   const timeAgo = useTimeAgo();
@@ -1135,6 +1135,8 @@ export function IssueDetail({ issueId, onDelete, onDone, defaultSidebarOpen = tr
   const user = useAuthStore((s) => s.user);
   const paths = useWorkspacePaths();
   const openModal = useModalStore((state) => state.open);
+  const backOrReplace = useBackOrReplace();
+  const downloadAttachment = useDownloadAttachment();
 
   // Issue navigation — read from TQ list cache
   const wsId = useWorkspaceId();
@@ -1148,17 +1150,73 @@ export function IssueDetail({ issueId, onDelete, onDone, defaultSidebarOpen = tr
   const canModerateComments =
     currentUserRole === "owner" || currentUserRole === "admin";
   const { data: allIssues = [] } = useQuery(issueListOptions(wsId));
-  const { getActorName, getMemberName, getAgentName } = useActorName();
-  // A task handed to a squad runs as a relay. When it has a chain, the page
-  // becomes the room it runs in: the strip says whose turn it is, the parked
-  // bar owns the actions, and the stream speaks in bubbles and agent cards.
+  const { getActorName, getMemberName, getAgentName, getSquadName } = useActorName();
+  // A task handed to a squad runs as a relay, and this page reads top-to-bottom
+  // as that relay: one chapter per leg, the reader's own leg open as their
+  // workbench, and the whole record folded at the bottom.
   const { data: chain } = useQuery(issueChainOptions(id));
   // The relay's run states (waiting for pickup vs executing on whose machine)
   // are read from the task rows the chain's dispatch created.
   const { data: relayTasks = [] } = useQuery(agentTaskSnapshotOptions(wsId));
   const isRoom = !!chain && chain.steps.length > 0;
-  const parkedStep = chain?.steps.find((s) => s.state === "parked");
   const skipChainStep = useSkipChainStep(id);
+  // Everything the reader-specific room pieces need, derived once: which leg
+  // is active, which one is theirs, whether they hold the 通过.
+  const relayView = useMemo(
+    () => (chain ? deriveRelayView(chain, user?.id) : null),
+    [chain, user?.id],
+  );
+  const approveChainStep = useApproveChainStep(id);
+  const setChainStepPlan = useSetChainStepPlan(id);
+  // ── The subtask page (B 式重构) ───────────────────────────────────────
+  // One squad task = a parent + one subtask per person, in a fixed order.
+  // `openLeg` is the leg seq the reader is inside: null = land by default
+  // (the reader's own unfinished leg — their task IS that subtask), "parent"
+  // = explicitly back at the parent, a number = that leg's own page.
+  const [openLeg, setOpenLeg] = useState<number | "parent" | null>(null);
+  useEffect(() => {
+    setOpenLeg(null);
+  }, [id]);
+  const defaultLegSeq = relayView?.myStep ? relayView.myStep.position + 1 : null;
+  const openLegSeq =
+    openLeg === null ? defaultLegSeq : openLeg === "parent" ? null : openLeg;
+  const openLegStep =
+    chain && openLegSeq != null
+      ? chain.steps.find((step) => step.position + 1 === openLegSeq) ?? null
+      : null;
+  const openLegIsMine =
+    !!openLegStep && !!user?.id && openLegStep.holder_user_id === user.id;
+  const openLegRunState = openLegStep
+    ? stepRunState(id, openLegStep, relayTasks)
+    : "none";
+  // The leg's newest run, terminal included — the 执行实况 strip's subject and
+  // what 完整日志 opens. Full per-issue history (the snapshot above keeps only
+  // each agent's latest outcome overall, so a run finished here can fall out
+  // of it once the agent works somewhere else). Only the holder sees the leg.
+  const { data: issueTasks = [] } = useQuery({
+    queryKey: issueKeys.tasks(id),
+    queryFn: () => api.listTasksByIssue(id),
+  });
+  const openLegLatestRun = openLegStep
+    ? latestLegRun(id, openLegStep, issueTasks)
+    : null;
+  const openLegHolding =
+    openLegIsMine &&
+    !!openLegStep &&
+    (openLegStep.state === "doing" || openLegStep.state === "reviewing");
+
+  // The composer speaks for the page it is on: inside the reader's own live
+  // leg it talks to that leg's agent by name; the parent's box is the room's.
+  const roomComposerPlaceholder = isRoom
+    ? openLegHolding && openLegStep?.agent_id
+      ? t(($) => $.room.composer_mine, { agent: getAgentName(openLegStep.agent_id) })
+      : t(($) => $.room.composer_placeholder)
+    : undefined;
+  // What the composer posts INTO: only the reader's own live leg, and only
+  // from that leg's own page (单流分界: the room reads what a person says to
+  // the room; the leg keeps the rest).
+  const composerLegScopeId =
+    isRoom && openLegStep && openLegHolding ? openLegStep.id : undefined;
   const playerNames = useMemo(() => {
     const byUserId = new Map(members.map((m) => [m.user_id, m.identity ?? ""]));
     return {
@@ -1183,58 +1241,7 @@ export function IssueDetail({ issueId, onDelete, onDone, defaultSidebarOpen = tr
   // later save). It still needs the failure toast, or a failed upload just
   // erases its own placeholder and the file disappears unexplained.
   const { uploadWithToast } = useEditorUpload();
-  const { defaultLayout, onLayoutChanged } = useDefaultLayout({
-    id: layoutId,
-  });
-  const sidebarRef = usePanelRef();
   const isMobile = useIsMobile();
-  const desktopSidebarInitialOpen = getAnimatedRightSidebarInitialOpen(
-    defaultSidebarOpen,
-    defaultLayout,
-  );
-  const {
-    open: desktopSidebarOpen,
-    visualOpen: desktopSidebarVisualOpen,
-    motionEnabled: desktopSidebarMotionEnabled,
-    beginToggle: beginDesktopSidebarToggle,
-    handleResize: handleDesktopSidebarResize,
-  } = useAnimatedRightSidebarState(desktopSidebarInitialOpen);
-  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
-
-  useEffect(() => {
-    if (isMobile) {
-      setMobileSidebarOpen(false);
-    }
-  }, [isMobile]);
-  const sidebarOpen = isMobile ? mobileSidebarOpen : desktopSidebarOpen;
-  const [propertiesOpen, setPropertiesOpen] = useState(true);
-  const [detailsOpen, setDetailsOpen] = useState(true);
-  const [parentIssueOpen, setParentIssueOpen] = useState(true);
-  const [pullRequestsOpen, setPullRequestsOpen] = useState(true);
-  const [metadataOpen, setMetadataOpen] = useState(false);
-  const githubSettings = useGitHubSettings();
-
-  // Per-issue, per-session set of optional properties currently visible in
-  // the sidebar Properties section. Seeded on issue switch with whichever
-  // fields are already set; "+ Add property" adds an entry, clearing a
-  // value does *not* remove one (avoids row-flicker on edit → clear).
-  // Resets when the user navigates to a different issue.
-  const [visibleOptionalProps, setVisibleOptionalProps] = useState<Set<OptionalPropKey>>(
-    () => new Set(),
-  );
-  // Same progressive-disclosure machinery for custom properties, keyed by
-  // property definition id instead of a static key union.
-  const [visibleCustomProps, setVisibleCustomProps] = useState<Set<string>>(() => new Set());
-  const [autoOpenCustomProp, setAutoOpenCustomProp] = useState<string | null>(null);
-  // Optional property to auto-open as soon as it's mounted (the user just
-  // picked it from "+ Add property" and we want them dropped straight into
-  // edit state). Consumed by the row that matches this key, cleared after.
-  const [autoOpenProp, setAutoOpenProp] = useState<OptionalPropKey | null>(null);
-  // Controlled state for the "+ Add property" popover. Base UI's Popover
-  // doesn't auto-dismiss on item click (it's not a Menu primitive), so the
-  // popover would stay open behind the newly auto-opened picker — two
-  // popovers stacked. We close it explicitly in `addOptionalProp`.
-  const [addPropPopoverOpen, setAddPropPopoverOpen] = useState(false);
   // Virtuoso's `customScrollParent` wants the HTMLElement, not a ref. A plain
   // `useRef.current` does not trigger a re-render when it populates, so the
   // Virtuoso prop would never receive the element. Callback ref + state fixes
@@ -1273,10 +1280,8 @@ export function IssueDetail({ issueId, onDelete, onDone, defaultSidebarOpen = tr
   const consumedHighlightRef = useRef(consumedHighlightId);
   consumedHighlightRef.current = consumedHighlightId;
   const writeViewState = useViewStateWriter();
-  const rightSidebarShortcutTargetRef = useRef<HTMLDivElement | null>(null);
   const attachScrollContainer = useCallback(
     (el: HTMLDivElement | null) => {
-      rightSidebarShortcutTargetRef.current = el;
       setScrollContainerEl(el);
       restoreScrollRef(el);
     },
@@ -1559,13 +1564,82 @@ export function IssueDetail({ issueId, onDelete, onDone, defaultSidebarOpen = tr
     [timelineView.groups, expandedResolved],
   );
 
+  // The stream's display list: server entries plus the synthetic inserts the
+  // chain contributes (published handoff packages; later, locked leg blocks).
+  // The merge walks both chronologically; `items` itself stays untouched so
+  // find-search and the length-keyed effects keep counting server entries.
+  // How many runs the relay has taken across every leg — the meta row's one
+  // number. Read from the same snapshot the run states read from.
+  const relayRunsCount = useMemo(
+    () =>
+      chain
+        ? chain.steps.reduce(
+            (sum, step) => sum + legRunTasks(id, step, relayTasks).length,
+            0,
+          )
+        : 0,
+    [chain, id, relayTasks],
+  );
+
+  // One leg's conversation is exactly its own scoped entries; the parent's
+  // stream keeps everything else (room comments and system activity). This is
+  // the point of the split — no more "who is talking to whom" in one feed.
+  const legItems = useMemo(
+    () =>
+      openLegStep
+        ? items.filter(
+            (it) =>
+              (it.kind === "comment" || it.kind === "resolved-bar") &&
+              it.entry.chain_step_id === openLegStep.id,
+          )
+        : [],
+    [items, openLegStep],
+  );
+  const parentItems = useMemo(
+    () =>
+      items.filter((it) =>
+        it.kind === "activity-group" ? true : !it.entry.chain_step_id,
+      ),
+    [items],
+  );
+
+  // The discussion's display list for a solo task: comments plus human
+  // activity. Agent bookkeeping (status flips an agent made, run completion)
+  // belongs to Execution and audit, not the conversation. A group that
+  // contains any of those agent actions is dropped whole; human status/date
+  // changes still render. Room pages keep their full stream.
+  const discussionItems = useMemo(
+    () => {
+      if (isRoom) return items;
+      const hiddenAgentActions = new Set([
+        "status_changed",
+        "task_completed",
+        "task_failed",
+        "task_cancelled",
+      ]);
+      return items.filter((it) => {
+        if (it.kind === "comment" || it.kind === "resolved-bar") return true;
+        if (it.kind === "activity-group") {
+          return !it.entries.some(
+            (entry) =>
+              entry.actor_type === "agent" &&
+              !!entry.action &&
+              hiddenAgentActions.has(entry.action),
+          );
+        }
+        return false;
+      });
+    },
+    [items, isRoom],
+  );
+
   // In-page find (Cmd/Ctrl+F). `items.length` is the content signal that
   // triggers a match recompute when comments are added/removed; text edits
   // are caught by the hook's own MutationObserver. Opening find forces the
   // timeline to render flat below so every comment is in the DOM to match.
   const find = useInPageFind({
     container: scrollContainerEl,
-    contentKey: items.length,
+    contentKey: discussionItems.length,
     enabled: !!issue,
   });
   // Close the bar (and drop highlights) when navigating to another issue —
@@ -1602,12 +1676,12 @@ export function IssueDetail({ issueId, onDelete, onDone, defaultSidebarOpen = tr
   // a direct findIndex hit; for reply ids we look up the enclosing root.
   const targetIdx = useMemo(() => {
     if (!highlightCommentId) return -1;
-    const direct = items.findIndex((it) => it.id === highlightCommentId);
+    const direct = discussionItems.findIndex((it) => it.id === highlightCommentId);
     if (direct >= 0) return direct;
     const rootId = replyToRoot.get(highlightCommentId);
     if (!rootId) return -1;
-    return items.findIndex((it) => it.id === rootId);
-  }, [items, highlightCommentId, replyToRoot]);
+    return discussionItems.findIndex((it) => it.id === rootId);
+  }, [discussionItems, highlightCommentId, replyToRoot]);
 
   // One entry per comment thread (folded resolved bars included), activity
   // groups skipped. Derived from the same flat `items` array Virtuoso renders
@@ -1668,7 +1742,7 @@ export function IssueDetail({ issueId, onDelete, onDone, defaultSidebarOpen = tr
   useEffect(() => {
     if (!pendingPostedCommentId || isFlatTimeline) return;
     const rootId = replyToRoot.get(pendingPostedCommentId) ?? pendingPostedCommentId;
-    const index = items.findIndex((item) => item.id === rootId);
+    const index = discussionItems.findIndex((item) => item.id === rootId);
     if (index < 0) return;
     let timer: number | undefined;
     const scrollEnd = () => {
@@ -1686,7 +1760,7 @@ export function IssueDetail({ issueId, onDelete, onDone, defaultSidebarOpen = tr
       cancelAnimationFrame(frame);
       if (timer !== undefined) window.clearTimeout(timer);
     };
-  }, [pendingPostedCommentId, items, replyToRoot, isFlatTimeline]);
+  }, [pendingPostedCommentId, discussionItems, replyToRoot, isFlatTimeline]);
 
   // Flat mode (find bar / deep link) has no Virtuoso, so drive scrollTop by
   // hand: align the row's bottom to the composer's top edge. The comment's
@@ -1696,7 +1770,7 @@ export function IssueDetail({ issueId, onDelete, onDone, defaultSidebarOpen = tr
   useEffect(() => {
     if (!pendingPostedCommentId || !isFlatTimeline) return;
     const rootId = replyToRoot.get(pendingPostedCommentId) ?? pendingPostedCommentId;
-    if (items.findIndex((item) => item.id === rootId) < 0) return;
+    if (discussionItems.findIndex((item) => item.id === rootId) < 0) return;
     let rafId = 0;
     let frames = 0;
     let last = -1;
@@ -1719,7 +1793,7 @@ export function IssueDetail({ issueId, onDelete, onDone, defaultSidebarOpen = tr
     };
     rafId = requestAnimationFrame(alignBottom);
     return () => cancelAnimationFrame(rafId);
-  }, [pendingPostedCommentId, items, replyToRoot, isFlatTimeline, scrollContainerEl]);
+  }, [pendingPostedCommentId, discussionItems, replyToRoot, isFlatTimeline, scrollContainerEl]);
   const jumpFlashTimerRef = useRef<number | null>(null);
   useEffect(
     () => () => {
@@ -1742,7 +1816,7 @@ export function IssueDetail({ issueId, onDelete, onDone, defaultSidebarOpen = tr
       } else {
         // Virtualized mode: the target row may not be mounted, so scroll by
         // index and let Virtuoso mount it. Offset leaves a small top gap.
-        const index = items.findIndex((it) => it.id === threadId);
+        const index = discussionItems.findIndex((it) => it.id === threadId);
         if (index < 0) return;
         virtuosoRef.current?.scrollToIndex({ index, align: "start", offset: -16 });
       }
@@ -1753,7 +1827,7 @@ export function IssueDetail({ issueId, onDelete, onDone, defaultSidebarOpen = tr
       if (jumpFlashTimerRef.current !== null) window.clearTimeout(jumpFlashTimerRef.current);
       jumpFlashTimerRef.current = window.setTimeout(() => setHighlightedId(null), 2000);
     },
-    [isFlatTimeline, items, scrollContainerEl],
+    [isFlatTimeline, discussionItems, scrollContainerEl],
   );
 
   // Header thread navigator. `open` and `pinned` live here rather than inside
@@ -1816,6 +1890,245 @@ export function IssueDetail({ issueId, onDelete, onDone, defaultSidebarOpen = tr
   // `src`/`href` against this list to resolve an attachment id before
   // calling `/api/attachments/{id}`.
   const { data: issueAttachments } = useQuery(issueAttachmentsOptions(id));
+
+  // Handoff files reference attachments by id; the page owns the list, so one
+  // map resolves each package chip (and each log row's file chip) to its
+  // record — which is what makes view / edit / download real buttons.
+  const attachmentById = useMemo(
+    () => new Map((issueAttachments ?? []).map((a) => [a.id, a])),
+    [issueAttachments],
+  );
+  const attachmentOf = useCallback(
+    (attachmentId: string) => attachmentById.get(attachmentId),
+    [attachmentById],
+  );
+
+  // --- Handoff collection (审核 = 交接单) ---
+  // While the reader's leg waits on review, its candidates are gathered
+  // automatically: everything attached to the task during the leg's window,
+  // plus the branches this leg's runs delivered on. The holder curates the
+  // selection; the approve button publishes it.
+  const reviewingStep = relayView?.reviewingStep ?? null;
+  // The leg's generated output (产出 md) — see startLegOutput below; rides
+  // with the collected candidates.
+  const [outputCandidates, setOutputCandidates] = useState<HandoffCandidate[]>([]);
+  const handoffCandidates = useMemo<HandoffCandidate[]>(() => {
+    if (!reviewingStep || !relayView?.canApprove) return [];
+    const from = reviewingStep.started_at
+      ? new Date(reviewingStep.started_at).getTime()
+      : 0;
+    const out: HandoffCandidate[] = [];
+    for (const att of issueAttachments ?? []) {
+      const at = att.created_at ? new Date(att.created_at).getTime() : 0;
+      if (at < from) continue;
+      out.push({
+        id: `att:${att.id}`,
+        name: att.filename,
+        size: att.size_bytes,
+        kind: "attachment",
+        attachment_id: att.id,
+      });
+    }
+    for (const task of relayTasks) {
+      if (task.issue_id !== id || !task.branch_name) continue;
+      if (reviewingStep.agent_id && task.agent_id !== reviewingStep.agent_id) {
+        continue;
+      }
+      const at = task.created_at ? new Date(task.created_at).getTime() : 0;
+      if (at < from) continue;
+      out.push({
+        id: `branch:${task.id}`,
+        name: task.branch_name,
+        kind: "branch",
+      });
+    }
+    // Deduped: the auto-scan above may already have collected the same file
+    // once the generated output's upload lands on the issue.
+    for (const candidate of outputCandidates) {
+      if (!out.some((existing) => existing.id === candidate.id)) {
+        out.push(candidate);
+      }
+    }
+    return out;
+  }, [reviewingStep, relayView?.canApprove, issueAttachments, relayTasks, id, outputCandidates]);
+  const [handoffPicked, setHandoffPicked] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const [handoffSummary, setHandoffSummary] = useState("");
+  // The output (产出 md) flow: the holder asks their leg's agent to summarize
+  // this leg into the handoff document. `outputAsked` marks that the ask ran,
+  // so an approve click with an empty summary asks exactly once.
+  const generateLegOutput = useGenerateChainLegOutput(id);
+  const { uploadWithToast: uploadLegOutputFile } = useFileUpload(api);
+  const [outputProducing, setOutputProducing] = useState(false);
+  const [outputAsked, setOutputAsked] = useState(false);
+  const [outputBaselineId, setOutputBaselineId] = useState<string | null>(null);
+  // Raise-once bookkeeping. A ref, not state: the lift effect re-runs on every
+  // timeline refetch, and a single-slot state guard let the previous comment
+  // and a newer one take turns re-lifting each other.
+  const outputLiftedRef = useRef<Set<string>>(new Set());
+  // Whether the current summary text came from a lift (safe to replace on a
+  // regenerate) rather than from the holder's own typing (never replaced).
+  const [outputSummaryFromLift, setOutputSummaryFromLift] = useState(false);
+  const reviewingStepId = reviewingStep?.id ?? null;
+  // A new review round starts with nothing ticked and no summary…
+  useEffect(() => {
+    setHandoffPicked(new Set());
+    setHandoffSummary("");
+    setOutputProducing(false);
+    setOutputAsked(false);
+    setOutputBaselineId(null);
+    outputLiftedRef.current = new Set();
+    setOutputSummaryFromLift(false);
+    setOutputCandidates([]);
+  }, [reviewingStepId]);
+  // …then everything the collector found arrives already ticked ("自动收集").
+  // Only additions: a file the holder un-ticked is not re-ticked by the next
+  // refetch, but a candidate that lands mid-review still joins the package.
+  useEffect(() => {
+    if (handoffCandidates.length === 0) return;
+    setHandoffPicked((prev) => {
+      let changed = false;
+      const next = new Set(prev);
+      for (const candidate of handoffCandidates) {
+        if (!next.has(candidate.id)) {
+          next.add(candidate.id);
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [handoffCandidates]);
+  const handoffDraft = useMemo<HandoffDraft | undefined>(() => {
+    if (!relayView?.canApprove) return undefined;
+    return {
+      candidates: handoffCandidates,
+      picked: handoffPicked,
+      onToggle: (candidateId: string) =>
+        setHandoffPicked((prev) => {
+          const next = new Set(prev);
+          if (next.has(candidateId)) next.delete(candidateId);
+          else next.add(candidateId);
+          return next;
+        }),
+      summary: handoffSummary,
+      onSummaryChange: setHandoffSummary,
+    };
+  }, [relayView?.canApprove, handoffCandidates, handoffPicked, handoffSummary]);
+  const approveWithHandoff = () =>
+    approveChainStep.mutate(
+      {
+        summary: handoffSummary.trim(),
+        files: handoffCandidates
+          .filter((candidate) => handoffPicked.has(candidate.id))
+          .map((candidate) => ({
+            name: candidate.name,
+            size: candidate.size,
+            kind: candidate.kind,
+            attachment_id: candidate.attachment_id,
+          })),
+      },
+      { onError: () => toast.error(t(($) => $.room.approve_failed)) },
+    );
+
+  // The leg's output: one summary per finished leg, written by the leg's own
+  // agent — not one document per question. The ask queues a run; the document
+  // arrives as the run's comment in this leg, and this handler lifts it into
+  // the handoff summary and carries it as a .md file, so the delivered output
+  // previews/edits/downloads like every other handoff file.
+  const startLegOutput = () => {
+    if (outputProducing || !relayView?.canApprove) return;
+    // Baseline: the leg's latest agent comment BEFORE the ask. Anything after
+    // it in the leg is the output — clock-skew-proof where a timestamp
+    // compare is not.
+    const latest = [...timeline]
+      .reverse()
+      .find(
+        (entry) =>
+          entry.actor_type === "agent" &&
+          (!reviewingStep || entry.chain_step_id === reviewingStep.id),
+      );
+    setOutputBaselineId(latest?.id ?? "");
+    // A regenerate replaces our own earlier lift — never the holder's words.
+    if (outputSummaryFromLift) {
+      setHandoffSummary("");
+      setOutputSummaryFromLift(false);
+    }
+    setOutputAsked(true);
+    setOutputProducing(true);
+    generateLegOutput.mutate(undefined, {
+      onError: (err) => {
+        setOutputProducing(false);
+        const message = err instanceof Error ? err.message : "";
+        toast.error(
+          /already running/i.test(message)
+            ? t(($) => $.room.output_agent_busy)
+            : t(($) => $.room.output_failed),
+        );
+      },
+    });
+  };
+  // Keyed on the ASK, not on the producing flag: a real run can outlast any
+  // progress timer, and a late-landing document must still be lifted. The
+  // holder's own words always win over an auto-fill.
+  useEffect(() => {
+    if (!outputAsked) return;
+    // The document is the FIRST agent comment AFTER the pre-ask baseline —
+    // see selectProducedLegComment for why scanning the whole timeline is
+    // the wrong shape.
+    const produced = selectProducedLegComment(
+      timeline,
+      outputBaselineId,
+      reviewingStep?.id ?? null,
+    );
+    if (!produced?.content) return;
+    if (outputLiftedRef.current.has(produced.id)) return;
+    outputLiftedRef.current.add(produced.id);
+    setOutputProducing(false);
+    const markdown = produced.content;
+    setHandoffSummary((prev) => (prev.trim() === "" ? markdown : prev));
+    setOutputSummaryFromLift(true);
+    const seq = (reviewingStep?.position ?? 0) + 1;
+    void (async () => {
+      const uploaded = await uploadLegOutputFile(
+        new File(
+          [markdown],
+          t(($) => $.room.output_file_name, { seq }),
+          { type: "text/markdown" },
+        ),
+        { issueId: id },
+      );
+      // The summary above still carries the document; the file is what makes
+      // it renderable/editable/downloadable downstream, so a failed upload
+      // only costs the attachment, never the text.
+      if (!uploaded) return;
+      setOutputCandidates((prev) =>
+        prev.some((candidate) => candidate.attachment_id === uploaded.id)
+          ? prev
+          : [
+              ...prev,
+              {
+                id: `att:${uploaded.id}`,
+                name: uploaded.filename,
+                size: uploaded.size_bytes,
+                kind: "attachment",
+                attachment_id: uploaded.id,
+              },
+            ],
+      );
+    })();
+  }, [outputAsked, outputBaselineId, timeline, reviewingStep, id, uploadLegOutputFile, t]);
+  // A run that never reports back must not leave the button frozen. Generous
+  // on purpose — real legs run for minutes, and the late-lift above still
+  // catches a document that lands after this fires.
+  useEffect(() => {
+    if (!outputProducing) return;
+    const timer = setTimeout(() => {
+      setOutputProducing(false);
+      toast.error(t(($) => $.room.output_timeout));
+    }, 15 * 60_000);
+    return () => clearTimeout(timer);
+  }, [outputProducing, t]);
 
   // Sub-issue queries
   const parentIssueId = issue?.parent_issue_id;
@@ -1928,7 +2241,7 @@ export function IssueDetail({ issueId, onDelete, onDone, defaultSidebarOpen = tr
   // ref populates only on the post-loading render, so it's the signal that
   // the timeline (and the deep-link target id) has actually rendered.
   useEffect(() => {
-    if (!highlightCommentId || items.length === 0) return;
+    if (!highlightCommentId || discussionItems.length === 0) return;
     // An explicit replay request (re-click on the already-open notification
     // row): the host cleared the memento entry and bumped the token, so
     // re-arm the landing guard and fall through to the jump.
@@ -1949,13 +2262,13 @@ export function IssueDetail({ issueId, onDelete, onDone, defaultSidebarOpen = tr
     const rootId = replyToRoot.get(highlightCommentId);
     if (rootId && rootId !== highlightCommentId) {
       // Root resolved → the whole thread is a folded bar.
-      if (items[targetIdx]?.kind === "resolved-bar") {
+      if (discussionItems[targetIdx]?.kind === "resolved-bar") {
         toggleResolvedExpand(rootId, true);
         return;
       }
       // A reply is the resolution → the other replies fold behind the
       // "N comments" bar; expand if the target is one of those folded replies.
-      const rootItem = items[targetIdx];
+      const rootItem = discussionItems[targetIdx];
       if (rootItem?.kind === "comment" && !expandedResolved.has(rootId)) {
         const resolution = deriveThreadResolution(
           rootItem.entry,
@@ -2015,7 +2328,7 @@ export function IssueDetail({ issueId, onDelete, onDone, defaultSidebarOpen = tr
       cancelAnimationFrame(rafId);
       clearTimeout(fade);
     };
-  }, [highlightCommentId, highlightRequestToken, id, writeViewState, items, targetIdx, scrollContainerEl, replyToRoot, expandedResolved, timelineView, toggleResolvedExpand]);
+  }, [highlightCommentId, highlightRequestToken, id, writeViewState, discussionItems, targetIdx, scrollContainerEl, replyToRoot, expandedResolved, timelineView, toggleResolvedExpand]);
 
   const descEditorRef = useRef<ContentEditorRef>(null);
   const descriptionEditingRef = useRef(false);
@@ -2040,6 +2353,7 @@ export function IssueDetail({ issueId, onDelete, onDone, defaultSidebarOpen = tr
   // text from `defaultValue` at mount and exposes no imperative setter, so
   // remounting is the only way to put the server's title back in the editor.
   const [titleResetToken, setTitleResetToken] = useState(0);
+  const [soloBriefCollapsed, setSoloBriefCollapsed] = useState(false);
   useEffect(() => {
     setTitleConflictDraft(null);
     setDescriptionConflictDraft(null);
@@ -2123,12 +2437,6 @@ export function IssueDetail({ issueId, onDelete, onDone, defaultSidebarOpen = tr
   const actions = useIssueActions(issue);
   const handleUpdateField = actions.updateField;
 
-  // Labels live in their own query (not on the issue body) — fetch the count
-  // here so seeding can decide whether the "Labels" optional row should be
-  // shown for an issue that already has labels attached.
-  const { data: attachedLabels = [] } = useQuery(issueLabelsOptions(wsId, id));
-  const attachedLabelsCount = attachedLabels.length;
-
   // Custom property catalog. Includes archived definitions: an issue can
   // still carry a value written before the archive, and that row must stay
   // renderable (read-only) until someone clears it.
@@ -2147,106 +2455,6 @@ export function IssueDetail({ issueId, onDelete, onDone, defaultSidebarOpen = tr
         .filter((p): p is IssueProperty => !!p),
     [subIssueRowPropertyIds, activeWorkspaceProperties],
   );
-
-  // Seed the visible-optional-props set:
-  //   - on issue switch, reset to whichever fields are currently set
-  //   - on the SAME issue, additively pick up fields the user just set
-  //     (so the row stays visible after they edit + clear in one session)
-  // Removal happens only on issue switch — never on clear.
-  const seededIssueIdRef = useRef<string | null>(null);
-  useEffect(() => {
-    if (!issue) return;
-    if (seededIssueIdRef.current !== issue.id) {
-      seededIssueIdRef.current = issue.id;
-      setAutoOpenProp(null);
-      setAutoOpenCustomProp(null);
-      const seed = new Set<OptionalPropKey>();
-      for (const k of OPTIONAL_PROP_KEYS) {
-        if (isOptionalPropSet(issue, k, attachedLabelsCount)) seed.add(k);
-      }
-      setVisibleOptionalProps(seed);
-      setVisibleCustomProps(new Set(Object.keys(issue.properties ?? {})));
-      return;
-    }
-    setVisibleOptionalProps((prev) => {
-      let next = prev;
-      for (const k of OPTIONAL_PROP_KEYS) {
-        if (isOptionalPropSet(issue, k, attachedLabelsCount) && !next.has(k)) {
-          if (next === prev) next = new Set(prev);
-          next.add(k);
-        }
-      }
-      return next;
-    });
-    setVisibleCustomProps((prev) => {
-      let next = prev;
-      for (const propertyId of Object.keys(issue.properties ?? {})) {
-        if (!next.has(propertyId)) {
-          if (next === prev) next = new Set(prev);
-          next.add(propertyId);
-        }
-      }
-      return next;
-    });
-  }, [issue, attachedLabelsCount]);
-
-  const addOptionalProp = useCallback(
-    (key: OptionalPropKey) => {
-      setVisibleOptionalProps((prev) => {
-        if (prev.has(key)) return prev;
-        const next = new Set(prev);
-        next.add(key);
-        return next;
-      });
-      setAutoOpenProp(key);
-      // Dismiss the "+ Add property" popover so it doesn't sit stacked
-      // behind the picker we're about to auto-open.
-      setAddPropPopoverOpen(false);
-    },
-    [],
-  );
-
-  const addCustomProp = useCallback((propertyId: string) => {
-    setVisibleCustomProps((prev) => {
-      if (prev.has(propertyId)) return prev;
-      const next = new Set(prev);
-      next.add(propertyId);
-      return next;
-    });
-    setAutoOpenCustomProp(propertyId);
-    setAddPropPopoverOpen(false);
-  }, []);
-
-  // Clear the auto-open flag after the next render so pickers (which read
-  // `defaultOpen` once via a useState initializer) keep the open state they
-  // captured on mount, but later interactions don't re-trigger it.
-  useEffect(() => {
-    if (autoOpenProp === null) return;
-    setAutoOpenProp(null);
-  }, [autoOpenProp]);
-
-  useEffect(() => {
-    if (autoOpenCustomProp === null) return;
-    setAutoOpenCustomProp(null);
-  }, [autoOpenCustomProp]);
-
-  const handleToggleSidebar = useCallback(() => {
-    if (isMobile) {
-      setMobileSidebarOpen((open) => !open);
-      return;
-    }
-
-    const panel = sidebarRef.current;
-    if (!panel) return;
-    const nextOpen = panel.isCollapsed();
-    beginDesktopSidebarToggle(nextOpen);
-    window.requestAnimationFrame(() => {
-      if (nextOpen) panel.expand();
-      else panel.collapse();
-    });
-  }, [beginDesktopSidebarToggle, isMobile, sidebarRef]);
-
-  useRightSidebarShortcut(rightSidebarShortcutTargetRef, handleToggleSidebar);
 
   useIssueDetailScrollRestore({
     restoreKey: `${wsId}:${id}`,
@@ -2274,6 +2482,129 @@ export function IssueDetail({ issueId, onDelete, onDone, defaultSidebarOpen = tr
         : null,
     [resolvedIssueId, resolvedIssueIdentifier],
   );
+
+  const soloStepCount = useMemo(
+    () => ((issue?.description ?? "").match(/^\s*\d+\./gm) ?? []).length,
+    [issue?.description],
+  );
+
+  const soloDeliveredAttachments = useMemo(() => {
+    const all = issueAttachments ?? [];
+    const fromComments = all.filter((attachment) => attachment.comment_id);
+    return fromComments.length > 0 ? fromComments : all;
+  }, [issueAttachments]);
+  const soloImageCount = useMemo(
+    () =>
+      soloDeliveredAttachments.filter((attachment) =>
+        attachment.content_type.startsWith("image/"),
+      ).length,
+    [soloDeliveredAttachments],
+  );
+  const soloFileCount = soloDeliveredAttachments.length - soloImageCount;
+  const soloHasDelivery = soloDeliveredAttachments.length > 0;
+
+  const soloRun = useMemo(() => {
+    if (isRoom) return null;
+    const active = issueTasks.find((task) =>
+      SOLO_ACTIVE_TASK_STATUSES.has(task.status),
+    );
+    const latest =
+      active ??
+      [...issueTasks]
+        .filter((task) => !SOLO_ACTIVE_TASK_STATUSES.has(task.status))
+        .sort(
+          (a, b) =>
+            (Date.parse(b.completed_at ?? b.started_at ?? b.created_at ?? "") || 0) -
+            (Date.parse(a.completed_at ?? a.started_at ?? a.created_at ?? "") || 0),
+        )[0] ??
+      null;
+    if (!latest) return null;
+    const started = latest.started_at ?? latest.dispatched_at ?? latest.created_at;
+    return {
+      task: latest,
+      active: SOLO_ACTIVE_TASK_STATUSES.has(latest.status),
+      started,
+    };
+  }, [issueTasks, isRoom]);
+
+  // ── Refresh archive (full-route layout) ───────────────────────────────
+  // A squad task opens on the leg the relay is sitting on; the right rail
+  // switches legs without leaving the page. A solo task uses the same shell
+  // with its own run and outputs.
+  const refreshIsSquad = !!isRoom && !!chain;
+  const refreshStep = refreshIsSquad && chain
+    ? typeof openLeg === "number"
+      ? chain.steps.find((step) => step.position + 1 === openLeg)
+        ?? relayView?.activeStep
+        ?? chain.steps[0]
+        ?? null
+      : relayView?.activeStep ?? chain.steps[0] ?? null
+    : null;
+  const refreshSeq = refreshStep ? refreshStep.position + 1 : null;
+  const refreshRunState = refreshStep
+    ? stepRunState(id, refreshStep, relayTasks)
+    : "none";
+  const refreshLatestRun = refreshStep
+    ? latestLegRun(id, refreshStep, issueTasks)
+    : null;
+  const refreshStepIsMine =
+    !!refreshStep && !!user?.id && refreshStep.holder_user_id === user.id;
+  const refreshStepHolding =
+    refreshStepIsMine &&
+    (refreshStep?.state === "doing" || refreshStep?.state === "reviewing");
+  const refreshCanApprove =
+    !!refreshStep &&
+    refreshStepIsMine &&
+    chainStateKey(refreshStep.state) === "reviewing";
+  const refreshNextStep =
+    refreshStep && chain
+      ? chain.steps[refreshStep.position + 1] ?? null
+      : null;
+  const refreshStepAgentName =
+    refreshStep?.agent_id
+      ? getAgentName(refreshStep.agent_id)
+      : refreshIsSquad
+        ? null
+        : issue?.assignee_type === "agent" && issue.assignee_id
+          ? getAgentName(issue.assignee_id)
+          : null;
+  const refreshRunTask = refreshIsSquad
+    ? refreshLatestRun
+    : soloRun?.task ?? null;
+  const refreshLegItems = useMemo(
+    () =>
+      refreshStep
+        ? items.filter(
+            (item) =>
+              (item.kind === "comment" || item.kind === "resolved-bar") &&
+              item.entry.chain_step_id === refreshStep.id,
+          )
+        : [],
+    [items, refreshStep],
+  );
+  const refreshDiscussionItems = refreshStep ? refreshLegItems : discussionItems;
+  const refreshLegDelivery = useMemo(() => {
+    if (!refreshStep) return null;
+    for (let i = timeline.length - 1; i >= 0; i--) {
+      const entry = timeline[i];
+      if (
+        entry?.chain_step_id === refreshStep.id &&
+        (entry.attachments?.length ?? 0) > 0
+      ) {
+        return entry;
+      }
+    }
+    return null;
+  }, [timeline, refreshStep]);
+
+  const soloAccepted = issue ? issueBehavesAs(issue, "done") : false;
+  const soloCancelled = issue ? issueBehavesAs(issue, "cancelled") : false;
+  const acceptDelivery = useCallback(() => {
+    if (!issue || soloAccepted || soloCancelled) return;
+    handleUpdateField({ status: "done" });
+    onDone?.();
+    toast.success(t(($) => $.detail.accept_delivery_toast));
+  }, [issue, handleUpdateField, onDone, soloAccepted, soloCancelled, t]);
 
   if (loading) {
     return <IssueDetailSkeleton leading={leadingAction} />;
@@ -2338,350 +2669,6 @@ export function IssueDetail({ issueId, onDelete, onDone, defaultSidebarOpen = tr
     persistDescriptionSave(draft);
   };
 
-  const sidebarContent = (
-    <div className="space-y-5">
-      {/* The room's roster leads the rail on a relay task: who is in it and
-          whether each of them can actually run their turn. */}
-      {isRoom && chain ? (
-        <RoomMembersCard
-          chain={chain}
-          nameOf={playerNames.nameOf}
-          identityOf={playerNames.identityOf}
-          agentNameOf={getAgentName}
-        />
-      ) : null}
-      {/* Properties */}
-      <div>
-        <button
-          type="button"
-          className={`flex w-full items-center gap-1 rounded-md px-2 py-1 text-caption font-medium transition-colors mb-2 hover:bg-accent/70 ${propertiesOpen ? "" : "text-muted-foreground hover:text-foreground"}`}
-          onClick={() => setPropertiesOpen(!propertiesOpen)}
-        >
-          {t(($) => $.detail.section_properties)}
-          <ChevronRight className={`!size-3 shrink-0 stroke-[2.5] text-muted-foreground transition-transform ${propertiesOpen ? "rotate-90" : ""}`} />
-        </button>
-        {propertiesOpen && <div className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-0.5 pl-2">
-          {/* Core props — always rendered. */}
-          <PropRow label={t(($) => $.detail.prop_status)}>
-            <StatusPicker status={issue.status} onUpdate={handleUpdateField} align="start" />
-          </PropRow>
-          <PropRow label={t(($) => $.detail.prop_assignee)}>
-            <AssigneePicker assigneeType={issue.assignee_type} assigneeId={issue.assignee_id} onUpdate={handleUpdateField} align="start" />
-          </PropRow>
-          <PropRow label={t(($) => $.detail.prop_project)}>
-            <ProjectPicker
-              projectId={issue.project_id}
-              onUpdate={handleUpdateField}
-            />
-          </PropRow>
-
-          {/* Optional props — rendered only when set on the issue OR added
-              via "+ Add property" in this session. Row order follows the
-              order of `OPTIONAL_PROP_KEYS`. */}
-          {visibleOptionalProps.has("priority") && (
-            <PropRow label={t(($) => $.detail.prop_priority)}>
-              <PriorityPicker
-                priority={issue.priority}
-                onUpdate={handleUpdateField}
-                align="start"
-                defaultOpen={autoOpenProp === "priority"}
-              />
-            </PropRow>
-          )}
-          {issue.parent_issue_id != null && visibleOptionalProps.has("stage") && (
-            <PropRow label={t(($) => $.detail.prop_stage)}>
-              <StagePicker
-                stage={issue.stage}
-                onUpdate={handleUpdateField}
-                maxStage={maxSiblingStage(parentChildIssues)}
-                align="start"
-                defaultOpen={autoOpenProp === "stage"}
-              />
-            </PropRow>
-          )}
-          {visibleOptionalProps.has("start_date") && (
-            <PropRow label={t(($) => $.detail.prop_start_date)}>
-              <StartDatePicker
-                startDate={issue.start_date}
-                onUpdate={handleUpdateField}
-                defaultOpen={autoOpenProp === "start_date"}
-              />
-            </PropRow>
-          )}
-          {visibleOptionalProps.has("due_date") && (
-            <PropRow label={t(($) => $.detail.prop_due_date)}>
-              <DueDatePicker
-                dueDate={issue.due_date}
-                onUpdate={handleUpdateField}
-                defaultOpen={autoOpenProp === "due_date"}
-              />
-            </PropRow>
-          )}
-          {visibleOptionalProps.has("labels") && (
-            <PropRow label={t(($) => $.detail.prop_labels)}>
-              <LabelPicker
-                issueId={issue.id}
-                align="start"
-                defaultOpen={autoOpenProp === "labels"}
-              />
-            </PropRow>
-          )}
-
-          {/* Custom properties — same progressive disclosure as the
-              built-in optional props: a row renders when the issue has a
-              value OR the user added the property this session. Archived
-              definitions render read-only until their value is cleared. */}
-          {workspaceProperties
-            .filter(
-              (p) =>
-                issue.properties?.[p.id] !== undefined ||
-                (!p.archived && visibleCustomProps.has(p.id)),
-            )
-            .map((p) => (
-              <PropRow
-                key={p.id}
-                label={
-                  <>
-                    <PropertyIcon property={p} className="size-3.5 text-caption" />
-                    <span className="truncate">{p.name}</span>
-                  </>
-                }
-              >
-                <CustomPropertyValueEditor
-                  issue={issue}
-                  property={p}
-                  defaultOpen={autoOpenCustomProp === p.id}
-                />
-              </PropRow>
-            ))}
-
-          {/* "+ Add property" — opens a Popover listing optional fields
-              not yet displayed. Hidden once every optional field is on
-              screen. Sits inside the same grid as a full-row, with its
-              own padding so the visual rhythm follows the rows above. */}
-          {(OPTIONAL_PROP_KEYS.some((k) => !visibleOptionalProps.has(k) && (k !== "stage" || issue.parent_issue_id != null)) ||
-            workspaceProperties.some((p) => !p.archived && !visibleCustomProps.has(p.id) && issue.properties?.[p.id] === undefined)) && (
-            <div className="col-span-2 mt-1">
-              <Popover open={addPropPopoverOpen} onOpenChange={setAddPropPopoverOpen}>
-                <PopoverTrigger
-                  className="flex items-center gap-1.5 rounded-md px-2 py-1 -mx-2 text-caption text-muted-foreground hover:bg-accent/50 hover:text-foreground transition-colors"
-                >
-                  <Plus className="h-3 w-3 shrink-0" />
-                  <span>{t(($) => $.detail.add_property_action)}</span>
-                </PopoverTrigger>
-                {/* Item visuals mirror the inspector rows' typography
-                    (text-caption, muted icons) and each option leads with the
-                    icon the resulting picker uses, so the dropdown reads
-                    as a preview of what will show up below. */}
-                <PopoverContent align="start" className="w-44 p-1">
-                  {OPTIONAL_PROP_KEYS.filter((k) => !visibleOptionalProps.has(k) && (k !== "stage" || issue.parent_issue_id != null)).map((k) => (
-                    <button
-                      key={k}
-                      type="button"
-                      onClick={() => addOptionalProp(k)}
-                      className="flex w-full items-center gap-2 rounded-md px-2 py-1 text-caption text-foreground transition-colors hover:bg-accent focus-visible:bg-accent focus-visible:outline-none"
-                    >
-                      {k === "priority" && (
-                        <PriorityIcon priority="medium" inheritColor className="text-muted-foreground" />
-                      )}
-                      {k === "stage" && (
-                        <Milestone className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                      )}
-                      {k === "start_date" && (
-                        <CalendarClock className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                      )}
-                      {k === "due_date" && (
-                        <CalendarDays className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                      )}
-                      {k === "labels" && (
-                        <Tag className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                      )}
-                      <span className="truncate">
-                        {k === "priority" && t(($) => $.detail.prop_priority)}
-                        {k === "stage" && t(($) => $.detail.prop_stage)}
-                        {k === "start_date" && t(($) => $.detail.prop_start_date)}
-                        {k === "due_date" && t(($) => $.detail.prop_due_date)}
-                        {k === "labels" && t(($) => $.detail.prop_labels)}
-                      </span>
-                    </button>
-                  ))}
-                  {(() => {
-                    const addable = workspaceProperties.filter(
-                      (p) =>
-                        !p.archived &&
-                        !visibleCustomProps.has(p.id) &&
-                        issue.properties?.[p.id] === undefined,
-                    );
-                    if (addable.length === 0) return null;
-                    return (
-                      <>
-                        <div className="my-1 h-px bg-border" />
-                        {addable.map((p) => (
-                          <button
-                            key={p.id}
-                            type="button"
-                            onClick={() => addCustomProp(p.id)}
-                            className="flex w-full items-center gap-2 rounded-md px-2 py-1 text-caption text-foreground transition-colors hover:bg-accent focus-visible:bg-accent focus-visible:outline-none"
-                          >
-                            {p.icon ? (
-                              <PropertyIcon property={p} className="size-3.5 text-caption" />
-                            ) : (
-                              <SlidersHorizontal className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                            )}
-                            <span className="truncate">{p.name}</span>
-                          </button>
-                        ))}
-                      </>
-                    );
-                  })()}
-                </PopoverContent>
-              </Popover>
-            </div>
-          )}
-        </div>}
-      </div>
-
-      {/* Quick actions — the sidebar's only "do something" block, so it sits
-          directly under Properties and above every read-only section. Renders
-          nothing when the workspace has no active action visible to this
-          member. It is NOT filtered by invoke permission: a member can see and
-          click an action they cannot run, and the refusal is explained at run
-          time rather than by a silently shorter list. */}
-      <QuickActionsSection issueId={issue.id} />
-      <PluginPanelSection issueId={issue.id} />
-
-      {/* Parent issue — standalone section, only when the issue has a
-          parent. Setting a parent is reachable via the issue actions menu;
-          this card surfaces an existing parent without occupying sidebar
-          space for issues that don't have one. */}
-      {parentIssue && (
-        <div>
-          <button
-            type="button"
-            className={`flex w-full items-center gap-1 rounded-md px-2 py-1 text-caption font-medium transition-colors mb-2 hover:bg-accent/70 ${parentIssueOpen ? "" : "text-muted-foreground hover:text-foreground"}`}
-            onClick={() => setParentIssueOpen(!parentIssueOpen)}
-          >
-            {t(($) => $.detail.section_parent_issue)}
-            <ChevronRight className={`!size-3 shrink-0 stroke-[2.5] text-muted-foreground transition-transform ${parentIssueOpen ? "rotate-90" : ""}`} />
-          </button>
-          {parentIssueOpen && <div className="pl-2">
-            <div className="flex items-center gap-0.5 rounded-md px-2 -mx-2 hover:bg-accent/50 transition-colors group">
-              <AppLink
-                href={paths.issueDetail(parentIssue.id)}
-                className="flex flex-1 min-w-0 items-center gap-1.5 py-1.5 text-caption"
-              >
-                <StatusIcon
-                  status={parentIssue.status}
-                  category={issueStatusCategory(parentIssue) ?? undefined}
-                  className="h-3.5 w-3.5 shrink-0"
-                />
-                <span className="text-muted-foreground shrink-0">{parentIssue.identifier}</span>
-                <span className="truncate group-hover:text-foreground">{parentIssue.title}</span>
-              </AppLink>
-              <button
-                type="button"
-                title={t(($) => $.actions.remove_parent_issue)}
-                aria-label={t(($) => $.actions.remove_parent_issue)}
-                onClick={() => actions.removeParent()}
-                className="shrink-0 rounded p-1 text-muted-foreground opacity-0 transition-opacity hover:bg-accent hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100"
-              >
-                <Unlink className="h-3.5 w-3.5" />
-              </button>
-            </div>
-          </div>}
-        </div>
-      )}
-
-      {/* Pull requests — hidden when the workspace disables the PR sidebar
-          (or the GitHub master switch is off). Backend data is kept either
-          way so re-enabling restores the section instantly. */}
-      {githubSettings.prSidebar && (
-        <div>
-          <button
-            type="button"
-            className={`flex w-full items-center gap-1 rounded-md px-2 py-1 text-caption font-medium transition-colors mb-2 hover:bg-accent/70 ${pullRequestsOpen ? "" : "text-muted-foreground hover:text-foreground"}`}
-            onClick={() => setPullRequestsOpen(!pullRequestsOpen)}
-          >
-            {t(($) => $.detail.section_pull_requests)}
-            <ChevronRight className={`!size-3 shrink-0 stroke-[2.5] text-muted-foreground transition-transform ${pullRequestsOpen ? "rotate-90" : ""}`} />
-          </button>
-          {pullRequestsOpen && <div className="pl-2"><PullRequestList issueId={id} /></div>}
-        </div>
-      )}
-
-      {/* Execution log — active runs + collapsed past runs, each carrying its
-          own token spend, with the issue total on the section header.
-          Self-contained; owns its own collapse state and WS subscriptions.
-          Hides itself when there are no runs to show. */}
-      <ExecutionLogSection issueId={id} identifier={issue.identifier} />
-
-      {/* Details — creator and timestamps. Sits below the execution log
-          because it is the least-read block in the sidebar: the values
-          never change once the issue exists, while the log above it is
-          what people actually come here to check. */}
-      <div>
-        <button
-          type="button"
-          className={`flex w-full items-center gap-1 rounded-md px-2 py-1 text-caption font-medium transition-colors mb-2 hover:bg-accent/70 ${detailsOpen ? "" : "text-muted-foreground hover:text-foreground"}`}
-          onClick={() => setDetailsOpen(!detailsOpen)}
-        >
-          {t(($) => $.detail.section_details)}
-          <ChevronRight className={`!size-3 shrink-0 stroke-[2.5] text-muted-foreground transition-transform ${detailsOpen ? "rotate-90" : ""}`} />
-        </button>
-        {detailsOpen && <div className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-0.5 pl-2">
-          <PropRow label={t(($) => $.detail.prop_created_by)}>
-            <ActorAvatar actorType={issue.creator_type} actorId={issue.creator_id} size="sm" enableHoverCard />
-            <span className="cursor-pointer truncate">{getActorName(issue.creator_type, issue.creator_id)}</span>
-          </PropRow>
-          <PropRow label={t(($) => $.detail.prop_created)}>
-            <span className="text-muted-foreground">{shortDate(issue.created_at, locale)}</span>
-          </PropRow>
-          <PropRow label={t(($) => $.detail.prop_updated)}>
-            <span className="text-muted-foreground">{shortDate(issue.updated_at, locale)}</span>
-          </PropRow>
-        </div>}
-      </div>
-
-      {/* The standalone "Token usage" section that used to sit here is gone:
-          it showed the same issue totals the execution-log header now carries,
-          minus the cost and minus any way to tell which run spent them. Its
-          every field (input / output / cache / run count) lives in the usage
-          dialog that header opens. The `/api/issues/:id/usage` endpoint it
-          read stays — the CLI's `issue usage` command still uses it. */}
-
-      {/* Metadata — agent-facing free-form KV bag. The values almost
-          never mean anything to humans, so the trigger row matches the
-          sibling section headers (Pull requests / Details / Parent issue)
-          but clicking opens a dialog with the raw JSON instead of expanding
-          inline — the payload can be large and pushing the rest of the
-          sidebar down was noisy. */}
-      {Object.keys(issue.metadata ?? {}).length > 0 && (
-        <>
-          <button
-            type="button"
-            className="flex w-full items-center gap-1 rounded-md px-2 py-1 text-caption font-medium text-muted-foreground transition-colors hover:bg-accent/70 hover:text-foreground"
-            onClick={() => setMetadataOpen(true)}
-          >
-            {t(($) => $.detail.section_metadata)}
-            <span className="tabular-nums">
-              · {Object.keys(issue.metadata ?? {}).length}
-            </span>
-          </button>
-          <Dialog open={metadataOpen} onOpenChange={setMetadataOpen}>
-            <DialogContent className="max-w-2xl">
-              <DialogHeader>
-                <DialogTitle>{t(($) => $.detail.section_metadata)}</DialogTitle>
-              </DialogHeader>
-              <pre className="max-h-[60vh] overflow-auto rounded-md bg-muted p-3 font-mono text-caption">
-                {JSON.stringify(issue.metadata ?? {}, null, 2)}
-              </pre>
-            </DialogContent>
-          </Dialog>
-        </>
-      )}
-    </div>
-  );
-
   // Shared row renderer for both timeline render modes (flat / virtualized).
   // The wrapper `id="comment-..."` is the deep-link target — equivalent to
   // a native `<a href="#comment-...">` anchor.
@@ -2718,6 +2705,7 @@ export function IssueDetail({ issueId, onDelete, onDone, defaultSidebarOpen = tr
         );
       }
       const isResolved = !!item.entry.resolved_at;
+      const attachmentCount = item.entry.attachments?.length ?? 0;
       return (
         <div className="pb-3" id={`comment-${item.id}`}>
           <CommentCard
@@ -2737,7 +2725,24 @@ export function IssueDetail({ issueId, onDelete, onDone, defaultSidebarOpen = tr
             expandedResolvedIds={expandedResolved}
             onResolvedExpandChange={toggleResolvedExpand}
             highlightedCommentId={highlightedId}
+            hideAttachments={!isRoom}
           />
+          {!isRoom && attachmentCount > 0 ? (
+            <button
+              type="button"
+              className="qw-solo-archived"
+              onClick={() => {
+                document
+                  .getElementById("solo-delivery")
+                  ?.scrollIntoView({ behavior: "smooth", block: "start" });
+              }}
+            >
+              <FileText className="size-3.5" />
+              {t(($) => $.detail.attachments_archived, {
+                count: attachmentCount,
+              })}
+            </button>
+          ) : null}
         </div>
       );
     }
@@ -2768,6 +2773,550 @@ export function IssueDetail({ issueId, onDelete, onDone, defaultSidebarOpen = tr
     );
   };
 
+  // The subscribe cluster (delegated badge / subscribe control / subscribers)
+  // is shared: the plain issue's activity header and the relay log's header
+  // both carry it, and it must not be built twice.
+  const subscriptionControls = (
+    <>
+                  {/* A delegated subscription is one the user never opted into
+                      by hand — their agent created this issue for them. Saying
+                      so is what keeps it from reading as the product quietly
+                      adding them to things (MUL-5483). */}
+                  {isSubscribed && subscriptionReason === "delegated" && (
+                    <Tooltip>
+                      {/* Quiet surface, not plain body text: this is metadata
+                          explaining a state, and must not read as a second
+                          action sitting next to Unsubscribe. Uses the shared
+                          caption role rather than an ad-hoc size (MUL-5451). */}
+                      <TooltipTrigger className="cursor-default rounded-full bg-muted px-2 py-0.5 text-caption text-muted-foreground">
+                        {t(($) => $.detail.delegated_subscription_badge)}
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-64">
+                        {t(($) => $.detail.delegated_subscription_hint)}
+                      </TooltipContent>
+                    </Tooltip>
+                  )}
+                  {/* Nothing until the subscribers query resolves: the default
+                      empty list reads as "not subscribed" for everyone, so
+                      rendering it flashes Subscribe at someone who is already
+                      subscribed, and a click landing in that window sends a
+                      subscribe instead of the unsubscribe they meant. An
+                      unresolved state is better shown as no control than as the
+                      wrong one (MUL-5714). */}
+                  {subscriptionKnown &&
+                    (!isSubscribed || (childCountKnown && childIssues.length === 0) ? (
+                      /* One button, no menu, when there is nothing for the
+                         subtree option to cover. This is the root-only path
+                         (opt_out_scope='issue'), NOT the subtree one: even at
+                         zero children the two are different server writes,
+                         because a subtree tombstone also keeps FUTURE children
+                         from re-subscribing the user
+                         (server/pkg/db/queries/subscriber.sql). Declining one
+                         issue must not silently opt someone out of a tree that
+                         does not exist yet. While the child count is unknown we
+                         keep the menu below — it never picks a scope for the
+                         user. */
+                      <button
+                        type="button"
+                        onClick={handleToggleSubscribe}
+                        disabled={togglePending || !user?.id}
+                        className={SUBSCRIPTION_ACTION_CLASS}
+                      >
+                        {isSubscribed
+                          ? t(($) => $.detail.unsubscribe)
+                          : t(($) => $.detail.subscribe)}
+                      </button>
+                    ) : (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger
+                          disabled={togglePending || subtreePending || !user?.id}
+                          className={SUBSCRIPTION_ACTION_CLASS}
+                        >
+                          {t(($) => $.detail.unsubscribe)}
+                        </DropdownMenuTrigger>
+                        {/* onClick, not onSelect: Base UI's Menu.Item exposes no
+                            onSelect (that is the Radix spelling), and because its
+                            props extend the full div attribute set, an onSelect
+                            typechecks and silently lands on the DOM node as the
+                            native text-selection event — the handler never runs
+                            (MUL-5710). */}
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            onClick={handleToggleSubscribe}
+                            disabled={togglePending}
+                          >
+                            {t(($) => $.detail.unsubscribe_this)}
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={handleUnsubscribeSubtree}
+                            disabled={subtreePending}
+                          >
+                            {t(($) => $.detail.unsubscribe_subtree)}
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    ))}
+                  <Popover>
+                    <PopoverTrigger className="cursor-pointer hover:opacity-80 transition-opacity">
+                      {subscribers.length > 0 ? (
+                        <AvatarGroup>
+                          {subscribers.slice(0, 4).map((sub) => (
+                            <ActorAvatar
+                              key={`${sub.user_type}-${sub.user_id}`}
+                              actorType={sub.user_type}
+                              actorId={sub.user_id}
+                              size="md"
+                              enableHoverCard
+                            />
+                          ))}
+                          {subscribers.length > 4 && (
+                            <AvatarGroupCount>+{subscribers.length - 4}</AvatarGroupCount>
+                          )}
+                        </AvatarGroup>
+                      ) : (
+                        <span className="flex items-center justify-center h-6 w-6 rounded-full border border-dashed border-muted-foreground/30 text-muted-foreground">
+                          <Users className="h-3 w-3" />
+                        </span>
+                      )}
+                    </PopoverTrigger>
+                    <SubscriberPopoverContent
+                      members={members}
+                      agents={agents}
+                      subscribers={subscribers}
+                      toggleSubscriber={toggleSubscriber}
+                      togglesDisabled={
+                        !subscriptionKnown || togglePending || !user?.id
+                      }
+                      t={t}
+                    />
+                  </Popover>
+    </>
+  );
+
+  // The timeline body (skeleton / virtualized / flat). The parent page renders
+  // it over the room-level entries; the solo page over everything.
+  const renderTimeline = (list: TimelineItem[]) => (
+              timelineLoading && timelineView.groups.length === 0 ? (
+                <TimelineSkeleton />
+              ) : (
+                // Two render modes:
+                //   - `highlightCommentId` set (came from inbox deep-link) →
+                //     render flat. Every comment mounts, every height is real,
+                //     the target id is in the DOM the instant the useEffect
+                //     above runs `scrollIntoView`. No virtualization estimate
+                //     errors, no spacer reflow drift. Pays cold-mount cost
+                //     proportional to items.length (markdown + lowlight per
+                //     comment), which is acceptable in the deep-link case —
+                //     the user has explicit intent to land on a specific item.
+                //   - `find.open` (in-page Cmd/Ctrl+F) → also render flat, so
+                //     every comment is in the DOM for the find walk to match
+                //     and highlight. Same explicit-intent cold-mount trade-off.
+                //   - otherwise → Virtuoso. Browsing mode, virtualization
+                //     wins on first-paint perf for long timelines.
+                //
+                // The split is deliberate: virtualization and "land precisely
+                // on a target" have fundamentally opposed contracts (estimated
+                // heights vs real heights). Trying to satisfy both in one
+                // path is what produced the bug history this PR closes.
+                !highlightCommentId && !find.open ? (
+                  !scrollContainerEl ? (
+                    // Skeleton while the callback ref populates so the gap
+                    // between IssueDetail mount and Virtuoso mount doesn't
+                    // flash empty.
+                    <TimelineSkeleton />
+                  ) : (
+                    <div className="mt-4">
+                      <Virtuoso
+                        key={`${wsId}:${id}`}
+                        ref={virtuosoRef}
+                        customScrollParent={scrollContainerEl}
+                        data={list}
+                        initialScrollTop={restoredScrollTop}
+                        increaseViewportBy={{ top: 800, bottom: 800 }}
+                        computeItemKey={(_i, item) => `${item.kind}:${item.id}`}
+                        skipAnimationFrameInResizeObserver
+                        // followOutput intentionally NOT set. Virtuoso treats
+                        // it as a sticky "is at bottom" flag and resets
+                        // scrollTop to maxScrollTop on every height-change
+                        // tick — issue-detail is document-shaped, not chat.
+                        itemContent={renderItem}
+                      />
+                    </div>
+                  )
+                ) : (
+                  <div className="mt-4">
+                    {list.map((item, i) => (
+                      <Fragment key={`${item.kind}:${item.id}`}>
+                        {renderItem(i, item)}
+                      </Fragment>
+                    ))}
+                  </div>
+                )
+              )
+  );
+
+  // The workbench slots the relay chapters receive. Built here because they
+  // need this page's handlers; the chapters own only the layout.
+  const roomPlan = relayView ? (
+    <section className="flex flex-col gap-1.5">
+      <div className="flex items-center gap-2 text-caption font-semibold text-muted-foreground">
+        <Flag className="size-3.5" />
+        {t(($) => $.room.leg_plan_label)}
+        <span className="grow" />
+        <span className="rounded-full bg-muted px-1.5 text-micro font-normal">
+          {t(($) => $.room.leg_plan_only_you)}
+        </span>
+      </div>
+      <LegPlanSection
+        view={relayView}
+        planPending={setChainStepPlan.isPending}
+        handoff={handoffDraft}
+        onSavePlan={(plan) =>
+          setChainStepPlan.mutate(plan, {
+            onSuccess: () => toast.success(t(($) => $.room.leg_plan_saved)),
+            onError: () => toast.error(t(($) => $.room.leg_plan_save_failed)),
+          })
+        }
+      />
+    </section>
+  ) : null;
+  const roomStream = (
+    <section className="flex flex-col gap-1">
+      <h2 className="text-title-sm font-semibold">
+        {t(($) => $.detail.activity_section)}
+      </h2>
+      {renderTimeline(parentItems)}
+    </section>
+  );
+  const roomResources = relayView ? (
+    <section className="flex flex-col gap-1.5">
+      <div className="flex items-center gap-2 text-caption font-semibold text-muted-foreground">
+        <Box className="size-3.5" />
+        {t(($) => $.room.res_title)}
+        <span className="grow" />
+        <span className="rounded-full bg-muted px-1.5 text-micro font-normal">
+          {t(($) => $.room.res_locked)}
+        </span>
+      </div>
+      <LegResourcesSection
+        view={relayView}
+        agentNameOf={getAgentName}
+        projectId={issue.project_id}
+      />
+    </section>
+  ) : null;
+  // The next holder without an agent parks the relay the moment the baton
+  // moves — said here, at the decision, instead of discovered after.
+  const nextAgentlessStep =
+    relayView?.nextAfterMineStep &&
+    !relayView.nextAfterMineStep.agent_id &&
+    chainStateKey(relayView.nextAfterMineStep.state) === "pending"
+      ? relayView.nextAfterMineStep
+      : null;
+  const roomSquadName =
+    issue.assignee_type === "squad" && issue.assignee_id
+      ? getSquadName(issue.assignee_id)
+      : undefined;
+  const roomBindHref = issue.assignee_id
+    ? paths.squadDetail(issue.assignee_id)
+    : paths.tasks();
+  const handleSkipParkedStep = () =>
+    skipChainStep.mutate(undefined, {
+      onError: () => toast.error(t(($) => $.room.skip_failed)),
+    });
+  const roomDecide = chain && relayView ? (
+    <div className="overflow-hidden rounded-lg border border-surface-border bg-surface shadow-[var(--shadow-surface)]">
+      {nextAgentlessStep ? (
+        <div className="flex flex-wrap items-center gap-2 border-b border-warning/25 bg-warning/10 px-3.5 py-2 text-caption text-warning">
+          <span className="min-w-0">
+            {t(($) => $.room.decide_warn_agentless, {
+              name: playerNames.nameOf(nextAgentlessStep.holder_user_id),
+            })}
+          </span>
+          <span className="grow" />
+          <AppLink
+            href={roomBindHref}
+            className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+          >
+            {t(($) => $.room.parked_bar_action, {
+              name: playerNames.nameOf(nextAgentlessStep.holder_user_id),
+            })}
+          </AppLink>
+        </div>
+      ) : null}
+      <div className="flex flex-wrap items-center gap-3 px-3.5 py-2.5">
+        {relayView.canApprove ? (
+          <Button size="sm" className="bg-success text-white hover:bg-success/90"
+            disabled={approveChainStep.isPending || outputProducing}
+            onClick={() => {
+              // 交棒之前先有产出：summary 还空着、且这一轮还没让智能体总结过
+              // ——那这次点击就是「让本棒智能体把对话和结果总结成产出 md」，
+              // 产出落地后摘要自动填好，再点一次交棒。
+              if (!handoffSummary.trim() && !outputAsked) {
+                startLegOutput();
+                return;
+              }
+              approveWithHandoff();
+            }}
+          >
+            {outputProducing ? (
+              <Loader2 className="size-3.5 animate-spin" />
+            ) : (
+              <CircleCheck className="size-3.5" />
+            )}
+            {outputProducing
+              ? t(($) => $.room.output_producing)
+              : relayView.nextStep
+                ? t(($) => $.room.approve_pass_to, {
+                    name: playerNames.nameOf(relayView.nextStep.holder_user_id),
+                  })
+                : t(($) => $.room.approve_finish)}
+          </Button>
+        ) : null}
+        {relayView.canApprove && !outputProducing ? (
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled={approveChainStep.isPending}
+            onClick={startLegOutput}
+          >
+            <Sparkles className="size-3.5" />
+            {outputAsked
+              ? t(($) => $.room.output_regenerate)
+              : t(($) => $.room.output_generate)}
+          </Button>
+        ) : null}
+        <span className="min-w-0 text-caption text-muted-foreground">
+          {outputProducing
+            ? t(($) => $.room.output_waiting)
+            : relayView.nextAfterMineStep
+              ? t(($) => $.room.approve_hint, {
+                  name: playerNames.nameOf(relayView.nextAfterMineStep.holder_user_id),
+                })
+              : t(($) => $.room.approve_hint_last)}
+        </span>
+      </div>
+    </div>
+  ) : null;
+
+
+  // ── The leg's own page (child) ────────────────────────────────────────
+  // Only this person's conversation, plan, resources and outputs. The parent
+  // list is the only place the legs meet.
+  const legSubtaskBody = openLegStep && chain && relayView ? (() => {
+    const step = openLegStep;
+    const seq = step.position + 1;
+    const key = chainStateKey(step.state);
+    const prevStep = chain.steps[step.position - 1] ?? null;
+    const nextStep = chain.steps[step.position + 1] ?? null;
+    const agentName = step.agent_id ? getAgentName(step.agent_id) : null;
+    const runCount = legRunTasks(id, step, relayTasks).length;
+    return (
+      <>
+        <div className="flex flex-wrap items-center gap-2 text-caption">
+          <button
+            type="button"
+            onClick={() => setOpenLeg("parent")}
+            className="inline-flex items-center gap-1 rounded-[5px] border border-surface-border bg-surface px-2 py-1 text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <ChevronLeft className="size-3.5" />
+            {t(($) => $.room.back_to_parent)}
+          </button>
+          <span className="font-mono text-micro text-faint-foreground">
+            {issue.identifier}-{seq}
+          </span>
+          <span className="text-faint-foreground">·</span>
+          <span className="text-faint-foreground">
+            {t(($) => $.room.parent_label)} {issue.identifier}
+          </span>
+        </div>
+        <h2 className="mt-3 text-title-lg font-semibold leading-snug">
+          {step.title || t(($) => $.room.chapter_leg_bare, { seq })}
+        </h2>
+        <div className="mt-2.5 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-caption text-muted-foreground">
+          <SeatMark userId={step.holder_user_id} state={step.state} size="sm" />
+          <span className="font-medium text-foreground">
+            {playerNames.nameOf(step.holder_user_id)}
+          </span>
+          {t(($) => $.room.chat_leg, { seq, total: chain.steps.length })}
+          {prevStep ? (
+            <>
+              <span aria-hidden="true" className="text-border">|</span>
+              <span>{t(($) => $.room.leg_from_prev)}</span>
+              {prevStep.handoff ? (
+                prevStep.handoff.files.map((file, i) => (
+                  <HandoffFileChip
+                    key={`${file.name}-${i}`}
+                    file={file}
+                    attachment={
+                      file.attachment_id
+                        ? attachmentOf(file.attachment_id)
+                        : undefined
+                    }
+                  />
+                ))
+              ) : (
+                <span className="text-faint-foreground">
+                  {t(($) => $.room.chapter_no_handoff)}
+                </span>
+              )}
+            </>
+          ) : null}
+          <span aria-hidden="true" className="text-border">|</span>
+          {nextStep ? (
+            <>
+              <span>
+                {t(($) => $.room.leg_next_label)} ·{" "}
+                {playerNames.nameOf(nextStep.holder_user_id)}
+              </span>
+              {!nextStep.agent_id && chainStateKey(nextStep.state) === "pending" ? (
+                <span className="rounded-full bg-warning/20 px-1.5 py-px text-micro whitespace-nowrap text-warning">
+                  {t(($) => $.room.flow_no_agent)}
+                </span>
+              ) : null}
+            </>
+          ) : (
+            <span>{t(($) => $.room.leg_last_label)}</span>
+          )}
+        </div>
+
+        <div className="mt-4 grid items-start gap-3.5 lg:grid-cols-[minmax(0,1fr)_340px]">
+          {/* 独立对话框 —— 只有这一棒的对话 */}
+          <section className="min-w-0 overflow-hidden rounded-lg border border-surface-border bg-surface shadow-[var(--shadow-surface)]">
+            <header className="flex flex-wrap items-center gap-2 border-b border-border bg-muted/45 px-3.5 py-2.5">
+              <SeatMark userId={step.holder_user_id} state={step.state} size="sm" />
+              <span className="text-caption font-semibold">
+                {openLegIsMine
+                  ? t(($) => $.room.leg_dialog_mine)
+                  : t(($) => $.room.leg_dialog_their, {
+                      name: playerNames.nameOf(step.holder_user_id),
+                    })}
+              </span>
+              <span className="grow" />
+              {step.agent_id && (key === "doing" || key === "reviewing") ? (
+                <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-inflight/35 bg-inflight-surface px-1.5 py-px text-micro whitespace-nowrap text-inflight">
+                  <Bot className="size-2.5" />
+                  <span className="font-mono">{agentName}</span>
+                  {openLegRunState === "running" ? (
+                    <>
+                      <span>· {t(($) => $.room.chat_running)}</span>
+                      <span
+                        className="size-1.5 animate-pulse rounded-full bg-inflight"
+                        aria-hidden="true"
+                      />
+                    </>
+                  ) : openLegRunState === "queued" ? (
+                    <span>· {t(($) => $.room.state_waiting)}</span>
+                  ) : null}
+                </span>
+              ) : null}
+              <ChainStateTag state={step.state} runState={openLegRunState} />
+            </header>
+            <div className="px-1 pb-2 pt-1">
+              {openLegIsMine ? (
+                legItems.length > 0 ? (
+                  <div>
+                    {legItems.map((item) => (
+                      <Fragment key={`${item.kind}:${item.id}`}>
+                        {renderItem(0, item)}
+                      </Fragment>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="px-3 py-4 text-caption text-faint-foreground">
+                    {key === "done"
+                      ? t(($) => $.room.leg_delivered_note)
+                      : key === "pending"
+                        ? t(($) => $.room.leg_waiting)
+                        : t(($) => $.room.leg_thread_empty)}
+                  </p>
+                )
+              ) : (
+                <div className="px-3 py-2">
+                  <LockedLegBlock
+                    seq={seq}
+                    holderName={playerNames.nameOf(step.holder_user_id)}
+                    commentCount={step.leg_comment_count ?? 0}
+                    runCount={runCount}
+                    active={key !== "done"}
+                  />
+                </div>
+              )}
+            </div>
+            {openLegIsMine || key === "done" ? (
+              <div className="border-t border-border bg-success/5 px-3.5 py-2.5">
+                <div className="flex items-center gap-1.5 font-mono text-micro text-faint-foreground">
+                  <FileText className="size-3" />
+                  {t(($) => $.room.outputs_title)}
+                </div>
+                {key === "done" && step.handoff?.files.length ? (
+                  <div className="mt-1.5 flex flex-wrap gap-1.5">
+                    {step.handoff.files.map((file, i) => (
+                      <HandoffFileChip
+                        key={`${file.name}-${i}`}
+                        file={file}
+                        attachment={
+                          file.attachment_id
+                            ? attachmentOf(file.attachment_id)
+                            : undefined
+                        }
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <p className="mt-1.5 text-caption text-faint-foreground">
+                    {openLegHolding
+                      ? t(($) => $.room.outputs_running)
+                      : t(($) => $.room.outputs_pending)}
+                  </p>
+                )}
+              </div>
+            ) : null}
+          </section>
+
+          {/* 右栏：实况 / 方案 / 资源 / 交棒 */}
+          <aside className="flex min-w-0 flex-col gap-3.5">
+            {openLegIsMine && openLegStep?.agent_id && openLegLatestRun ? (
+              <LegRunLive
+                task={openLegLatestRun}
+                agentName={getAgentName(openLegStep.agent_id)}
+                stepLabel={t(($) => $.room.chat_leg, {
+                  seq: openLegStep.position + 1,
+                  total: chain.steps.length,
+                })}
+              />
+            ) : null}
+            {openLegIsMine ? roomPlan : null}
+            {openLegHolding ? roomResources : null}
+            {openLegIsMine && key === "done" && step.handoff ? (
+              <HandoffCard
+                step={step}
+                nameOf={playerNames.nameOf}
+                attachmentOf={attachmentOf}
+              />
+            ) : null}
+            {openLegHolding ? roomDecide : null}
+            {key === "parked" ? (
+              <ChainParkedBar
+                step={step}
+                nameOf={playerNames.nameOf}
+                bindHref={roomBindHref}
+                onSkip={handleSkipParkedStep}
+                skipPending={skipChainStep.isPending}
+              />
+            ) : null}
+            {!openLegIsMine && key !== "parked" ? (
+              <div className="flex items-start gap-2 rounded-lg border border-dashed border-surface-border bg-muted/30 px-3.5 py-3 text-caption leading-relaxed text-muted-foreground">
+                <Lock className="mt-0.5 size-3.5 shrink-0" />
+                <span>{t(($) => $.room.leg_page_other_note)}</span>
+              </div>
+            ) : null}
+          </aside>
+        </div>
+      </>
+    );
+  })() : null;
+
   // Breadcrumb shows the single most-direct container, never a fabricated chain.
   // project_id and parent_issue_id are orthogonal (a sub-issue can live in a
   // different project than its parent), so we never render both: parent wins,
@@ -2791,161 +3340,8 @@ export function IssueDetail({ issueId, onDelete, onDone, defaultSidebarOpen = tr
         ]
       : [];
 
-  const detailContent = (
-    // Hosts the one image viewer this issue's images page through — see
-    // ImageSequenceProvider. Wraps the whole column so the description
-    // editor's images and the timeline's images share one sequence.
-    <CurrentIssueRenderContextProvider value={currentIssueRenderContext}>
-    <ImageSequenceProvider items={imageSequence}>
-    <div className="relative flex h-full min-w-0 flex-1 flex-col">
-        {/* In-page find bar — floats over the top-right of the content column
-            (below the breadcrumb header), outside the scroll container so it
-            stays put while the timeline scrolls and its own text isn't walked.
-            z-30: must beat every sticky affordance pinned at the timeline's
-            top-0 (comment headers z-10, resolve collapse bars z-20) — at equal
-            z the later-in-DOM sticky bar paints over the find bar and orphans
-            its close button (MUL-4414). On desktop it also steps inside the
-            thread rail's right-edge strip, so an open find bar can't cover
-            the topmost ticks. */}
-        {find.open && (
-          <FindBar
-            find={find}
-            className={cn("absolute top-14 z-30", isMobile ? "right-4" : "right-10")}
-          />
-        )}
-        <BreadcrumbHeader
-          leading={leadingAction}
-          segments={breadcrumbSegments}
-          leaf={
-            <AppLink
-              href={paths.issueDetail(issue.id)}
-              className="flex min-w-0 transition-opacity hover:opacity-80"
-            >
-              <span className="truncate font-medium text-foreground">
-                {issue.identifier} {issue.title}
-              </span>
-            </AppLink>
-          }
-          actions={
-            <>
-            {/* Live "agent is working" chip, leftmost in the right cluster so
-                it never overlaps the title (which truncates to make room).
-                It self-hides when no agent is active. */}
-            <IssueAgentHeaderChip issueId={id} />
-            {/* Thread navigator. Leftmost of the action buttons because it
-                navigates the document, while everything to its right acts on
-                the issue. Hidden on mobile with the rail: the panel would work
-                there, but it needs a sheet rather than a popover to be usable
-                one-handed, which is its own change. */}
-            {!isMobile && (
-              <ThreadNavPanel
-                threads={minimapThreads}
-                onJump={jumpToThread}
-                onHoverThread={setThreadNavHoverId}
-                open={threadNavOpen}
-                pinned={threadNavPinned}
-                onOpenChange={handleThreadNavOpenChange}
-              />
-            )}
-            {onDone && !issueBehavesAsAny(issue, ["done", "cancelled"]) && (
-              <Tooltip>
-                <TooltipTrigger
-                  render={
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      className="text-muted-foreground"
-                      onClick={() => { handleUpdateField({ status: "done" }); onDone?.(); }}
-                    >
-                      <CircleCheck />
-                    </Button>
-                  }
-                />
-                <TooltipContent side="bottom">{t(($) => $.detail.mark_done_tooltip)}</TooltipContent>
-              </Tooltip>
-            )}
-            {onDone && issueBehavesAs(issue, "done") && (
-              <Tooltip>
-                <TooltipTrigger
-                  render={
-                    <Button
-                      variant="ghost"
-                      size="icon-sm"
-                      className="text-muted-foreground"
-                      onClick={() => { onDone(); }}
-                    >
-                      <Archive />
-                    </Button>
-                  }
-                />
-                <TooltipContent side="bottom">{t(($) => $.detail.archive_tooltip)}</TooltipContent>
-              </Tooltip>
-            )}
-            <Tooltip>
-              <TooltipTrigger
-                render={
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    className={cn("text-muted-foreground", actions.isPinned && "text-foreground")}
-                    onClick={actions.togglePin}
-                  >
-                    {actions.isPinned ? <PinOff /> : <Pin />}
-                  </Button>
-                }
-              />
-              <TooltipContent side="bottom">{actions.isPinned ? t(($) => $.detail.unpin_tooltip) : t(($) => $.detail.pin_tooltip)}</TooltipContent>
-            </Tooltip>
-            <IssueActionsDropdown
-              issue={issue}
-              align="end"
-              // When a parent passes `onDelete`, we detect deletion via effect
-              // above and skip navigation. Otherwise the modal takes us back
-              // to the list we came from, falling back to all issues.
-              onDeletedFallbackPath={onDelete ? undefined : paths.issues()}
-              trigger={
-                <Button variant="ghost" size="icon-sm" className="text-muted-foreground">
-                  <MoreHorizontal />
-                </Button>
-              }
-            />
-            <Tooltip>
-              <TooltipTrigger
-                render={
-                  <Button
-                    variant={sidebarOpen ? "secondary" : "ghost"}
-                    size="icon-sm"
-                    className={sidebarOpen ? "" : "text-muted-foreground"}
-                    onClick={handleToggleSidebar}
-                  >
-                    <PanelRight />
-                  </Button>
-                }
-              />
-              <TooltipContent side="bottom">{t(($) => $.detail.sidebar_tooltip)}</TooltipContent>
-            </Tooltip>
-            </>
-          }
-        />
-
-        {/* scrollbar-gutter both-edges: with classic (space-taking) scrollbars —
-            macOS with a mouse or "always show", Windows, Linux — the global
-            `scrollbar-width: thin` carves ~11px off the right side only, so the
-            centered column reads 32px left vs 43px right (MUL-4404). Mirroring
-            the gutter restores symmetry; overlay-scrollbar platforms reserve
-            nothing and render unchanged. */}
-        <div
-          ref={attachScrollContainer}
-          data-tab-scroll-root={scrollContainerKey}
-          className="relative flex-1 overflow-y-auto [scrollbar-gutter:stable_both-edges]"
-        >
-        {/* Gutters: 32px is a comfortable reading margin on a desktop column
-            but eats 16% of a 393px phone, so below `md` they drop to 12px.
-            `max-md:pb-chat-launcher` reserves the launcher's corner at the end
-            of the scroll: below `md` the composer is not pinned (see
-            `useStickyComposer`), so it lands here — right where the launcher
-            floats — once the reader scrolls to the bottom. */}
-        <div className="mx-auto w-full max-w-4xl px-3 py-6 max-md:pb-chat-launcher md:px-8 md:py-8">
+  const titleEditorBlock = (
+    <>
           {titleLazy.active && (
             <div className={titleLazy.ready ? undefined : "hidden"}>
               <TitleEditor
@@ -2953,7 +3349,9 @@ export function IssueDetail({ issueId, onDelete, onDone, defaultSidebarOpen = tr
                 ref={titleEditorRef}
                 defaultValue={titleConflictDraft ?? issue.title}
                 placeholder={t(($) => $.detail.title_placeholder)}
-                className="w-full text-display-sm font-bold leading-snug tracking-tight"
+                className={layout === "refresh"
+                  ? "rd-title-editor"
+                  : "w-full text-display-sm font-semibold leading-[1.38] tracking-tight"}
                 onReady={titleLazy.onReady}
                 onBlur={(value) => {
                   const trimmed = value.trim();
@@ -2981,7 +3379,9 @@ export function IssueDetail({ issueId, onDelete, onDone, defaultSidebarOpen = tr
             <div
               role="button"
               tabIndex={0}
-              className="w-full cursor-text text-display-sm font-bold leading-snug tracking-tight"
+              className={layout === "refresh"
+                ? "rd-title-editor cursor-text"
+                : "w-full cursor-text text-display-sm font-semibold leading-[1.38] tracking-tight"}
               onClick={(e) => {
                 // A drag-selection (copying the title) must not summon the editor.
                 const sel = window.getSelection();
@@ -3049,7 +3449,11 @@ export function IssueDetail({ issueId, onDelete, onDone, defaultSidebarOpen = tr
               )}
             />
           ) : null}
+    </>
+  );
 
+  const parentLinkBlock = (
+    <>
           {parentIssue && !issue.source_context && (
             <AppLink
               href={paths.issueDetail(parentIssue.id)}
@@ -3096,22 +3500,18 @@ export function IssueDetail({ issueId, onDelete, onDone, defaultSidebarOpen = tr
             />
           )}
 
-          <div
-            {...descDropZoneProps}
-            className="relative mt-5 rounded-lg"
-            onFocusCapture={() => {
-              if (!descriptionEditingRef.current) {
-                descriptionEditingRef.current = true;
-              }
-            }}
-            onBlurCapture={(event) => {
-              if (!event.currentTarget.contains(event.relatedTarget)) {
-                descriptionEditingRef.current = false;
-              }
-            }}
-          >
+          {/* The relay's position line: the people in order, when the task was
+              filed, and how many runs it has taken so far. The states
+              themselves live in the chapters below — the line does not repeat
+              them, it only says where in the relay you are looking. */}
+    </>
+  );
+
+  const descriptionEditorBlock = (
+    <>
             <ContentEditor
               ref={descEditorRef}
+              className={isRoom ? undefined : "qw-solo-rich"}
               key={id}
               value={descriptionConflictDraft ?? issue.description ?? ""}
               placeholder={t(($) => $.detail.desc_placeholder)}
@@ -3210,7 +3610,7 @@ export function IssueDetail({ issueId, onDelete, onDone, defaultSidebarOpen = tr
               />
             ) : null}
 
-            <div className="flex items-center gap-1 mt-3">
+            <div className={cn("flex items-center gap-1 mt-3", layout === "refresh" && "hidden")}>
               <ReactionBar
                 reactions={issueReactions}
                 currentUserId={user?.id}
@@ -3223,11 +3623,1263 @@ export function IssueDetail({ issueId, onDelete, onDone, defaultSidebarOpen = tr
                 onSelect={(file) => descEditorRef.current?.uploadFile(file)}
               />
             </div>
+    </>
+  );
+
+
+
+  const soloAcceptButton = soloCancelled ? null : (
+    <Button
+      type="button"
+      size="sm"
+      className="h-[31px] px-3 text-[12.5px]"
+      onClick={acceptDelivery}
+      disabled={soloAccepted}
+    >
+      <CircleCheck className="size-3.5" />
+      {soloAccepted
+        ? t(($) => $.detail.accepted_delivery)
+        : t(($) => $.detail.accept_delivery)}
+    </Button>
+  );
+
+  const soloHeaderActions = (
+    <div className="qw-solo-actions">
+      {!soloHasDelivery ? soloAcceptButton : null}
+      {subscriptionControls}
+      <Button
+        type="button"
+        variant="outline"
+        size="icon-sm"
+        aria-label={t(($) => $.detail.copy_link)}
+        onClick={() => {
+          void copyText(window.location.href);
+          toast.success(t(($) => $.detail.link_copied));
+        }}
+      >
+        <Link2 />
+      </Button>
+      <IssueActionsDropdown
+        issue={issue}
+        align="end"
+        onDeletedFallbackPath={onDelete ? undefined : paths.tasks()}
+        trigger={
+          <Button
+            variant="outline"
+            size="icon-sm"
+            className="text-muted-foreground"
+          >
+            <MoreHorizontal />
+          </Button>
+        }
+      />
+    </div>
+  );
+
+  const soloHeader = (
+    <div>
+      {leadingAction ? <div className="qw-solo-leading">{leadingAction}</div> : null}
+      <div className="qw-solo-crumbs">
+        <AppLink href={paths.tasks()}>{t(($) => $.detail.tasks_crumb)}</AppLink>
+        {breadcrumbProject ? (
+          <>
+            <span className="sep">/</span>
+            <AppLink
+              href={paths.projectDetail(breadcrumbProject.id)}
+              className="flex min-w-0 items-center gap-1"
+            >
+              <ProjectIcon project={breadcrumbProject} size="sm" />
+              <span className="min-w-0 truncate">{breadcrumbProject.title}</span>
+            </AppLink>
+          </>
+        ) : null}
+        <span className="sep">/</span>
+        <span className="id">{issue.identifier}</span>
+      </div>
+      <div className="qw-solo-title-row">
+        <span className="qw-solo-title-state">
+          <StatusIcon
+            status={issue.status}
+            category={issueStatusCategory(issue) ?? undefined}
+            className="size-[17px]"
+          />
+        </span>
+        <div className="qw-solo-title-main">{titleEditorBlock}</div>
+        <span className="qw-solo-hash">#{issue.number}</span>
+        {soloHeaderActions}
+      </div>
+      <div className="qw-solo-meta">
+        <ActorAvatar
+          actorType={issue.creator_type}
+          actorId={issue.creator_id}
+          size="xs"
+          profileLink={false}
+        />
+        <span>
+          <b>{getActorName(issue.creator_type, issue.creator_id)}</b>{" "}
+          {t(($) => $.detail.prop_created)}{" "}
+          <span className="dt">{shortDate(issue.created_at, locale)}</span>
+        </span>
+        {soloRun ? (
+          <>
+            <span className="dot">·</span>
+            <span className={soloRun.active ? "run-live" : "run-done"}>
+              {soloRun.active
+                ? t(($) => $.detail.execution_running)
+                : t(($) => $.detail.execution_done)}
+            </span>
+            {soloRun.started ? (
+              <span className="dt">
+                <LiveDuration
+                  started={soloRun.started}
+                  completed={soloRun.task.completed_at}
+                  active={soloRun.active}
+                />
+              </span>
+            ) : null}
+          </>
+        ) : null}
+        <span className="dot">·</span>
+        <span>
+          {t(($) => $.detail.delivery_images, { count: soloImageCount })}
+          {" · "}
+          {t(($) => $.detail.delivery_files, { count: soloFileCount })}
+        </span>
+        <span className="dot">·</span>
+        <span>
+          {t(($) => $.detail.prop_updated)}{" "}
+          <span className="dt">{shortDate(issue.updated_at, locale)}</span>
+        </span>
+        <IssueAgentHeaderChip issueId={id} />
+      </div>
+      {parentLinkBlock}
+    </div>
+  );
+
+  const soloSticky = (
+    <>
+      <StatusIcon
+        status={issue.status}
+        category={issueStatusCategory(issue) ?? undefined}
+        className="size-4"
+      />
+      <span className="font-mono text-[11px] text-faint-foreground">
+        {issue.identifier}
+      </span>
+      <span className="min-w-0 truncate text-[12.5px] font-semibold">
+        {issue.title}
+      </span>
+      <span className="qw-solo-spacer" />
+      {soloRun ? (
+        <span
+          className={cn("qw-solo-runstate", soloRun.active ? "run" : "done")}
+        >
+          <i className="dot" />
+          {soloRun.active
+            ? t(($) => $.detail.execution_running)
+            : t(($) => $.detail.execution_done)}
+          {soloRun.started ? (
+            <>
+              {" · "}
+              <LiveDuration
+                started={soloRun.started}
+                completed={soloRun.task.completed_at}
+                active={soloRun.active}
+              />
+            </>
+          ) : null}
+        </span>
+      ) : null}
+      {soloAcceptButton}
+    </>
+  );
+
+  const soloBrief = (
+    <section className="qw-solo-brief">
+      <div className="qw-solo-section-head">
+        <h2 className="qw-solo-section-title">
+          {t(($) => $.detail.section_description)}
+        </h2>
+        {soloStepCount > 0 ? (
+          <span className="qw-solo-section-count">
+            {t(($) => $.detail.brief_steps, { count: soloStepCount })}
+          </span>
+        ) : null}
+        <span className="qw-solo-spacer" />
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          className="text-muted-foreground"
+          aria-label={t(($) => $.detail.brief_edit)}
+          onClick={() => {
+            setSoloBriefCollapsed(false);
+            window.requestAnimationFrame(() => descEditorRef.current?.focus());
+          }}
+        >
+          <Pencil />
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          className="text-muted-foreground"
+          aria-label={t(($) => $.detail.brief_toggle)}
+          onClick={() => setSoloBriefCollapsed((value) => !value)}
+        >
+          {soloBriefCollapsed ? <ChevronDown /> : <ChevronUp />}
+        </Button>
+      </div>
+      <div
+        {...descDropZoneProps}
+        className={cn(
+          "relative qw-solo-brief-body",
+          soloBriefCollapsed && "hidden",
+        )}
+        onFocusCapture={() => {
+          if (!descriptionEditingRef.current) {
+            descriptionEditingRef.current = true;
+          }
+        }}
+        onBlurCapture={(event) => {
+          if (!event.currentTarget.contains(event.relatedTarget)) {
+            descriptionEditingRef.current = false;
+          }
+        }}
+      >
+        {descriptionEditorBlock}
+        {descDragOver && <FileDropOverlay />}
+      </div>
+    </section>
+  );
+
+  const soloDelivery = soloHasDelivery ? (
+    <SoloDeliverySection
+      attachments={issueAttachments ?? []}
+      state={
+        soloAccepted
+          ? "done"
+          : soloRun?.active
+            ? "running"
+            : "review"
+      }
+      action={soloAcceptButton}
+    />
+  ) : null;
+
+  const soloSubIssues =
+    childIssues.length > 0 ? (
+      <IssueContextMenuProvider>
+        <section className="mt-8">
+          <div className="qw-solo-section-head">
+            <h2 className="qw-solo-section-title">
+              {t(($) => $.detail.sub_issues_label)}
+            </h2>
+            <span className="qw-solo-section-count">
+              {childIssues.filter((child) => issueBehavesAs(child, "done")).length}
+              /{childIssues.length}
+            </span>
+            <span className="qw-solo-spacer" />
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="text-muted-foreground"
+              onClick={() => actions.openCreateSubIssue()}
+            >
+              <Plus />
+              {t(($) => $.detail.add_sub_issue_tooltip)}
+            </Button>
+          </div>
+          <div className="overflow-hidden rounded-lg border border-border bg-card/30 divide-y divide-border/60">
+            {groupSubIssuesByStage(childIssues).map(({ stage, items: groupItems }) => (
+              <Fragment key={stage ?? "unstaged"}>
+                {childIssues.some((child) => child.stage != null) ? (
+                  <div className="bg-muted/40 px-3 py-1 text-micro font-medium uppercase tracking-wider text-muted-foreground">
+                    {stage == null
+                      ? t(($) => $.stage.none)
+                      : t(($) => $.stage.value, { n: stage })}
+                  </div>
+                ) : null}
+                {groupItems.map((child) => (
+                  <SubIssueRow
+                    key={child.id}
+                    child={child}
+                    childProgress={subIssueProgress?.get(child.id)}
+                    rowProps={subIssueRowProps}
+                    customProperties={subIssueCustomProps}
+                  />
+                ))}
+              </Fragment>
+            ))}
+          </div>
+        </section>
+      </IssueContextMenuProvider>
+    ) : null;
+
+  const soloDiscussion = (
+    <>
+      <div className="qw-solo-section-head">
+        <h2 className="qw-solo-section-title">
+          {t(($) => $.detail.discussion_section)}
+        </h2>
+        <span className="qw-solo-section-count">
+          {timeline.filter((entry) => entry.type === "comment").length}
+        </span>
+      </div>
+      <LocalDirectoryHint projectId={issue?.project_id} />
+      <div className="qw-solo-timeline">{renderTimeline(discussionItems)}</div>
+    </>
+  );
+
+  const soloComposer = (
+    <div
+      ref={composerRef}
+      className={cn(
+        "qw-solo-composer",
+        stickyComposer &&
+          "sticky bottom-0 z-10 -mb-4 bg-background pb-4 before:pointer-events-none before:absolute before:inset-x-0 before:bottom-full before:h-4 before:bg-gradient-to-t before:from-background before:to-transparent",
+      )}
+    >
+      <CommentInput
+        key={id}
+        issueId={id}
+        onSubmit={submitComment}
+        onAccepted={scrollToTimelineBottom}
+        variant="solo"
+      />
+    </div>
+  );
+
+  const soloBody = (
+    <SoloIssueView
+      scrollContainerEl={scrollContainerEl}
+      sticky={soloSticky}
+      header={soloHeader}
+      propsStrip={
+        <SoloPropertyStrip issue={issue} onUpdate={handleUpdateField} />
+      }
+      delivery={soloDelivery}
+      brief={soloBrief}
+      clarification={<RequirementClarificationCard issue={issue} />}
+      execution={<SoloRunLog issueId={id} agentNameOf={getAgentName} />}
+      subIssues={soloSubIssues}
+      discussion={soloDiscussion}
+      composer={soloComposer}
+    />
+  );
+
+  // ── Refresh archive: the full-route detail layout ─────────────────────
+  const refreshCrumb = refreshStep
+    ? `${issue.identifier}-${refreshSeq}`
+    : issue.identifier;
+  const refreshKicker = refreshStep
+    ? t(($) => $.detail.refresh_kicker_squad, { seq: refreshSeq ?? 1 })
+    : t(($) => $.detail.refresh_kicker_solo);
+  const refreshTypeLabel = refreshStep
+    ? t(($) => $.detail.refresh_leg_type, {
+        seq: refreshSeq ?? 1,
+        total: chain?.steps.length ?? 1,
+      })
+    : t(($) => $.detail.refresh_solo_type);
+  const refreshTitle = refreshStep
+    ? refreshStep.title || t(($) => $.room.chapter_leg_bare, { seq: refreshSeq ?? 1 })
+    : issue.title;
+  const refreshStepStateLabel = refreshStep
+    ? refreshStep.state === "reviewing"
+      ? t(($) => $.room.state_reviewing)
+      : refreshStep.state === "done"
+        ? t(($) => $.room.state_done)
+        : refreshStep.state === "parked"
+          ? t(($) => $.room.state_parked)
+          : refreshStep.state === "skipped"
+            ? t(($) => $.room.state_skipped)
+            : refreshStep.state === "doing"
+              ? refreshRunState === "queued"
+                ? t(($) => $.room.state_waiting)
+                : t(($) => $.room.state_doing)
+              : t(($) => $.room.state_pending)
+    : resolveStatusLabel(issue.status);
+  const refreshStateTone = refreshStep
+    ? chainStateKey(refreshStep.state) === "reviewing"
+      ? "review"
+      : chainStateKey(refreshStep.state) === "done" ||
+          chainStateKey(refreshStep.state) === "skipped"
+        ? "done"
+        : chainStateKey(refreshStep.state) === "parked"
+          ? "parked"
+          : chainStateKey(refreshStep.state) === "doing"
+            ? refreshRunState === "queued"
+              ? "planned"
+              : "running"
+            : "planned"
+    : issueStatusCategory(issue) === "done"
+      ? "done"
+      : issueStatusCategory(issue) === "in_review"
+        ? "review"
+        : issueStatusCategory(issue) === "in_progress"
+          ? "running"
+          : issueStatusCategory(issue) === "blocked"
+            ? "parked"
+            : "planned";
+  const refreshTime = timeAgo(
+    refreshStep
+      ? refreshStep.completed_at ?? refreshStep.started_at ?? issue.updated_at
+      : issue.updated_at,
+  );
+  const refreshOwnerName = refreshStep
+    ? playerNames.nameOf(refreshStep.holder_user_id)
+    : getActorName(issue.creator_type, issue.creator_id);
+  const refreshOwnerType = refreshStep ? "member" : issue.creator_type;
+  const refreshOwnerId = refreshStep ? refreshStep.holder_user_id : issue.creator_id;
+  const refreshParentCode = refreshStep ? issue.identifier : parentIssue?.identifier;
+  const refreshParentTitle = refreshStep ? issue.title : parentIssue?.title;
+  const refreshPriority = priorityLabel(issue.priority, t);
+  const refreshProjectName = breadcrumbProject?.title ?? "—";
+  const refreshDueLabel = issue.due_date
+    ? formatDateOnly(issue.due_date, { month: "short", day: "numeric" }, locale)
+    : t(($) => $.pickers.due_date.none);
+  const refreshRunAgentName = refreshRunTask
+    ? getAgentName(refreshRunTask.agent_id)
+    : refreshStepAgentName ?? refreshOwnerName;
+  const refreshRunModel = refreshRunTask?.usage?.[0]?.model ?? "";
+  const refreshRunStarted = refreshRunTask
+    ? refreshRunTask.started_at ?? refreshRunTask.dispatched_at ?? refreshRunTask.created_at
+    : null;
+  const refreshRunActive =
+    !!refreshRunTask && SOLO_ACTIVE_TASK_STATUSES.has(refreshRunTask.status);
+  const refreshDeliveryFile = refreshStep?.handoff?.files?.[0] ?? null;
+  const refreshDeliveryAttachment = refreshLegDelivery?.attachments?.[0] ?? null;
+  const refreshDeliverySummary =
+    refreshStep?.handoff?.summary ?? refreshLegDelivery?.content ?? "";
+  const refreshHasDeliverable = !!(
+    refreshDeliveryFile ||
+    refreshDeliveryAttachment ||
+    (refreshStep && refreshDeliverySummary)
+  );
+  const refreshDeliveryName =
+    refreshDeliveryFile?.name ??
+    refreshDeliveryAttachment?.filename ??
+    (refreshStep?.title || t(($) => $.detail.refresh_output));
+  const refreshDeliveryMeta = refreshDeliveryAttachment
+    ? `${refreshDeliveryAttachment.content_type} · ${Math.max(1, Math.round(refreshDeliveryAttachment.size_bytes / 1024))} KB`
+    : refreshDeliveryFile
+      ? `${refreshDeliveryFile.kind ?? "file"}`
+      : "";
+  const refreshDownloadDeliverable = () => {
+    const attachmentId =
+      refreshDeliveryFile?.attachment_id ?? refreshDeliveryAttachment?.id;
+    if (attachmentId) void downloadAttachment(attachmentId);
+  };
+  const refreshAllAttachments = soloDeliveredAttachments;
+  const refreshDownloadAll = () => {
+    refreshAllAttachments.forEach((attachment) => {
+      void downloadAttachment(attachment.id);
+    });
+  };
+  const refreshPrimarySquadAction = () => {
+    if (!refreshCanApprove) return;
+    if (!handoffSummary.trim() && !outputAsked) {
+      startLegOutput();
+      return;
+    }
+    approveWithHandoff();
+  };
+  const refreshSelectStep = (step: NonNullable<typeof refreshStep>) => {
+    setOpenLeg(step.position + 1);
+    scrollContainerEl?.scrollTo({ top: 0, behavior: "smooth" });
+  };
+  const refreshComposerStepId =
+    refreshStepIsMine && refreshStepHolding ? refreshStep?.id : undefined;
+  const refreshComposerPlaceholder = refreshStep
+    ? refreshStepHolding && refreshStep.agent_id
+      ? t(($) => $.room.composer_mine, {
+          agent: getAgentName(refreshStep.agent_id),
+        })
+      : t(($) => $.room.composer_placeholder)
+    : t(($) => $.comment.leave_comment_placeholder);
+
+  const refreshTopbar = (
+    <header className="rd-topbar">
+      <button
+        type="button"
+        className="rd-back"
+        onClick={() => backOrReplace(paths.tasks())}
+      >
+        <ChevronLeft className="size-3.5" />
+        {t(($) => $.detail.tasks_crumb)}
+      </button>
+      <span className="rd-crumb">
+        {t(($) => $.detail.refresh_crumb_task)} / {refreshCrumb}
+      </span>
+      <div className="rd-top-actions">
+        <button
+          type="button"
+          className="rd-textbtn"
+          onClick={() => {
+            void copyText(window.location.href);
+            toast.success(t(($) => $.detail.link_copied));
+          }}
+        >
+          {t(($) => $.detail.copy_link)}
+        </button>
+        {subscriptionKnown ? (
+          <button
+            type="button"
+            className="rd-textbtn"
+            disabled={togglePending || !user?.id}
+            onClick={handleToggleSubscribe}
+          >
+            {isSubscribed
+              ? t(($) => $.detail.unsubscribe)
+              : t(($) => $.detail.subscribe)}
+          </button>
+        ) : null}
+        <IssueActionsDropdown
+          issue={issue}
+          align="end"
+          onDeletedFallbackPath={onDelete ? undefined : paths.tasks()}
+          trigger={
+            <button type="button" className="rd-iconbtn" aria-label={t(($) => $.detail.refresh_more)}>
+              <MoreHorizontal className="size-4" />
+            </button>
+          }
+        />
+      </div>
+    </header>
+  );
+
+  const refreshHeader = (
+    <header className="rd-head">
+      <div className="rd-kicker">{refreshKicker}</div>
+      <div className="rd-title-row">
+        <div className="rd-title">
+          {refreshStep ? (
+            <h2 className="rd-title-text">{refreshTitle}</h2>
+          ) : (
+            titleEditorBlock
+          )}
+        </div>
+        <div className="rd-head-state" data-state={refreshStateTone}>
+          <div className="rd-state-word">
+            <i />
+            {refreshStepStateLabel}
+          </div>
+          <span className="rd-state-time">{refreshTime}</span>
+        </div>
+      </div>
+      <div className="rd-meta">
+        <ActorAvatar
+          actorType={refreshOwnerType}
+          actorId={refreshOwnerId}
+          size="xs"
+          profileLink={false}
+        />
+        <span>{refreshOwnerName}</span>
+        <span className="rd-dot" />
+        <span>{refreshTypeLabel}</span>
+        {refreshStepAgentName ? (
+          <span className="rd-cli-chip">
+            <Bot className="size-3" />
+            <span>{refreshStepAgentName}</span>
+          </span>
+        ) : !refreshStep ? (
+          <IssueAgentHeaderChip issueId={id} />
+        ) : null}
+        <span className="rd-dot" />
+        <span>{refreshTime}</span>
+        {refreshParentCode ? (
+          <>
+            <span className="rd-dot" />
+            <span className="rd-parent">
+              {t(($) => $.detail.refresh_parent)} {refreshParentCode}
+              {refreshParentTitle ? ` · ${refreshParentTitle}` : ""}
+            </span>
+          </>
+        ) : null}
+      </div>
+    </header>
+  );
+
+  const refreshBrief = (
+    <section className="rd-section">
+      <div className="rd-section-head">
+        <span>{refreshStep
+          ? t(($) => $.detail.refresh_this_leg)
+          : t(($) => $.detail.refresh_brief)}</span>
+        <i />
+      </div>
+      <div
+        {...descDropZoneProps}
+        className="rd-brief"
+        onFocusCapture={() => {
+          if (!descriptionEditingRef.current) descriptionEditingRef.current = true;
+        }}
+        onBlurCapture={(event) => {
+          if (!event.currentTarget.contains(event.relatedTarget)) {
+            descriptionEditingRef.current = false;
+          }
+        }}
+      >
+        {descriptionEditorBlock}
+        {descDragOver && <FileDropOverlay />}
+        <div className="rd-brief-facts">
+          <span><b>{t(($) => $.detail.prop_project)}</b>{refreshProjectName}</span>
+          <span><b>{t(($) => $.detail.prop_priority)}</b>{refreshPriority}</span>
+          <span><b>{t(($) => $.detail.prop_due_date)}</b>{refreshDueLabel}</span>
+        </div>
+      </div>
+    </section>
+  );
+
+  const refreshRunSection = (
+    <section className="rd-section">
+      <div className="rd-section-head">
+        <span>{t(($) => $.detail.refresh_runlog)}</span>
+        <i />
+        {refreshRunTask && refreshRunStarted ? (
+          <em>
+            <LiveDuration
+              started={refreshRunStarted}
+              completed={refreshRunTask.completed_at}
+              active={refreshRunActive}
+            />
+          </em>
+        ) : null}
+      </div>
+      {refreshRunTask ? (
+        <RefreshRunLogCard task={refreshRunTask} agentName={refreshRunAgentName} />
+      ) : (
+        <p className="rd-empty">{t(($) => $.detail.refresh_no_run)}</p>
+      )}
+    </section>
+  );
+
+  const refreshDeliverable = refreshHasDeliverable ? (
+    <section className="rd-section">
+      <div className="rd-section-head">
+        <span>{t(($) => $.detail.refresh_output)}</span>
+        <i />
+      </div>
+      <div className="rd-deliverable">
+        <span className="rd-file-ico">
+          {(refreshDeliveryFile?.name.split(".").pop() ??
+            refreshDeliveryAttachment?.filename.split(".").pop() ??
+            "MD").slice(0, 4).toUpperCase()}
+        </span>
+        <div className="rd-deliverable-main">
+          <div className="rd-deliverable-name">{refreshDeliveryName}</div>
+          {refreshDeliveryMeta ? <div className="rd-deliverable-meta">{refreshDeliveryMeta}</div> : null}
+          {refreshDeliverySummary ? (
+            <div className="rd-deliverable-desc">{refreshDeliverySummary}</div>
+          ) : null}
+        </div>
+        {refreshDeliveryFile?.attachment_id || refreshDeliveryAttachment ? (
+          <button type="button" className="rd-deliverable-open" onClick={refreshDownloadDeliverable}>
+            {t(($) => $.detail.delivery_download)}
+            <ArrowUpRight className="size-3" />
+          </button>
+        ) : null}
+      </div>
+    </section>
+  ) : null;
+
+  const refreshOutputSection = !refreshStep && soloHasDelivery ? (
+    <section className="rd-section rd-output">
+      <div className="rd-section-head">
+        <span>{t(($) => $.detail.refresh_output)}</span>
+        <i />
+        <em>
+          {t(($) => $.detail.delivery_images, { count: soloImageCount })}
+          {" · "}
+          {t(($) => $.detail.delivery_files, { count: soloFileCount })}
+        </em>
+      </div>
+      <SoloDeliverySection
+        attachments={issueAttachments ?? []}
+        state={soloAccepted ? "done" : soloRun?.active ? "running" : "review"}
+        showChrome={false}
+      />
+    </section>
+  ) : null;
+
+  const refreshDiscussion = (
+    <section className="rd-section rd-discussion">
+      <div className="rd-section-head">
+        <span>{refreshStep
+          ? t(($) => $.detail.refresh_room)
+          : t(($) => $.detail.refresh_discussion)}</span>
+        <i />
+        <em>{refreshDiscussionItems.length}</em>
+      </div>
+      <div className="rd-timeline">
+        {refreshStep && !refreshStepIsMine && refreshDiscussionItems.length === 0 ? (
+          <p className="rd-empty">{t(($) => $.room.leg_page_other_note)}</p>
+        ) : (
+          renderTimeline(refreshDiscussionItems)
+        )}
+      </div>
+      {!refreshStep || refreshStepIsMine ? (
+        <div className="rd-composer">
+          <CommentInput
+            key={`${id}:${refreshStep?.id ?? "solo"}`}
+            issueId={id}
+            onSubmit={submitComment}
+            onAccepted={scrollToTimelineBottom}
+            placeholder={refreshComposerPlaceholder}
+            chainStepId={refreshComposerStepId}
+          />
+        </div>
+      ) : null}
+    </section>
+  );
+
+  const refreshSquadRail = refreshStep && chain && relayView ? (
+    <>
+      <div className="rd-card">
+        <div className="rd-card-label">{t(($) => $.detail.refresh_chain)}</div>
+        <div className="rd-chain">
+          {chain.steps.map((step) => {
+            const key = chainStateKey(step.state);
+            const selected = step.id === refreshStep.id;
+            return (
+              <button
+                key={step.id}
+                type="button"
+                className="rd-chain-node"
+                data-active={selected ? "" : undefined}
+                data-state={key}
+                onClick={() => refreshSelectStep(step)}
+              >
+                <span className="rd-chain-dot" />
+                <ActorAvatar
+                  actorType="member"
+                  actorId={step.holder_user_id}
+                  size="xs"
+                  profileLink={false}
+                  className="rd-chain-ava"
+                />
+                <span className="rd-chain-main">
+                  <b>{playerNames.nameOf(step.holder_user_id)}</b>
+                  <span>
+                    {t(($) => $.room.chat_leg, {
+                      seq: step.position + 1,
+                      total: chain.steps.length,
+                    })}
+                    {step.title ? ` · ${step.title}` : ""}
+                  </span>
+                </span>
+                <span className="rd-chain-state">
+                  {step.state === "reviewing"
+                    ? t(($) => $.room.state_reviewing)
+                    : step.state === "done"
+                      ? t(($) => $.room.state_done)
+                      : step.state === "doing"
+                        ? t(($) => $.room.state_doing)
+                        : step.state === "parked"
+                          ? t(($) => $.room.state_parked)
+                          : t(($) => $.room.state_pending)}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="rd-card">
+        <div className="rd-card-label">{t(($) => $.detail.refresh_state)}</div>
+        <div className="rd-rail-state" data-state={refreshStateTone}>
+          <i />
+          <span className="word">{refreshStepStateLabel}</span>
+          <span className="time">{refreshTime}</span>
+        </div>
+        <div className="rd-next">
+          <ActorAvatar
+            actorType="member"
+            actorId={refreshNextStep?.holder_user_id ?? refreshStep.holder_user_id}
+            size="xs"
+            profileLink={false}
+            className="rd-next-ava"
+          />
+          <div>
+            <b>
+              {refreshNextStep
+                ? `${t(($) => $.detail.refresh_next)} · ${playerNames.nameOf(refreshNextStep.holder_user_id)}`
+                : t(($) => $.room.leg_last_label)}
+            </b>
+            <span>
+              {refreshNextStep
+                ? refreshNextStep.agent_id
+                  ? t(($) => $.detail.refresh_next)
+                  : t(($) => $.room.flow_no_agent)
+                : t(($) => $.room.approve_hint_last)}
+            </span>
+          </div>
+          <span className="rd-next-go">{refreshNextStep ? "→" : "✓"}</span>
+        </div>
+      </div>
+
+      <div className="rd-card rd-facts">
+        <div className="rd-fact"><span>OWNER</span><b>{refreshOwnerName}</b></div>
+        <div className="rd-fact"><span>PRIORITY</span><b>{refreshPriority}</b></div>
+        <div className="rd-fact"><span>{t(($) => $.detail.prop_updated)}</span><b>{refreshTime}</b></div>
+        <div className="rd-fact">
+          <span>{t(($) => $.room.parent_label)}</span>
+          <b>{issue.identifier} · {issue.title}</b>
+        </div>
+      </div>
+
+      <div className="rd-actions">
+        <button
+          type="button"
+          className="rd-primary"
+          disabled={
+            !refreshCanApprove ||
+            approveChainStep.isPending ||
+            outputProducing
+          }
+          onClick={refreshPrimarySquadAction}
+        >
+          {refreshCanApprove
+            ? outputProducing
+              ? t(($) => $.room.output_producing)
+              : refreshNextStep
+                ? t(($) => $.detail.refresh_pass)
+                : t(($) => $.detail.refresh_pass_finish)
+            : refreshStep.state === "done"
+              ? t(($) => $.detail.refresh_delivered)
+              : refreshStep.state === "pending"
+                ? t(($) => $.room.state_pending)
+                : refreshStep.state === "doing"
+                  ? t(($) => $.room.state_doing)
+                  : refreshStep.state === "parked"
+                    ? t(($) => $.room.state_parked)
+                    : refreshStep.state === "skipped"
+                      ? t(($) => $.room.state_skipped)
+                      : t(($) => $.detail.refresh_waiting_review, {
+                          name: playerNames.nameOf(refreshStep.holder_user_id),
+                        })}
+        </button>
+        {refreshCanApprove ? (
+          <button
+            type="button"
+            className="rd-secondary"
+            disabled={outputProducing}
+            onClick={startLegOutput}
+          >
+            {outputAsked
+              ? t(($) => $.detail.refresh_regenerate)
+              : t(($) => $.room.output_generate)}
+          </button>
+        ) : null}
+        <button
+          type="button"
+          className="rd-delete"
+          onClick={() => actions.openDeleteConfirm({ onDeletedFallbackPath: paths.tasks() })}
+        >
+          {t(($) => $.detail.refresh_delete)}
+        </button>
+      </div>
+    </>
+  ) : null;
+
+  const refreshSoloRail = (
+    <>
+      <div className="rd-card">
+        <div className="rd-card-label">{t(($) => $.detail.refresh_task_info)}</div>
+        <div className="rd-rail-state" data-state={refreshStateTone}>
+          <i />
+          <span className="word">{refreshStepStateLabel}</span>
+          <span className="time">{refreshTime}</span>
+        </div>
+        <div className="rd-rail-sub">
+          {refreshTypeLabel} · {refreshOwnerName}
+        </div>
+        <div className="rd-facts rd-facts-tight">
+          <div className="rd-fact"><span>OWNER</span><b>{refreshOwnerName}</b></div>
+          <div className="rd-fact"><span>PRIORITY</span><b>{refreshPriority}</b></div>
+          <div className="rd-fact"><span>CREATED</span><b>{shortDate(issue.created_at, locale)}</b></div>
+          <div className="rd-fact"><span>UPDATED</span><b>{shortDate(issue.updated_at, locale)}</b></div>
+          <div className="rd-fact"><span>SOURCE</span><b>{t(($) => $.detail.refresh_source_solo)}</b></div>
+        </div>
+      </div>
+
+      <div className="rd-card">
+        <div className="rd-card-label">{t(($) => $.detail.refresh_runtime)}</div>
+        {refreshRunTask ? (
+          <>
+            <div className="rd-runtime">
+              <ActorAvatar
+                actorType="agent"
+                actorId={refreshRunTask.agent_id}
+                size="sm"
+                profileLink={false}
+                className="rd-runtime-ava"
+              />
+              <div>
+                <b>{refreshRunAgentName}</b>
+                <span>{refreshRunModel || refreshRunTask.status}</span>
+              </div>
+            </div>
+            <div className="rd-facts rd-facts-tight">
+              <div className="rd-fact">
+                <span>DURATION</span>
+                <b>
+                  {refreshRunTask && refreshRunStarted ? (
+                    <LiveDuration
+                      started={refreshRunStarted}
+                      completed={refreshRunTask.completed_at}
+                      active={refreshRunActive}
+                    />
+                  ) : (
+                    "—"
+                  )}
+                </b>
+              </div>
+              <div className="rd-fact"><span>MODEL</span><b>{refreshRunModel || "—"}</b></div>
+            </div>
+          </>
+        ) : (
+          <p className="rd-empty">{t(($) => $.detail.refresh_no_run)}</p>
+        )}
+      </div>
+
+      <div className="rd-card">
+        <div className="rd-card-label">{t(($) => $.detail.refresh_output)}</div>
+        {refreshAllAttachments.length > 0 ? (
+          <>
+            <div className="rd-output-row">
+              <span>
+                {t(($) => $.detail.delivery_images, { count: soloImageCount })}
+                {" · "}
+                {t(($) => $.detail.delivery_files, { count: soloFileCount })}
+              </span>
+              <button type="button" onClick={refreshDownloadAll}>
+                {t(($) => $.detail.delivery_download)}
+              </button>
+            </div>
+            <div className="rd-output-list">
+              {refreshAllAttachments.slice(0, 4).map((attachment) => (
+                <span key={attachment.id}>
+                  <FileText className="size-3" />
+                  {attachment.filename}
+                </span>
+              ))}
+            </div>
+          </>
+        ) : (
+          <p className="rd-empty">{t(($) => $.detail.refresh_no_output)}</p>
+        )}
+      </div>
+
+      <div className="rd-actions">
+        <button
+          type="button"
+          className="rd-primary"
+          disabled={soloAccepted}
+          onClick={soloHasDelivery ? refreshDownloadAll : acceptDelivery}
+        >
+          {soloHasDelivery
+            ? t(($) => $.detail.delivery_download_all)
+            : soloAccepted
+              ? t(($) => $.detail.accepted_delivery)
+              : t(($) => $.detail.accept_delivery)}
+        </button>
+        {soloHasDelivery && !soloAccepted ? (
+          <button type="button" className="rd-secondary" onClick={acceptDelivery}>
+            {t(($) => $.detail.accept_delivery)}
+          </button>
+        ) : null}
+        <button
+          type="button"
+          className="rd-delete"
+          onClick={() => actions.openDeleteConfirm({ onDeletedFallbackPath: paths.tasks() })}
+        >
+          {t(($) => $.detail.refresh_delete)}
+        </button>
+      </div>
+    </>
+  );
+
+  const refreshBody = (
+    <div className="rd-enter" key={`${id}:${refreshStep?.id ?? "solo"}`}>
+      {refreshHeader}
+      <div className="rd-body">
+        <div className="rd-canvas">
+          {refreshBrief}
+          {refreshDeliverable}
+          {refreshRunSection}
+          {refreshOutputSection}
+          {refreshDiscussion}
+        </div>
+        <aside className="rd-rail">
+          {refreshStep ? refreshSquadRail : refreshSoloRail}
+        </aside>
+      </div>
+    </div>
+  );
+
+  const detailContent = (
+    // Hosts the one image viewer this issue's images page through — see
+    // ImageSequenceProvider. Wraps the whole column so the description
+    // editor's images and the timeline's images share one sequence.
+    <CurrentIssueRenderContextProvider value={currentIssueRenderContext}>
+    <ImageSequenceProvider items={imageSequence}>
+    <div className="relative flex h-full min-w-0 flex-1 flex-col">
+        {/* In-page find bar — floats over the top-right of the content column
+            (below the breadcrumb header), outside the scroll container so it
+            stays put while the timeline scrolls and its own text isn't walked.
+            z-30: must beat every sticky affordance pinned at the timeline's
+            top-0 (comment headers z-10, resolve collapse bars z-20) — at equal
+            z the later-in-DOM sticky bar paints over the find bar and orphans
+            its close button (MUL-4414). On desktop it also steps inside the
+            thread rail's right-edge strip, so an open find bar can't cover
+            the topmost ticks. */}
+        {find.open && (
+          <FindBar
+            find={find}
+            className={cn(layout === "refresh" || isRoom ? "absolute top-14 z-30" : "absolute top-4 z-30", isMobile ? "right-4" : "right-10")}
+          />
+        )}
+        {layout === "refresh" ? refreshTopbar : isRoom && (
+        <BreadcrumbHeader
+          leading={leadingAction}
+          className="border-b border-border/60"
+          segments={breadcrumbSegments}
+          leaf={
+            <AppLink
+              href={paths.issueDetail(issue.id)}
+              className="flex min-w-0 items-center gap-2 transition-opacity hover:opacity-80"
+            >
+              {/* The identifier reads as a machine handle, not a word: mono
+                  in its own bordered chip, the way this product writes ids
+                  everywhere else. */}
+              <span className="shrink-0 rounded-[4px] border border-border bg-muted/50 px-1.5 py-px font-mono text-micro text-muted-foreground">
+                {issue.identifier}
+              </span>
+              <span className="truncate font-medium text-foreground">
+                {issue.title}
+              </span>
+            </AppLink>
+          }
+          actions={
+            <>
+            {/* Solo tasks keep the live "agent is working" chip here. A relay
+                task does not: the run belongs to one leg, so the signal lives
+                on that leg's chapter instead of floating in the chrome. */}
+            {!isRoom ? <IssueAgentHeaderChip issueId={id} /> : null}
+            {/* Thread navigator. Leftmost of the action buttons because it
+                navigates the document, while everything to its right acts on
+                the issue. Hidden on mobile with the rail: the panel would work
+                there, but it needs a sheet rather than a popover to be usable
+                one-handed, which is its own change. */}
+            {!isMobile && (
+              <ThreadNavPanel
+                threads={minimapThreads}
+                onJump={jumpToThread}
+                onHoverThread={setThreadNavHoverId}
+                open={threadNavOpen}
+                pinned={threadNavPinned}
+                onOpenChange={handleThreadNavOpenChange}
+              />
+            )}
+            {onDone && !isRoom && !issueBehavesAsAny(issue, ["done", "cancelled"]) && (
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <Button
+                      variant="outline"
+                      size="icon-sm"
+                      className="text-muted-foreground"
+                      onClick={() => { handleUpdateField({ status: "done" }); onDone?.(); }}
+                    >
+                      <CircleCheck />
+                    </Button>
+                  }
+                />
+                <TooltipContent side="bottom">{t(($) => $.detail.mark_done_tooltip)}</TooltipContent>
+              </Tooltip>
+            )}
+            {onDone && issueBehavesAs(issue, "done") && (
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <Button
+                      variant="outline"
+                      size="icon-sm"
+                      className="text-muted-foreground"
+                      onClick={() => { onDone(); }}
+                    >
+                      <Archive />
+                    </Button>
+                  }
+                />
+                <TooltipContent side="bottom">{t(($) => $.detail.archive_tooltip)}</TooltipContent>
+              </Tooltip>
+            )}
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Button
+                    variant="outline"
+                    size="icon-sm"
+                    className={cn("text-muted-foreground", actions.isPinned && "text-foreground")}
+                    onClick={actions.togglePin}
+                  >
+                    {actions.isPinned ? <PinOff /> : <Pin />}
+                  </Button>
+                }
+              />
+              <TooltipContent side="bottom">{actions.isPinned ? t(($) => $.detail.unpin_tooltip) : t(($) => $.detail.pin_tooltip)}</TooltipContent>
+            </Tooltip>
+            <IssueActionsDropdown
+              issue={issue}
+              align="end"
+              // When a parent passes `onDelete`, we detect deletion via effect
+              // above and skip navigation. Otherwise the modal takes us back
+              // to the list we came from, falling back to all issues.
+              onDeletedFallbackPath={onDelete ? undefined : paths.tasks()}
+              trigger={
+                <Button variant="outline" size="icon-sm" className="text-muted-foreground">
+                  <MoreHorizontal />
+                </Button>
+              }
+            />
+            </>
+          }
+        />
+        )}
+
+        {/* scrollbar-gutter both-edges: with classic (space-taking) scrollbars —
+            macOS with a mouse or "always show", Windows, Linux — the global
+            `scrollbar-width: thin` carves ~11px off the right side only, so the
+            centered column reads 32px left vs 43px right (MUL-4404). Mirroring
+            the gutter restores symmetry; overlay-scrollbar platforms reserve
+            nothing and render unchanged. */}
+        <div
+          ref={attachScrollContainer}
+          data-tab-scroll-root={scrollContainerKey}
+          className="relative flex-1 overflow-y-auto [scrollbar-gutter:stable_both-edges]"
+        >
+        {/* Gutters: 32px is a comfortable reading margin on a desktop column
+            but eats 16% of a 393px phone, so below `md` they drop to 12px.
+            `max-md:pb-chat-launcher` reserves the launcher's corner at the end
+            of the scroll: below `md` the composer is not pinned (see
+            `useStickyComposer`), so it lands here — right where the launcher
+            floats — once the reader scrolls to the bottom.
+            Width: a relay page has no properties rail beside it (see the
+            isRoom branch below), so the 4xl reading column would just strand
+            space on both sides of the screen — it uses the room there is
+            (capped at 1400px so an ultrawide monitor still reads). Plain
+            issues keep the capped column their side panel pairs with. */}
+        <div
+          data-issue-column
+          className={layout === "refresh"
+            ? "rd-content"
+            : cn(
+                "mx-auto w-full px-3 py-6 max-md:pb-chat-launcher md:px-8 md:py-8",
+                isRoom ? "max-w-[1400px]" : "max-w-[1352px]",
+              )}
+        >
+          {/* A subtask page replaces the whole column: the leg's own dialog,
+              plan and outputs. The parent mast belongs to the parent page. */}
+          {layout === "refresh" ? refreshBody : isRoom && chain && relayView && openLegStep ? (
+            legSubtaskBody
+          ) : isRoom ? (
+          <>
+          {titleEditorBlock}
+
+          {!isRoom ? (
+            <div className="mt-2.5 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-caption text-muted-foreground">
+              <span className="inline-flex items-center gap-1.5 rounded-md bg-muted/60 px-2 py-0.5">
+                <StatusIcon
+                  status={issue.status}
+                  category={issueStatusCategory(issue) ?? undefined}
+                  className="h-3.5 w-3.5 shrink-0"
+                />
+                <span className="text-foreground">
+                  {resolveStatusLabel(issue.status)}
+                </span>
+              </span>
+              {issue.assignee_type && issue.assignee_id ? (
+                <span className="inline-flex min-w-0 items-center gap-1.5 rounded-md bg-muted/60 px-2 py-0.5">
+                  <ActorAvatar
+                    actorType={issue.assignee_type}
+                    actorId={issue.assignee_id}
+                    size="sm"
+                    profileLink={false}
+                  />
+                  <span className="truncate text-foreground">
+                    {getActorName(issue.assignee_type, issue.assignee_id)}
+                  </span>
+                </span>
+              ) : null}
+              <span className="font-mono text-micro">
+                {t(($) => $.detail.prop_created)}{" "}
+                {shortDate(issue.created_at, locale)}
+              </span>
+              <span className="font-mono text-micro">
+                {t(($) => $.detail.prop_updated)}{" "}
+                {shortDate(issue.updated_at, locale)}
+              </span>
+            </div>
+          ) : null}
+
+          {parentLinkBlock}
+          {isRoom && chain && relayView ? (
+            <RelayMetaRow
+              subtaskCount={chain.steps.length}
+              createdLabel={shortDate(issue.created_at, locale)}
+              runsCount={relayRunsCount}
+            />
+          ) : null}
+
+          <div
+            {...descDropZoneProps}
+            className={cn(
+              "relative mt-5 rounded-lg",
+              // On a relay task the description is the shared context of the
+              // whole relay — everyone works from it — so it reads as a
+              // labelled callout, not a bare document body. A solo task gets
+              // the same card treatment so both task kinds share one surface
+              // language.
+              isRoom &&
+                "border border-surface-border border-l-[3px] border-l-brand bg-brand/5 px-4 py-3 shadow-[var(--shadow-surface)]",
+              !isRoom &&
+                "border border-surface-border bg-surface px-4 py-3 shadow-[var(--shadow-surface)]",
+            )}
+            onFocusCapture={() => {
+              if (!descriptionEditingRef.current) {
+                descriptionEditingRef.current = true;
+              }
+            }}
+            onBlurCapture={(event) => {
+              if (!event.currentTarget.contains(event.relatedTarget)) {
+                descriptionEditingRef.current = false;
+              }
+            }}
+          >
+            {isRoom ? (
+              <div className="mb-2 flex items-center gap-2 text-caption font-semibold text-muted-foreground">
+                <Flag className="size-3.5" />
+                {t(($) => $.room.ctx_title)}
+                <span className="grow" />
+                <span className="rounded-full bg-muted px-1.5 text-micro font-normal">
+                  {t(($) => $.room.ctx_shared)}
+                </span>
+              </div>
+            ) : (
+              <div className="mb-2 flex items-center gap-2 text-caption font-semibold text-muted-foreground">
+                {t(($) => $.detail.section_description)}
+              </div>
+            )}
+            {descriptionEditorBlock}
             {descDragOver && <FileDropOverlay />}
           </div>
 
-          {/* Sub-issues — Linear-style */}
-          {childIssues.length === 0 && (
+          {/* Sub-issues — a solo-task structure. A relay's legs ARE its
+              substructure, so squad tasks never offer the affordance. */}
+          {!isRoom && childIssues.length === 0 && (
             <div className="mt-6">
               <button
                 type="button"
@@ -3345,155 +4997,56 @@ export function IssueDetail({ issueId, onDelete, onDone, defaultSidebarOpen = tr
 
           <div className="my-8 border-t" />
 
-          {/* Activity / Comments */}
+          {isRoom && chain && relayView ? (
+            <>
+              <RelayFlowRail
+                chain={chain}
+                view={relayView}
+                issueId={id}
+                tasks={relayTasks}
+                nameOf={playerNames.nameOf}
+                identifier={issue.identifier}
+              />
+              <SubtaskList
+                chain={chain}
+                view={relayView}
+                issueId={id}
+                tasks={relayTasks}
+                nameOf={playerNames.nameOf}
+                identifier={issue.identifier}
+                formatTime={(iso) => shortDate(iso, locale)}
+                onOpenLeg={(seq) => setOpenLeg(seq)}
+              />
+              <div className="my-8 border-t" />
+              {roomStream}
+              <div className="my-8 border-t" />
+              {/* The full relay record, at the bottom of the page. */}
+              <RelayLogSection
+                chain={chain}
+                issueId={id}
+                tasks={relayTasks}
+                nameOf={playerNames.nameOf}
+                agentNameOf={getAgentName}
+                createdAt={issue.created_at}
+                currentUserId={user?.id}
+                squadName={roomSquadName}
+                attachmentOf={attachmentOf}
+                action={subscriptionControls}
+              />
+            </>
+          ) : (
+            <>
           <div>
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
+              <div className="flex min-w-0 items-center gap-3">
                 <h2 className="text-title-sm font-semibold">{t(($) => $.detail.activity_section)}</h2>
               </div>
               <div className="flex items-center gap-2">
-                {/* A delegated subscription is one the user never opted into
-                    by hand — their agent created this issue for them. Saying
-                    so is what keeps it from reading as the product quietly
-                    adding them to things (MUL-5483). */}
-                {isSubscribed && subscriptionReason === "delegated" && (
-                  <Tooltip>
-                    {/* Quiet surface, not plain body text: this is metadata
-                        explaining a state, and must not read as a second
-                        action sitting next to Unsubscribe. Uses the shared
-                        caption role rather than an ad-hoc size (MUL-5451). */}
-                    <TooltipTrigger className="cursor-default rounded-full bg-muted px-2 py-0.5 text-caption text-muted-foreground">
-                      {t(($) => $.detail.delegated_subscription_badge)}
-                    </TooltipTrigger>
-                    <TooltipContent side="top" className="max-w-64">
-                      {t(($) => $.detail.delegated_subscription_hint)}
-                    </TooltipContent>
-                  </Tooltip>
-                )}
-                {/* Nothing until the subscribers query resolves: the default
-                    empty list reads as "not subscribed" for everyone, so
-                    rendering it flashes Subscribe at someone who is already
-                    subscribed, and a click landing in that window sends a
-                    subscribe instead of the unsubscribe they meant. An
-                    unresolved state is better shown as no control than as the
-                    wrong one (MUL-5714). */}
-                {subscriptionKnown &&
-                  (!isSubscribed || (childCountKnown && childIssues.length === 0) ? (
-                    /* One button, no menu, when there is nothing for the
-                       subtree option to cover. This is the root-only path
-                       (opt_out_scope='issue'), NOT the subtree one: even at
-                       zero children the two are different server writes,
-                       because a subtree tombstone also keeps FUTURE children
-                       from re-subscribing the user
-                       (server/pkg/db/queries/subscriber.sql). Declining one
-                       issue must not silently opt someone out of a tree that
-                       does not exist yet. While the child count is unknown we
-                       keep the menu below — it never picks a scope for the
-                       user. */
-                    <button
-                      type="button"
-                      onClick={handleToggleSubscribe}
-                      disabled={togglePending || !user?.id}
-                      className={SUBSCRIPTION_ACTION_CLASS}
-                    >
-                      {isSubscribed
-                        ? t(($) => $.detail.unsubscribe)
-                        : t(($) => $.detail.subscribe)}
-                    </button>
-                  ) : (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger
-                        disabled={togglePending || subtreePending || !user?.id}
-                        className={SUBSCRIPTION_ACTION_CLASS}
-                      >
-                        {t(($) => $.detail.unsubscribe)}
-                      </DropdownMenuTrigger>
-                      {/* onClick, not onSelect: Base UI's Menu.Item exposes no
-                          onSelect (that is the Radix spelling), and because its
-                          props extend the full div attribute set, an onSelect
-                          typechecks and silently lands on the DOM node as the
-                          native text-selection event — the handler never runs
-                          (MUL-5710). */}
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem
-                          onClick={handleToggleSubscribe}
-                          disabled={togglePending}
-                        >
-                          {t(($) => $.detail.unsubscribe_this)}
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={handleUnsubscribeSubtree}
-                          disabled={subtreePending}
-                        >
-                          {t(($) => $.detail.unsubscribe_subtree)}
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  ))}
-                <Popover>
-                  <PopoverTrigger className="cursor-pointer hover:opacity-80 transition-opacity">
-                    {subscribers.length > 0 ? (
-                      <AvatarGroup>
-                        {subscribers.slice(0, 4).map((sub) => (
-                          <ActorAvatar
-                            key={`${sub.user_type}-${sub.user_id}`}
-                            actorType={sub.user_type}
-                            actorId={sub.user_id}
-                            size="md"
-                            enableHoverCard
-                          />
-                        ))}
-                        {subscribers.length > 4 && (
-                          <AvatarGroupCount>+{subscribers.length - 4}</AvatarGroupCount>
-                        )}
-                      </AvatarGroup>
-                    ) : (
-                      <span className="flex items-center justify-center h-6 w-6 rounded-full border border-dashed border-muted-foreground/30 text-muted-foreground">
-                        <Users className="h-3 w-3" />
-                      </span>
-                    )}
-                  </PopoverTrigger>
-                  <SubscriberPopoverContent
-                    members={members}
-                    agents={agents}
-                    subscribers={subscribers}
-                    toggleSubscriber={toggleSubscriber}
-                    togglesDisabled={
-                      !subscriptionKnown || togglePending || !user?.id
-                    }
-                    t={t}
-                  />
-                </Popover>
+                {subscriptionControls}
               </div>
             </div>
 
             <LocalDirectoryHint projectId={issue?.project_id} />
-
-            {/* The relay, above the room: whose turn it is, and — when it has
-                stopped — the bar that says on whom and what can be done. */}
-            {isRoom && chain ? (
-              <div className="mt-3 flex flex-col gap-1.5">
-                {parkedStep && issue.assignee_id ? (
-                  <ChainParkedBar
-                    step={parkedStep}
-                    nameOf={playerNames.nameOf}
-                    bindHref={paths.squadDetail(issue.assignee_id)}
-                    onSkip={() =>
-                      skipChainStep.mutate(undefined, {
-                        onError: () => toast.error(t(($) => $.room.skip_failed)),
-                      })
-                    }
-                    skipPending={skipChainStep.isPending}
-                  />
-                ) : null}
-                <ChainStepsStrip
-                  chain={chain}
-                  issueId={id}
-                  tasks={relayTasks}
-                  nameOf={playerNames.nameOf}
-                />
-              </div>
-            ) : null}
 
             {/* The "agent is working" live signal now lives in the header
                 (IssueAgentHeaderChip) so it stays in one fixed place and
@@ -3511,65 +5064,14 @@ export function IssueDetail({ issueId, onDelete, onDone, defaultSidebarOpen = tr
                 first commit. Without this null guard Virtuoso falls back to
                 its own scroller, grabs 0 height inside overflow-y-auto, and
                 miscomputes total-height on first paint. */}
-            {timelineLoading && timelineView.groups.length === 0 ? (
-              <TimelineSkeleton />
-            ) : (
-              // Two render modes:
-              //   - `highlightCommentId` set (came from inbox deep-link) →
-              //     render flat. Every comment mounts, every height is real,
-              //     the target id is in the DOM the instant the useEffect
-              //     above runs `scrollIntoView`. No virtualization estimate
-              //     errors, no spacer reflow drift. Pays cold-mount cost
-              //     proportional to items.length (markdown + lowlight per
-              //     comment), which is acceptable in the deep-link case —
-              //     the user has explicit intent to land on a specific item.
-              //   - `find.open` (in-page Cmd/Ctrl+F) → also render flat, so
-              //     every comment is in the DOM for the find walk to match
-              //     and highlight. Same explicit-intent cold-mount trade-off.
-              //   - otherwise → Virtuoso. Browsing mode, virtualization
-              //     wins on first-paint perf for long timelines.
-              //
-              // The split is deliberate: virtualization and "land precisely
-              // on a target" have fundamentally opposed contracts (estimated
-              // heights vs real heights). Trying to satisfy both in one
-              // path is what produced the bug history this PR closes.
-              !highlightCommentId && !find.open ? (
-                !scrollContainerEl ? (
-                  // Skeleton while the callback ref populates so the gap
-                  // between IssueDetail mount and Virtuoso mount doesn't
-                  // flash empty.
-                  <TimelineSkeleton />
-                ) : (
-                  <div className="mt-4">
-                    <Virtuoso
-                      key={`${wsId}:${id}`}
-                      ref={virtuosoRef}
-                      customScrollParent={scrollContainerEl}
-                      data={items}
-                      initialScrollTop={restoredScrollTop}
-                      increaseViewportBy={{ top: 800, bottom: 800 }}
-                      computeItemKey={(_i, item) => `${item.kind}:${item.id}`}
-                      skipAnimationFrameInResizeObserver
-                      // followOutput intentionally NOT set. Virtuoso treats
-                      // it as a sticky "is at bottom" flag and resets
-                      // scrollTop to maxScrollTop on every height-change
-                      // tick — issue-detail is document-shaped, not chat.
-                      itemContent={renderItem}
-                    />
-                  </div>
-                )
-              ) : (
-                <div className="mt-4">
-                  {items.map((item, i) => (
-                    <Fragment key={`${item.kind}:${item.id}`}>
-                      {renderItem(i, item)}
-                    </Fragment>
-                  ))}
-                </div>
-              )
-            )}
-
+            {renderTimeline(items)}
           </div>
+            </>
+          )}
+          </>
+          ) : (
+            soloBody
+          )}
 
           {/* Bottom comment input — no avatar, full width. Direct child of
               the content column (not the Activity section): a sticky box
@@ -3584,6 +5086,7 @@ export function IssueDetail({ issueId, onDelete, onDone, defaultSidebarOpen = tr
               page background and is invisible), and pb-4 so the card floats
               off the viewport edge — with -mb-4 giving the padding back to
               the column's py-8 so the at-rest layout doesn't shift. */}
+          {layout !== "refresh" && isRoom && (isRoom && openLegStep && !openLegHolding ? null : (
           <div
             ref={composerRef}
             className={cn(
@@ -3602,9 +5105,11 @@ export function IssueDetail({ issueId, onDelete, onDone, defaultSidebarOpen = tr
               issueId={id}
               onSubmit={submitComment}
               onAccepted={scrollToTimelineBottom}
-              placeholder={isRoom ? t(($) => $.room.composer_placeholder) : undefined}
+              placeholder={roomComposerPlaceholder}
+              chainStepId={composerLegScopeId}
             />
           </div>
+          ))}
         </div>
         </div>
 
@@ -3618,7 +5123,7 @@ export function IssueDetail({ issueId, onDelete, onDone, defaultSidebarOpen = tr
             the resize handle's 4px drag strip at the panel edge. Hover
             previews a thread, click jumps to it. Hidden on mobile: no
             hover, and the gutter is too tight. */}
-        {!isMobile && (
+        {!isMobile && layout !== "refresh" && (
           <ThreadMinimap
             threads={minimapThreads}
             scrollContainerEl={scrollContainerEl}
@@ -3632,41 +5137,5 @@ export function IssueDetail({ issueId, onDelete, onDone, defaultSidebarOpen = tr
     </CurrentIssueRenderContextProvider>
   );
 
-  if (isMobile) {
-    return (
-      <div className="flex flex-1 min-h-0">
-        {detailContent}
-        <Sheet open={mobileSidebarOpen} onOpenChange={setMobileSidebarOpen}>
-          <SheetContent side="right" showCloseButton={false} className="w-[320px] overflow-y-auto p-4">
-            {sidebarContent}
-          </SheetContent>
-        </Sheet>
-      </div>
-    );
-  }
-
-  return (
-    <ResizablePanelGroup orientation="horizontal" className="flex-1 min-h-0" defaultLayout={defaultLayout} onLayoutChanged={onLayoutChanged}>
-      <ResizablePanel id="content" minSize="50%">
-        {detailContent}
-      </ResizablePanel>
-      <ResizableHandle />
-      <ResizablePanel
-        id="sidebar"
-        {...rightSidebarPanelMotionProps}
-        data-right-sidebar-motion={desktopSidebarMotionEnabled ? "enabled" : undefined}
-        defaultSize={desktopSidebarOpen ? 320 : 0}
-        minSize={260}
-        maxSize={420}
-        collapsible
-        groupResizeBehavior="preserve-pixel-size"
-        panelRef={sidebarRef}
-        onResize={handleDesktopSidebarResize}
-      >
-        <AnimatedRightSidebar open={desktopSidebarVisualOpen} motionEnabled={desktopSidebarMotionEnabled}>
-          {sidebarContent}
-        </AnimatedRightSidebar>
-      </ResizablePanel>
-    </ResizablePanelGroup>
-  );
+  return <div className="flex flex-1 min-h-0">{detailContent}</div>;
 }

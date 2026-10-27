@@ -1,13 +1,20 @@
 {
   "page": {
-    "title": "インボックス",
-    "back": "インボックス"
+    "title": "通知台",
+    "back": "通知台"
   },
   "menu": {
     "mark_all_read": "すべて既読にする",
     "archive_all": "すべてアーカイブ",
     "archive_all_read": "既読の項目をすべてアーカイブ",
-    "archive_completed": "完了した項目をアーカイブ"
+    "archive_completed": "完了した項目をアーカイブ",
+    "clear_all": "すべてクリア",
+    "clear_dialog": {
+      "title": "受信トレイをクリアしますか？",
+      "description": "アーカイブ済みを含むすべての通知が完全に削除されます。元に戻すことはできません。",
+      "cancel": "キャンセル",
+      "confirm": "すべてクリア"
+    }
   },
   "filters": {
     "tooltip": "インボックスを絞り込む",
@@ -71,7 +78,8 @@
     "quick_create_done": "エージェントで作成",
     "quick_create_failed": "エージェントでの作成に失敗",
     "quick_create_unconfirmed": "エージェントでの作成結果は未確認",
-    "flow_handoff": "フローの引き継ぎ"
+    "flow_handoff": "フローの引き継ぎ",
+    "squad_message": "チームメッセージ"
   },
   "labels": {
     "set_status_to": "ステータスを変更:",
@@ -90,7 +98,9 @@
   "toasts": {
     "source_context_retry_started": "元のコンテキストで再試行を開始しました",
     "archived": "通知をアーカイブしました",
-    "unarchived": "通知を元に戻しました"
+    "unarchived": "通知を元に戻しました",
+    "archived_all": "すべての通知をアーカイブしました",
+    "deleted_all": "受信トレイの通知を完全に削除しました"
   },
   "errors": {
     "source_context_retry_failed": "元のコンテキストで再試行できませんでした",
@@ -103,7 +113,68 @@
     "archive_all_failed": "すべてアーカイブできませんでした",
     "archive_all_read_failed": "既読の項目をアーカイブできませんでした",
     "archive_completed_failed": "完了した項目をアーカイブできませんでした",
+    "delete_all_failed": "受信トレイの通知を完全に削除できませんでした",
     "unarchive_failed": "アーカイブ解除に失敗しました",
     "archived_load_failed": "アーカイブ済み通知を読み込めませんでした"
+  },
+  "console": {
+    "unread_cap": "UNREAD",
+    "task_info": "タスク情報",
+    "chat_info": "チャット",
+    "filter_all": "すべて",
+    "filter_unread": "未読",
+    "filter_task": "タスク",
+    "filter_chat": "チャット",
+    "filter_archived": "アーカイブ",
+    "live_task": "件のタスク情報",
+    "live_chat": "件のチャット",
+    "live_total_one": "全 {{count}} 件",
+    "live_total_other": "全 {{count}} 件",
+    "sync_hint": "最終同期 · たった今",
+    "mark_all_read": "すべて既読",
+    "cleanup_read": "既読を整理",
+    "clear_archived": "アーカイブを空にする",
+    "cleanup_read_title": "既読通知を整理しますか？",
+    "cleanup_read_body_one": "既読の {{count}} 件を完全に削除します。未読とアーカイブは残ります。",
+    "cleanup_read_body_other": "既読の {{count}} 件を完全に削除します。未読とアーカイブは残ります。",
+    "clear_archived_title": "アーカイブを空にしますか？",
+    "clear_archived_body_one": "アーカイブ済み {{count}} 件を完全に削除します。",
+    "clear_archived_body_other": "アーカイブ済み {{count}} 件を完全に削除します。",
+    "delete_title": "この通知を削除しますか？",
+    "delete_body": "「{{title}}」は通知台から完全に削除されます。",
+    "confirm_delete": "削除",
+    "cancel": "キャンセル",
+    "mark_read": "既読にする",
+    "mark_unread": "未読にする",
+    "archive": "アーカイブ",
+    "unarchive": "アーカイブ解除",
+    "delete": "削除",
+    "source_issue": "元のタスク / ISSUE",
+    "source_squad": "元のチーム / SQUAD",
+    "open_task": "タスクを開く",
+    "open_squad": "チャットを開く",
+    "priority": "優先度 {{value}}",
+    "no_assignee": "未割り当て",
+    "no_project": "プロジェクトなし",
+    "archived_tag": "アーカイブ済み",
+    "squad_members_one": "{{count}} 名",
+    "squad_members_other": "{{count}} 名",
+    "squad_leader": "リーダー {{name}}",
+    "empty": "このフィルターに通知はありません",
+    "select_prompt": "通知を選択して内容を表示",
+    "undo": "元に戻す",
+    "delete_failed": "削除できませんでした",
+    "cleanup_failed": "既読の整理に失敗しました",
+    "clear_failed": "アーカイブを空にできませんでした",
+    "deleted_toast": "通知を削除しました",
+    "cleaned_toast_one": "既読 {{count}} 件を整理しました",
+    "cleaned_toast_other": "既読 {{count}} 件を整理しました",
+    "cleared_toast_one": "アーカイブ {{count}} 件を空にしました",
+    "cleared_toast_other": "アーカイブ {{count}} 件を空にしました",
+    "marked_all_toast": "すべて既読にしました",
+    "load_failed": "通知を読み込めません",
+    "try_again": "再試行",
+    "back": "通知台",
+    "system_actor": "システム"
   }
 }

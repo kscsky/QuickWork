@@ -34,6 +34,10 @@ export type RouteIconName =
   | "Server"
   | "BookOpenText"
   | "Settings"
+  | "Github"
+  | "Plug"
+  | "Key"
+  | "Boxes"
   | "File"
   | "FileText"
   | "FileImage"
@@ -49,7 +53,6 @@ export type NavLabelKey =
   | "dispatch"
   | "tasks"
   | "my_issues"
-  | "issues"
   | "projects"
   | "autopilots"
   | "agents"
@@ -57,6 +60,14 @@ export type NavLabelKey =
   | "usage"
   | "runtimes"
   | "skills"
+  | "config"
+  | "models"
+  | "mcp"
+  | "github"
+  | "integrations"
+  | "tokens"
+  | "account"
+  | "workspace_settings"
   | "settings";
 
 /** Stable identifier for each workspace navigation page. */
@@ -65,7 +76,6 @@ export type WorkspacePageKey =
   | "dispatch"
   | "tasks"
   | "myIssues"
-  | "issues"
   | "projects"
   | "autopilots"
   | "agents"
@@ -73,7 +83,14 @@ export type WorkspacePageKey =
   | "usage"
   | "runtimes"
   | "skills"
-  | "settings";
+  | "config"
+  | "models"
+  | "mcp"
+  | "github"
+  | "integrations"
+  | "tokens"
+  | "account"
+  | "workspaceSettings";
 
 export interface WorkspacePage {
   /** Route segment at index 1 of `/{slug}/{segment}/...`. */
@@ -96,7 +113,6 @@ export const WORKSPACE_PAGES: Record<WorkspacePageKey, WorkspacePage> = {
   // because progress here is "which step", not a status column.
   tasks: { segment: "tasks", icon: "ListTodo", navKey: "tasks" },
   myIssues: { segment: "my-issues", icon: "CircleUser", navKey: "my_issues" },
-  issues: { segment: "issues", icon: "ListTodo", navKey: "issues" },
   projects: { segment: "projects", icon: "FolderKanban", navKey: "projects" },
   autopilots: { segment: "autopilots", icon: "Zap", navKey: "autopilots" },
   agents: { segment: "agents", icon: "Bot", navKey: "agents" },
@@ -104,7 +120,22 @@ export const WORKSPACE_PAGES: Record<WorkspacePageKey, WorkspacePage> = {
   usage: { segment: "usage", icon: "BarChart3", navKey: "usage" },
   runtimes: { segment: "runtimes", icon: "Monitor", navKey: "runtimes" },
   skills: { segment: "skills", icon: "BookOpenText", navKey: "skills" },
-  settings: { segment: "settings", icon: "Settings", navKey: "settings" },
+  config: { segment: "config", icon: "Settings", navKey: "config" },
+  models: { segment: "models", icon: "Boxes", navKey: "models" },
+  mcp: { segment: "mcp", icon: "Server", navKey: "mcp" },
+  github: { segment: "github", icon: "Github", navKey: "github" },
+  integrations: {
+    segment: "integrations",
+    icon: "Plug",
+    navKey: "integrations",
+  },
+  tokens: { segment: "tokens", icon: "Key", navKey: "tokens" },
+  account: { segment: "account", icon: "CircleUser", navKey: "account" },
+  workspaceSettings: {
+    segment: "workspace-settings",
+    icon: "Settings",
+    navKey: "workspace_settings",
+  },
 };
 
 /** Reverse lookup: route segment → page key. */

@@ -4,7 +4,6 @@ import {
   useState,
   useEffect,
   useCallback,
-  useContext,
   createContext,
   useRef,
   type ReactNode,
@@ -19,13 +18,13 @@ import {
   InputOTPGroup,
   InputOTPSlot,
 } from "@quickwork/ui/components/ui/input-otp";
-import { UI_EASE_OUT, UI_MOTION_DURATION } from "@quickwork/ui/lib/motion";
+import { UI_EASE_OUT } from "@quickwork/ui/lib/motion";
 import { cn } from "@quickwork/ui/lib/utils";
 import { useAuthStore } from "@quickwork/core/auth";
 import { workspaceKeys } from "@quickwork/core/workspace/queries";
 import { ApiError, api } from "@quickwork/core/api";
 import type { User } from "@quickwork/core/types";
-import { DispatchScene } from "./dispatch-scene";
+import { RelayScene } from "./relay-scene";
 import { useT } from "../i18n";
 
 // ---------------------------------------------------------------------------
@@ -102,7 +101,6 @@ export function validateCliCallback(cliCallback: string): boolean {
 // ---------------------------------------------------------------------------
 
 /** Seconds between successive items of the sign-in column. */
-const REVEAL_STAGGER = 0.06;
 
 const EASE_OUT: [number, number, number, number] = [...UI_EASE_OUT];
 
@@ -129,23 +127,17 @@ const StepDirectionContext = createContext<1 | -1>(1);
  * steps replace the email form rather than the content swapping in flat.
  */
 function Reveal({ index, children }: { index: number; children: ReactNode }) {
-  const shouldReduceMotion = useReducedMotion() ?? false;
-  const direction = useContext(StepDirectionContext);
-
+  // CSS drives this cascade rather than motion: the form's first paint must
+  // never depend on a JS animation frame (an interrupted hydration left the
+  // whole sign-in column at opacity 0), and the keyframes also give the
+  // reduced-motion opt-out for free.
   return (
-    <motion.div
-      initial={
-        shouldReduceMotion ? false : { opacity: 0, y: 12, x: direction * 10 }
-      }
-      animate={{ opacity: 1, y: 0, x: 0 }}
-      transition={{
-        duration: UI_MOTION_DURATION.standard,
-        delay: shouldReduceMotion ? 0 : index * REVEAL_STAGGER,
-        ease: EASE_OUT,
-      }}
+    <div
+      className="login-reveal"
+      style={{ "--i": index } as React.CSSProperties}
     >
       {children}
-    </motion.div>
+    </div>
   );
 }
 
@@ -485,26 +477,35 @@ function LoginShell({
 
   return (
     <div className="grid min-h-svh lg:grid-cols-[1.15fr_1fr]">
-      <aside className="relative hidden flex-col justify-between overflow-hidden border-r border-surface-border bg-app-shell pl-14 pt-14 pb-16 lg:flex">
-        <div className="flex items-center gap-2.5">
-          <span className="size-2.5 rounded-[3px] bg-brand" />
-          <span className="text-title-sm font-semibold tracking-tight">QuickWork</span>
+      <aside className="qw-login-stage relative hidden flex-col justify-between overflow-hidden border-r border-white/10 pl-12 pr-10 pt-8 pb-10 lg:flex">
+        <span aria-hidden="true" className="qw-login-stage-glow" />
+        <div className="relative z-[2] flex items-center gap-2.5">
+          <span className="grid size-[22px] place-items-center rounded-[4px] bg-[#eef2f7] font-serif text-[12px] font-semibold text-[#14181f]">
+            Q
+          </span>
+          <span className="text-[13px] font-semibold tracking-[-0.01em] text-[#eef2f7]">{t(($) => $.signin.brand_name)}</span>
+          <span className="ml-auto font-mono text-[9px] tracking-[0.15em] text-white/35">{t(($) => $.signin.relay_live)}</span>
         </div>
 
-        <div className="flex flex-col gap-12">
-          <div className="flex flex-col gap-4">
-            <h1 className="max-w-[11ch] text-display font-semibold leading-[1.06] tracking-[-0.035em]">
+        <div className="relative z-[2] flex flex-col gap-9">
+          <div className="flex flex-col gap-3.5">
+            <h1 className="max-w-[11ch] text-[42px] font-semibold leading-[1.08] tracking-[-0.03em] text-[#f4f7fa]">
               {t(($) => $.signin.brand_title)}
             </h1>
-            <p className="max-w-[34ch] text-body-lg leading-7 text-muted-foreground">
+            <p className="max-w-[41ch] text-[12.5px] leading-[1.85] text-white/60">
               {t(($) => $.signin.brand_line)}
             </p>
           </div>
 
-          <DispatchScene />
+          <div className="qw-login-board">
+            <RelayScene />
+          </div>
         </div>
 
-        <div aria-hidden="true" />
+        <div className="relative z-[2] flex items-center justify-between gap-4 font-mono text-[9px] tracking-[0.12em] text-white/25">
+          <span>{t(($) => $.signin.stage_left)}</span>
+          <span>{t(($) => $.signin.stage_right)}</span>
+        </div>
       </aside>
 
       {/* The shell owns the backdrop, so the panel reads as an object placed on
@@ -787,6 +788,7 @@ export function LoginPage({
             <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-brand/10 text-brand">
               <PromptGlyph />
             </span>
+            {/* eslint-disable-next-line i18next/no-literal-string -- CLI command, not UI copy */}
             <span className="font-mono text-label text-foreground">
               quickwork login
             </span>

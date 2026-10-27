@@ -15,9 +15,9 @@ function present(url: string, data: TabEntityData = {}) {
 
 describe("resolveTabPresentation — pages", () => {
   it("uses the page icon and localized page name", () => {
-    expect(present("/acme/issues")).toEqual({
+    expect(present("/acme/tasks")).toEqual({
       visual: { kind: "icon", icon: "ListTodo" },
-      title: { kind: "nav", navKey: "issues" },
+      title: { kind: "nav", navKey: "tasks" },
     });
     expect(present("/acme/projects")).toEqual({
       visual: { kind: "icon", icon: "FolderKanban" },

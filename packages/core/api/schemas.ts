@@ -12,7 +12,7 @@ import type {
   ChatSession,
   PrioritizeQueuedChatTaskResponse,
   SendChatMessageResponse,
-  StartMikaOnboardingResponse,
+  StartQuillOnboardingResponse,
   Comment,
   CronPreviewResponse,
   DingTalkInstallation,
@@ -70,6 +70,7 @@ import type {
   SquadMember,
   SquadMessage,
   SquadRoom,
+  ChainLegOutputResponse,
   IssueChain,
   IssueChainForIssue,
   SquadPlaybook,
@@ -998,6 +999,8 @@ export const CommentSchema = z.object({
   source_task_id: z.string().nullable().optional(),
   // Set only on comments a quick action produced (MUL-5465). Server-only.
   quick_action_id: z.string().nullable().optional(),
+  // Leg attribution (单流分界); absent on older backends and for room comments.
+  chain_step_id: z.string().nullable().optional(),
 }).loose();
 
 export const CommentsListSchema = z.array(CommentSchema);
@@ -1605,6 +1608,120 @@ const DashboardFailureDailySchema = z.object({
 
 export const DashboardFailureDailyListSchema = z.array(DashboardFailureDailySchema);
 
+// Usage overview + model call log. `call_count` is the number of model calls
+// (task × provider × model), not distinct tasks — a run that fell back to a
+// second model contributes two. Cost fields keep the same split contract as
+// every other usage surface: provider ticks plus the tokens left to estimate.
+const UsageModelSummarySchema = z.object({
+  provider: z.string().default(""),
+  model: z.string().default(""),
+  call_count: z.number().default(0),
+  input_tokens: z.number().default(0),
+  output_tokens: z.number().default(0),
+  cache_read_tokens: z.number().default(0),
+  cache_write_tokens: z.number().default(0),
+  ...CostSplitShape,
+  success_calls: z.number().default(0),
+  failed_calls: z.number().default(0),
+  cancelled_calls: z.number().default(0),
+  running_calls: z.number().default(0),
+}).loose();
+
+export const UsageModelSummaryListSchema = z.array(UsageModelSummarySchema);
+
+// Drop malformed entries individually instead of discarding the whole array:
+// one bad row should cost one row, not the page. Same posture as the blocked
+// mention list (MUL-4525).
+function keepValidItems<T extends z.ZodTypeAny>(schema: T) {
+  return z
+    .array(z.unknown())
+    .catch([])
+    .default([])
+    .transform((items) =>
+      items.flatMap((item) => {
+        const parsed = schema.safeParse(item);
+        return parsed.success ? [parsed.data] : [];
+      }),
+    );
+}
+
+const UsageOverviewDailySchema = z.object({
+  date: z.string().default(""),
+  ...UsageModelSummarySchema.shape,
+}).loose();
+
+const UsageOverviewByAgentSchema = z.object({
+  agent_id: z.string().default(""),
+  ...UsageModelSummarySchema.shape,
+}).loose();
+
+// A missing `daily` / `by_model` / `by_agent` must not take the whole page
+// down: the page renders whatever section the backend could answer.
+export const UsageOverviewSchema = z.object({
+  daily: keepValidItems(UsageOverviewDailySchema),
+  by_model: keepValidItems(UsageModelSummarySchema),
+  by_agent: keepValidItems(UsageOverviewByAgentSchema),
+  previous_by_model: keepValidItems(UsageModelSummarySchema),
+}).loose();
+
+// Open strings on purpose: an installed desktop build may meet a status or
+// trigger it predates, and the UI maps unknown values to a neutral label.
+const UsageLogRowSchema = z.object({
+  id: z.string().default(""),
+  task_id: z.string().default(""),
+  status: z.string().default(""),
+  db_status: z.string().default(""),
+  agent_id: z.string().default(""),
+  agent_name: z.string().default(""),
+  agent_restricted: z.boolean().default(false),
+  issue_id: z.string().default(""),
+  issue_identifier: z.string().default(""),
+  issue_title: z.string().default(""),
+  project_id: z.string().default(""),
+  provider: z.string().default(""),
+  model: z.string().default(""),
+  trigger: z.string().default(""),
+  failure_reason: z.string().default(""),
+  started_at: z.string().optional(),
+  completed_at: z.string().optional(),
+  created_at: z.string().default(""),
+  input_tokens: z.number().default(0),
+  output_tokens: z.number().default(0),
+  cache_read_tokens: z.number().default(0),
+  cache_write_tokens: z.number().default(0),
+  cost_usd_ticks: z.number().optional(),
+}).loose();
+
+export const UsageStatusCountsSchema = z.object({
+  all: z.number().default(0),
+  success: z.number().default(0),
+  failed: z.number().default(0),
+  cancelled: z.number().default(0),
+  running: z.number().default(0),
+}).loose();
+
+export const UsageLogSummarySchema = z.object({
+  by_model: keepValidItems(UsageModelSummarySchema),
+  status_counts: UsageStatusCountsSchema.catch({
+    all: 0,
+    success: 0,
+    failed: 0,
+    cancelled: 0,
+    running: 0,
+  }),
+}).loose();
+
+export const UsageLogPageSchema = z.object({
+  rows: keepValidItems(UsageLogRowSchema),
+  total: z.number().catch(0),
+  page: z.number().catch(1),
+  page_size: z.number().catch(25),
+  summary: UsageLogSummarySchema.catch({
+    by_model: [],
+    status_counts: { all: 0, success: 0, failed: 0, cancelled: 0, running: 0 },
+  }),
+}).loose();
+
 const DashboardFailureByAgentSchema = z.object({
   agent_id: z.string().default(""),
   failure_reason: z.string().default(""),
@@ -1899,7 +2016,7 @@ export const SendChatMessageResponseSchema: z.ZodType<SendChatMessageResponse> =
 // `started` is the only field the flow branches on, and a malformed response
 // must not be read as "the opening landed" — parseWithFallback's fallback says
 // it did not, which leaves the flow's own retry as the recovery path.
-export const StartMikaOnboardingResponseSchema: z.ZodType<StartMikaOnboardingResponse> = z.object({
+export const StartQuillOnboardingResponseSchema: z.ZodType<StartQuillOnboardingResponse> = z.object({
   started: z.boolean(),
   message_id: z.string().nullish().transform((id) => id ?? undefined),
   created_at: z.string().nullish().transform((at) => at ?? undefined),
@@ -2114,6 +2231,21 @@ export const SquadRoomSchema = z.object({
 
 export const EMPTY_SQUAD_ROOM: SquadRoom = { messages: [], has_more: false };
 
+// The handoff package a leg published on 通过. Entries stay loose: a newer
+// client may curate kinds this build has never heard of, and a package that
+// renders unknown entries beats a chain that fails to parse.
+export const IssueChainHandoffFileSchema = z.object({
+  name: z.string(),
+  size: z.number().optional(),
+  attachment_id: z.string().optional(),
+  kind: z.string().optional(),
+}).loose();
+
+export const IssueChainHandoffSchema = z.object({
+  summary: z.string().default(""),
+  files: z.array(IssueChainHandoffFileSchema).default([]),
+}).loose();
+
 // One step of a task's relay.
 //
 // `agent_id` is optional on the wire because absent is a real state — the
@@ -2127,6 +2259,16 @@ export const IssueChainStepSchema = z.object({
   agent_id: z.string().optional(),
   title: z.string().default(""),
   state: z.string().default("pending"),
+  // The holder's own brief for their leg; absent on older backends.
+  plan: z.string().optional(),
+  // The published package, when the leg published one; absent on backends
+  // that predate the handoff, and absent (not empty) when nothing crossed.
+  // `.catch(undefined)`: a malformed package degrades to absent — it must not
+  // take the whole chain (and with it the relay's controls) down.
+  handoff: IssueChainHandoffSchema.optional().catch(undefined),
+  // Leg-scoped comment count for the locked placeholder; absent/0 on older
+  // backends and on legs with nothing hidden.
+  leg_comment_count: z.number().optional(),
   started_at: z.string().optional(),
   completed_at: z.string().optional(),
 }).loose();
@@ -2134,9 +2276,28 @@ export const IssueChainStepSchema = z.object({
 export const IssueChainSchema = z.object({
   steps: z.array(IssueChainStepSchema).default([]),
   parked: z.boolean().default(false),
+  // Absent on backends that predate the review gate.
+  reviewing: z.boolean().default(false),
 }).loose();
 
-export const EMPTY_ISSUE_CHAIN_RESPONSE: IssueChain = { steps: [], parked: false };
+// The leg-output ask's answer: which run was queued to write the document.
+// Loose + defaulted — the document itself arrives as the run's comment, so a
+// response shape change must never cost the client the ask.
+export const ChainLegOutputResponseSchema = z.object({
+  task_id: z.string().default(""),
+  status: z.string().default(""),
+}).loose();
+
+export const EMPTY_CHAIN_LEG_OUTPUT: ChainLegOutputResponse = {
+  task_id: "",
+  status: "",
+};
+
+export const EMPTY_ISSUE_CHAIN_RESPONSE: IssueChain = {
+  steps: [],
+  parked: false,
+  reviewing: false,
+};
 
 /** A task's chain tagged with the task it belongs to — the list-page shape. */
 export const IssueChainForIssueSchema = IssueChainSchema.extend({
@@ -2339,6 +2500,9 @@ const AutopilotListItemSchema = z.object({
   trigger_kinds: z.array(z.string()).optional(),
   next_run_at: z.string().nullable().optional(),
   last_run_status: z.string().nullable().optional(),
+  recent_run_statuses: z.array(z.string()).optional(),
+  schedule_cron: z.string().nullable().optional(),
+  schedule_timezone: z.string().nullable().optional(),
   // Per-caller write capability; absent on older servers (treated as unknown).
   can_write: z.boolean().optional(),
   // Narrower per-caller access-management capability (detail endpoint only).
@@ -3033,3 +3197,47 @@ export const TaskIssueResponseSchema = z.object({
 export type TaskIssueResponse = z.infer<typeof TaskIssueResponseSchema>;
 
 export const EMPTY_TASK_ISSUE: TaskIssueResponse = { issue_id: "" };
+
+// ---------------------------------------------------------------------------
+// Model pool catalog — GET /api/model-pool/catalog.
+//
+// Server-side aggregation of public free-model lists (NVIDIA NIM, OpenRouter
+// free). This endpoint never carries credentials: it only answers "what could
+// I run", not "what am I allowed to run". A malformed or older-server response
+// must degrade to an empty catalog, never throw on the settings page.
+// ---------------------------------------------------------------------------
+
+export const ModelPoolSourceSchema = z.object({
+  id: z.string().default(""),
+  name: z.string().default(""),
+  kind: z.string().default(""),
+  model_count: z.number().default(0),
+  free_count: z.number().default(0),
+  status: z.string().default(""),
+  error: z.string().optional().default(""),
+  synced_at: z.string().default(""),
+}).loose();
+
+export const ModelPoolModelSchema = z.object({
+  id: z.string().default(""),
+  name: z.string().default(""),
+  source: z.string().default(""),
+  protocol: z.string().default(""),
+  context_length: z.number().optional().default(0),
+  supports_tools: z.boolean().nullable().optional(),
+  reasoning: z.boolean().optional().default(false),
+  free: z.boolean().default(false),
+}).loose();
+
+export const ModelPoolCatalogSchema = z.object({
+  sources: z.array(ModelPoolSourceSchema).default([]),
+  models: z.array(ModelPoolModelSchema).default([]),
+  synced_at: z.string().default(""),
+}).loose();
+
+export type ModelPoolCatalogParsed = z.infer<typeof ModelPoolCatalogSchema>;
+export const EMPTY_MODEL_POOL_CATALOG: ModelPoolCatalogParsed = {
+  sources: [],
+  models: [],
+  synced_at: "",
+};

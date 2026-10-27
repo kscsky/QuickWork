@@ -70,7 +70,7 @@ export default function manifest(): MetadataRoute.Manifest {
     // segments, so they resolve to the last workspace the same way start_url
     // does instead of needing a slug the manifest cannot know.
     shortcuts: [
-      { name: "Inbox", url: "/inbox" },
+      { name: "Notifications", url: "/inbox" },
       { name: "My Issues", url: "/my-issues" },
     ],
   };

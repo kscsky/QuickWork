@@ -1155,3 +1155,80 @@ func (q *Queries) ReplaceCommentAttachments(ctx context.Context, arg ReplaceComm
 	}
 	return result.RowsAffected(), nil
 }
+
+const updateAttachmentContent = `-- name: UpdateAttachmentContent :one
+WITH updated AS (
+  UPDATE attachment AS a
+  SET url = $1, size_bytes = $2
+  WHERE a.id = $3 AND a.workspace_id = $4
+  RETURNING a.id, a.workspace_id, a.issue_id, a.comment_id, a.uploader_type, a.uploader_id, a.filename, a.url, a.content_type, a.size_bytes, a.created_at, a.chat_session_id, a.chat_message_id, a.task_id, a.source_context_id
+), bumped_issue AS (
+  UPDATE issue
+  SET revision = revision + 1
+  WHERE issue.id IN (SELECT issue_id FROM updated WHERE issue_id IS NOT NULL)
+  RETURNING revision
+)
+SELECT updated.id, updated.workspace_id, updated.issue_id, updated.comment_id, updated.uploader_type, updated.uploader_id, updated.filename, updated.url, updated.content_type, updated.size_bytes, updated.created_at, updated.chat_session_id, updated.chat_message_id, updated.task_id, updated.source_context_id,
+       COALESCE((SELECT revision FROM bumped_issue), 0)::bigint AS issue_revision
+FROM updated
+`
+
+type UpdateAttachmentContentParams struct {
+	NewUrl       string      `json:"new_url"`
+	NewSize      int64       `json:"new_size"`
+	AttachmentID pgtype.UUID `json:"attachment_id"`
+	WsID         pgtype.UUID `json:"ws_id"`
+}
+
+type UpdateAttachmentContentRow struct {
+	ID              pgtype.UUID        `json:"id"`
+	WorkspaceID     pgtype.UUID        `json:"workspace_id"`
+	IssueID         pgtype.UUID        `json:"issue_id"`
+	CommentID       pgtype.UUID        `json:"comment_id"`
+	UploaderType    string             `json:"uploader_type"`
+	UploaderID      pgtype.UUID        `json:"uploader_id"`
+	Filename        string             `json:"filename"`
+	Url             string             `json:"url"`
+	ContentType     string             `json:"content_type"`
+	SizeBytes       int64              `json:"size_bytes"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+	ChatSessionID   pgtype.UUID        `json:"chat_session_id"`
+	ChatMessageID   pgtype.UUID        `json:"chat_message_id"`
+	TaskID          pgtype.UUID        `json:"task_id"`
+	SourceContextID pgtype.UUID        `json:"source_context_id"`
+	IssueRevision   int64              `json:"issue_revision"`
+}
+
+// Swaps the object a text attachment points at after an in-place edit. The
+// URL changes (fresh storage key — CDN caches keyed by path can never serve
+// the previous revision) while the id stays stable, which is what handoff
+// packages and comments reference. Mirrors CreateAttachment's issue-revision
+// bump so clients holding a revision marker refetch the attachment list.
+func (q *Queries) UpdateAttachmentContent(ctx context.Context, arg UpdateAttachmentContentParams) (UpdateAttachmentContentRow, error) {
+	row := q.db.QueryRow(ctx, updateAttachmentContent,
+		arg.NewUrl,
+		arg.NewSize,
+		arg.AttachmentID,
+		arg.WsID,
+	)
+	var i UpdateAttachmentContentRow
+	err := row.Scan(
+		&i.ID,
+		&i.WorkspaceID,
+		&i.IssueID,
+		&i.CommentID,
+		&i.UploaderType,
+		&i.UploaderID,
+		&i.Filename,
+		&i.Url,
+		&i.ContentType,
+		&i.SizeBytes,
+		&i.CreatedAt,
+		&i.ChatSessionID,
+		&i.ChatMessageID,
+		&i.TaskID,
+		&i.SourceContextID,
+		&i.IssueRevision,
+	)
+	return i, err
+}

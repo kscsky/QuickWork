@@ -398,12 +398,7 @@ func parseDaysCutoff(
 	tzName string,
 	trimDays int,
 ) pgtype.Timestamptz {
-	days := defaultDays
-	if d := r.URL.Query().Get("days"); d != "" {
-		if parsed, err := strconv.Atoi(d); err == nil && parsed > 0 && parsed <= 365 {
-			days = parsed
-		}
-	}
+	days := parseDaysParam(r, defaultDays)
 	loc, err := time.LoadLocation(tzName)
 	if err != nil || loc == nil {
 		loc = time.UTC
@@ -415,6 +410,19 @@ func parseDaysCutoff(
 		Time:  sinceFromDays(dayWindowNow(), days-trimDays, loc),
 		Valid: true,
 	}
+}
+
+// parseDaysParam reads the shared `?days=` contract (1..365, default on
+// invalid) without also building a cutoff. The usage overview needs the
+// number as well as the cutoff: it derives the previous window from it.
+func parseDaysParam(r *http.Request, defaultDays int) int {
+	days := defaultDays
+	if d := r.URL.Query().Get("days"); d != "" {
+		if parsed, err := strconv.Atoi(d); err == nil && parsed > 0 && parsed <= 365 {
+			days = parsed
+		}
+	}
+	return days
 }
 
 // resolveViewingTZ resolves the IANA tz to render the response in:

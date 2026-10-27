@@ -37,7 +37,30 @@ const installationsRef = vi.hoisted(() => ({
     }[],
     configured: true,
     can_manage: true as boolean,
+    repository_browse_configured: false as boolean,
+  } as {
+    installations: {
+      id: string;
+      account_login: string;
+      installation_id?: number;
+      connected_by?: string;
+    }[];
+    configured: boolean;
+    can_manage: boolean;
+    repository_browse_configured?: boolean;
   },
+}));
+const reposRef = vi.hoisted(() => ({
+  current: [] as {
+    id: number;
+    full_name: string;
+    html_url: string;
+    clone_url: string;
+    description: string | null;
+    private: boolean;
+    archived: boolean;
+    default_branch: string;
+  }[],
 }));
 
 vi.mock("@tanstack/react-query", () => ({
@@ -47,11 +70,36 @@ vi.mock("@tanstack/react-query", () => ({
     if (key.includes("installations")) return { data: installationsRef.current };
     return { data: undefined };
   },
+  useInfiniteQuery: () => ({
+    data:
+      reposRef.current.length > 0
+        ? {
+            pages: [
+              {
+                repositories: reposRef.current,
+                total_count: reposRef.current.length,
+                next_page: null,
+              },
+            ],
+          }
+        : undefined,
+    isPending: false,
+    isError: false,
+    hasNextPage: false,
+    fetchNextPage: vi.fn(),
+    isFetchingNextPage: false,
+  }),
+  useMutation: () => ({
+    mutate: vi.fn(),
+    mutateAsync: vi.fn(),
+    isPending: false,
+  }),
   useQueryClient: () => ({
     setQueryData: mockSetQueryData,
     invalidateQueries: mockInvalidate,
   }),
   queryOptions: <T,>(opts: T) => opts,
+  infiniteQueryOptions: <T,>(opts: T) => opts,
 }));
 
 vi.mock("@quickwork/core/hooks", () => ({
@@ -138,7 +186,13 @@ function resetFixtures() {
     repos: [{ url: "https://github.com/acme/api" }],
   };
   membersRef.current = [{ user_id: "user-1", role: "owner" }];
-  installationsRef.current = { installations: [], configured: true, can_manage: true };
+  installationsRef.current = {
+    installations: [],
+    configured: true,
+    can_manage: true,
+    repository_browse_configured: false,
+  };
+  reposRef.current = [];
 }
 
 describe("GitHubTab", () => {
@@ -283,5 +337,48 @@ describe("GitHubTab", () => {
     render(<GitHubTab />, { wrapper: I18nWrapper });
     await user.click(screen.getByRole("button", { name: /Manage repositories/ }));
     expect(mockNavPush).toHaveBeenCalledWith("/acme/settings?tab=repositories");
+  });
+
+  it("renders the GitHub projects section with an empty state", () => {
+    render(<GitHubTab />, { wrapper: I18nWrapper });
+    expect(screen.getByRole("heading", { name: /^Projects/ })).toBeTruthy();
+    expect(screen.getByText("No GitHub projects yet")).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: /Import project/ }),
+    ).toBeTruthy();
+  });
+
+  it("opens the project import picker and imports selected repositories", async () => {
+    const user = userEvent.setup();
+    installationsRef.current = {
+      configured: true,
+      can_manage: true,
+      repository_browse_configured: true,
+      installations: [
+        { id: "inst-1", account_login: "acme", installation_id: 1 },
+      ],
+    };
+    reposRef.current = [
+      {
+        id: 1,
+        full_name: "acme/api",
+        html_url: "https://github.com/acme/api",
+        clone_url: "https://github.com/acme/api.git",
+        description: "API service",
+        private: true,
+        archived: false,
+        default_branch: "main",
+      },
+    ];
+    render(<GitHubTab />, { wrapper: I18nWrapper });
+    await user.click(screen.getByRole("button", { name: /Import project/ }));
+    expect(screen.getByText("acme/api")).toBeTruthy();
+    await user.click(screen.getByRole("checkbox", { name: /acme\/api/ }));
+    await user.click(
+      screen.getByRole("button", { name: /Import 1 project/ }),
+    );
+    await waitFor(() =>
+      expect(mockToastSuccess).toHaveBeenCalled(),
+    );
   });
 });

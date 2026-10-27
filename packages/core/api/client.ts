@@ -21,7 +21,7 @@ import type {
   IssueTableRowsRequest,
   IssueTableRowsResponse,
   Agent,
-  MikaBootstrapResponse,
+  QuillBootstrapResponse,
   CreateAgentRequest,
   AgentBuilderRuntimeSwitch,
   AgentBuilderSession,
@@ -40,6 +40,7 @@ import type {
   RuntimeProfile,
   CreateRuntimeProfileRequest,
   UpdateRuntimeProfileRequest,
+  ModelPoolCatalog,
   InboxItem,
   InboxWorkspaceUnread,
   IssueSubscriber,
@@ -74,6 +75,9 @@ import type {
   DashboardRunTimeDaily,
   DashboardFailureDaily,
   DashboardFailureByAgent,
+  UsageOverview,
+  UsageLogPage,
+  UsageLogSortKey,
   RuntimeUpdate,
   RuntimeModelListRequest,
   RuntimeLocalSkillListRequest,
@@ -93,7 +97,7 @@ import type {
   PendingChatTasksResponse,
   HasPendingChatTasksResponse,
   SendChatMessageResponse,
-  StartMikaOnboardingResponse,
+  StartQuillOnboardingResponse,
   CancelTaskResponse,
   Project,
   CreateProjectRequest,
@@ -203,7 +207,9 @@ import type {
   SquadPlaybook,
   SquadRoom,
   IssueChain,
+  ChainLegOutputResponse,
   IssueChainForIssue,
+  IssueChainHandoffFile,
   DispatchStep,
   SquadMember,
   SquadMemberStatusListResponse,
@@ -234,7 +240,7 @@ import {
   ChatSessionSchema,
   PrioritizeQueuedChatTaskResponseSchema,
   SendChatMessageResponseSchema,
-  StartMikaOnboardingResponseSchema,
+  StartQuillOnboardingResponseSchema,
   ChildIssuesResponseSchema,
   ChildIssueProgressResponseSchema,
   CommentsListSchema,
@@ -251,6 +257,8 @@ import {
   DashboardFailureByAgentListSchema,
   DashboardUsageByAgentListSchema,
   DashboardUsageDailyListSchema,
+  UsageOverviewSchema,
+  UsageLogPageSchema,
   EMPTY_APP_CONFIG,
   EMPTY_ATTACHMENT,
   EMPTY_CHAT_MESSAGE_LIST,
@@ -312,6 +320,8 @@ import {
   IssueChainSchema,
   IssueChainListSchema,
   EMPTY_ISSUE_CHAIN_RESPONSE,
+  ChainLegOutputResponseSchema,
+  EMPTY_CHAIN_LEG_OUTPUT,
   SquadPlaybookSchema,
   SquadPlaybookListSchema,
   EMPTY_PLAYBOOK_LIST,
@@ -431,7 +441,27 @@ import {
   type IssueView,
   type IssueViewPreference,
   type CreateIssueViewRequest,
+  ModelPoolCatalogSchema,
+  EMPTY_MODEL_POOL_CATALOG,
 } from "./schemas";
+
+const EMPTY_USAGE_OVERVIEW: UsageOverview = {
+  daily: [],
+  by_model: [],
+  by_agent: [],
+  previous_by_model: [],
+};
+
+const EMPTY_USAGE_LOG_PAGE: UsageLogPage = {
+  rows: [],
+  total: 0,
+  page: 1,
+  page_size: 25,
+  summary: {
+    by_model: [],
+    status_counts: { all: 0, success: 0, failed: 0, cancelled: 0, running: 0 },
+  },
+};
 
 /** Identifies the calling client to the server.
  *  Sent on every HTTP request as X-Client-Platform / X-Client-Version /
@@ -1196,6 +1226,22 @@ export class ApiClient {
     });
   }
 
+  /** Set one agent-facing metadata key on an issue. The server accepts JSON
+   *  scalars only (string / number / boolean). */
+  async setIssueMetadata(
+    issueId: string,
+    key: string,
+    value: string | number | boolean,
+  ): Promise<void> {
+    await this.fetch(
+      `/api/issues/${issueId}/metadata/${encodeURIComponent(key)}`,
+      {
+        method: "PUT",
+        body: JSON.stringify({ value }),
+      },
+    );
+  }
+
   async moveIssue(id: string, data: MoveIssueRequest): Promise<Issue> {
     return this.fetch(`/api/issues/${id}/move`, {
       method: "POST",
@@ -1268,12 +1314,14 @@ export class ApiClient {
     parentId?: string,
     attachmentIds?: string[],
     suppressAgentIds?: string[],
+    chainStepId?: string,
   ): Promise<Comment> {
     return this.fetch(`/api/issues/${issueId}/comments`, {
       method: "POST",
       body: JSON.stringify({
         content,
         type: type ?? "comment",
+        chain_step_id: chainStepId,
         ...(parentId ? { parent_id: parentId } : {}),
         ...(attachmentIds?.length ? { attachment_ids: attachmentIds } : {}),
         ...(suppressAgentIds?.length ? { suppress_agent_ids: suppressAgentIds } : {}),
@@ -1462,20 +1510,20 @@ export class ApiClient {
    * client cannot mint an agent that would claim them. The server is also the
    * idempotency boundary — calling twice yields the same agent.
    */
-  async createMikaAgent(
+  async createQuillAgent(
     data: {
       runtime_id: string;
       language: "en" | "zh" | "ko" | "ja";
       /** Empty means "whatever the runtime defaults to". */
       model?: string;
       /** Label for the onboarding conversation, used only if this call is the
-       *  one that creates it. The session's identity is the member and Mika,
+       *  one that creates it. The session's identity is the member and Quill,
        *  never this string — it is localized. */
       session_title?: string;
     },
     workspaceSlug?: string,
-  ): Promise<MikaBootstrapResponse> {
-    return this.fetch("/api/agents/mika", {
+  ): Promise<QuillBootstrapResponse> {
+    return this.fetch("/api/agents/quill", {
       method: "POST",
       headers: workspaceHeader(workspaceSlug),
       body: JSON.stringify(data),
@@ -1627,6 +1675,21 @@ export class ApiClient {
 
   async deleteRuntime(runtimeId: string): Promise<void> {
     await this.fetch(`/api/runtimes/${runtimeId}`, { method: "DELETE" });
+  }
+
+  /**
+   * Public free-model catalog (NVIDIA NIM + OpenRouter free). Carries no
+   * credentials; the settings page uses it to show what a runtime could run
+   * before the user configures a provider key.
+   */
+  async getModelPoolCatalog(): Promise<ModelPoolCatalog> {
+    const raw = await this.fetch<unknown>("/api/model-pool/catalog");
+    return parseWithFallback<ModelPoolCatalog>(
+      raw,
+      ModelPoolCatalogSchema,
+      EMPTY_MODEL_POOL_CATALOG,
+      { endpoint: "GET /api/model-pool/catalog" },
+    );
   }
 
   // Confirmed variant of deleteRuntime. The strict DELETE refuses with
@@ -1915,6 +1978,63 @@ export class ApiClient {
     );
   }
 
+  // ---------------------------------------------------------------------------
+  // Usage overview + model call log. Both read raw task_usage under the same
+  // calendar-day cutoff, so the overview totals and the log summary agree.
+  // ---------------------------------------------------------------------------
+
+  async getUsageOverview(
+    params: { days?: number; project_id?: string | null; tz?: string },
+  ): Promise<UsageOverview> {
+    const search = new URLSearchParams();
+    if (params.days) search.set("days", String(params.days));
+    if (params.project_id) search.set("project_id", params.project_id);
+    if (params.tz) search.set("tz", params.tz);
+    const raw = await this.fetch<unknown>(`/api/dashboard/usage/overview?${search}`);
+    return parseWithFallback<UsageOverview>(
+      raw,
+      UsageOverviewSchema,
+      EMPTY_USAGE_OVERVIEW,
+      { endpoint: "GET /api/dashboard/usage/overview" },
+    );
+  }
+
+  async getUsageLogs(params: {
+    days?: number;
+    project_id?: string | null;
+    tz?: string;
+    status?: string;
+    provider?: string;
+    model?: string;
+    agent_id?: string;
+    q?: string;
+    page?: number;
+    page_size?: number;
+    sort?: UsageLogSortKey;
+    dir?: "asc" | "desc";
+  }): Promise<UsageLogPage> {
+    const search = new URLSearchParams();
+    if (params.days) search.set("days", String(params.days));
+    if (params.project_id) search.set("project_id", params.project_id);
+    if (params.tz) search.set("tz", params.tz);
+    if (params.status) search.set("status", params.status);
+    if (params.provider) search.set("provider", params.provider);
+    if (params.model) search.set("model", params.model);
+    if (params.agent_id) search.set("agent_id", params.agent_id);
+    if (params.q) search.set("q", params.q);
+    if (params.page) search.set("page", String(params.page));
+    if (params.page_size) search.set("page_size", String(params.page_size));
+    if (params.sort) search.set("sort", params.sort);
+    if (params.dir) search.set("dir", params.dir);
+    const raw = await this.fetch<unknown>(`/api/dashboard/usage/logs?${search}`);
+    return parseWithFallback<UsageLogPage>(
+      raw,
+      UsageLogPageSchema,
+      EMPTY_USAGE_LOG_PAGE,
+      { endpoint: "GET /api/dashboard/usage/logs" },
+    );
+  }
+
   async initiateUpdate(
     runtimeId: string,
     targetVersion: string,
@@ -2149,6 +2269,22 @@ export class ApiClient {
 
   async archiveAllInbox(): Promise<{ count: number }> {
     return this.fetch("/api/inbox/archive-all", { method: "POST" });
+  }
+
+  async deleteAllInbox(): Promise<{ count: number }> {
+    return this.fetch("/api/inbox/delete-all", { method: "POST" });
+  }
+
+  async deleteInboxItem(id: string): Promise<{ count: number }> {
+    return this.fetch(`/api/inbox/${id}/delete`, { method: "POST" });
+  }
+
+  async deleteReadInbox(): Promise<{ count: number }> {
+    return this.fetch("/api/inbox/delete-read", { method: "POST" });
+  }
+
+  async deleteArchivedInbox(): Promise<{ count: number }> {
+    return this.fetch("/api/inbox/delete-archived", { method: "POST" });
   }
 
   async archiveAllReadInbox(): Promise<{ count: number }> {
@@ -3023,13 +3159,13 @@ export class ApiClient {
     return response;
   }
 
-  async startMikaOnboarding(
+  async startQuillOnboarding(
     sessionId: string,
     data: {
       language: "en" | "zh" | "ko" | "ja";
     },
     workspaceSlug?: string,
-  ): Promise<StartMikaOnboardingResponse> {
+  ): Promise<StartQuillOnboardingResponse> {
     const raw = await this.fetch<unknown>(`/api/chat/sessions/${sessionId}/onboarding`, {
       method: "POST",
       headers: workspaceHeader(workspaceSlug),
@@ -3037,7 +3173,7 @@ export class ApiClient {
     });
     return parseWithFallback(
       raw,
-      StartMikaOnboardingResponseSchema,
+      StartQuillOnboardingResponseSchema,
       { started: false },
       { endpoint: "POST /api/chat/sessions/:id/onboarding" },
     );
@@ -3153,6 +3289,20 @@ export class ApiClient {
 
   async deleteAttachment(id: string): Promise<void> {
     await this.fetch(`/api/attachments/${id}`, { method: "DELETE" });
+  }
+
+  // Replaces the bytes of a text attachment (markdown / text / html). The id
+  // stays stable — handoff packages reference it — while the server re-uploads
+  // the object under a fresh key and swaps the row's url, so cached signed
+  // URLs can never serve the previous revision.
+  async updateAttachmentContent(id: string, content: string): Promise<Attachment> {
+    const raw = await this.fetch<unknown>(`/api/attachments/${id}/content`, {
+      method: "PUT",
+      body: JSON.stringify({ content }),
+    });
+    return parseWithFallback(raw, AttachmentResponseSchema, EMPTY_ATTACHMENT, {
+      endpoint: "PUT /api/attachments/{id}/content",
+    });
   }
 
   // Fetches the raw bytes of a text-previewable attachment.
@@ -3791,6 +3941,42 @@ export class ApiClient {
     return parsed.chains;
   }
 
+  /**
+   * The holder's own 通过 on the step waiting for review: the run is done and
+   * they say it is what they meant, which hands the baton to the next person.
+   * The server refuses anyone but the step's holder (403).
+   *
+   * `handoff` is the package the holder curated — the summary they wrote and
+   * the files they ticked. Optional: approving bare still moves the relay, it
+   * just publishes no package.
+   */
+  async approveIssueChainStep(
+    issueId: string,
+    handoff?: { summary: string; files: IssueChainHandoffFile[] },
+  ): Promise<IssueChain> {
+    const raw = await this.fetch<unknown>(`/api/issues/${issueId}/chain/approve`, {
+      method: "POST",
+      body: JSON.stringify(handoff ? { summary: handoff.summary, files: handoff.files } : {}),
+    });
+    return parseWithFallback(raw, IssueChainSchema, EMPTY_ISSUE_CHAIN_RESPONSE, {
+      endpoint: "POST /api/issues/:id/chain/approve",
+    }) as IssueChain;
+  }
+
+  /**
+   * Writes the caller's own brief onto the leg they hold. Refused for anyone
+   * else's leg (403) — the view is personal by construction.
+   */
+  async setIssueChainStepPlan(issueId: string, plan: string): Promise<IssueChain> {
+    const raw = await this.fetch<unknown>(`/api/issues/${issueId}/chain/plan`, {
+      method: "POST",
+      body: JSON.stringify({ plan }),
+    });
+    return parseWithFallback(raw, IssueChainSchema, EMPTY_ISSUE_CHAIN_RESPONSE, {
+      endpoint: "POST /api/issues/:id/chain/plan",
+    }) as IssueChain;
+  }
+
   /** Skips the parked step and returns the chain as it now stands. */
   async skipIssueChainStep(issueId: string): Promise<IssueChain> {
     const raw = await this.fetch<unknown>(`/api/issues/${issueId}/chain/skip`, {
@@ -3800,6 +3986,22 @@ export class ApiClient {
     return parseWithFallback(raw, IssueChainSchema, EMPTY_ISSUE_CHAIN_RESPONSE, {
       endpoint: "POST /api/issues/:id/chain/skip",
     }) as IssueChain;
+  }
+
+  /**
+   * Asks the leg's own agent to write this leg's output (产出 md): one run that
+   * summarizes the leg's conversation and results into the handoff document.
+   * The response names the queued run; the document itself arrives as the
+   * run's comment in the leg.
+   */
+  async generateChainLegOutput(issueId: string): Promise<ChainLegOutputResponse> {
+    const raw = await this.fetch<unknown>(`/api/issues/${issueId}/chain/output`, {
+      method: "POST",
+      body: JSON.stringify({}),
+    });
+    return parseWithFallback(raw, ChainLegOutputResponseSchema, EMPTY_CHAIN_LEG_OUTPUT, {
+      endpoint: "POST /api/issues/:id/chain/output",
+    });
   }
 
   async listSquadPlaybooks(squadId: string): Promise<SquadPlaybook[]> {

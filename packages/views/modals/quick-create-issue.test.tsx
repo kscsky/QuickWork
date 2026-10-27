@@ -77,6 +77,7 @@ const emptyIssueDraft = () => ({
     propertyValues: {} as Record<string, string | number | boolean | string[]>,
   },
   agent: {
+    title: "",
     prompt: "",
     actorType: undefined as "agent" | "squad" | undefined,
     actorId: undefined as string | undefined,
@@ -245,6 +246,7 @@ vi.mock("@quickwork/core/runtimes", () => ({
   checkQuickCreateCliVersion: () => ({ state: "ok", min: "1.0.0" }),
   checkQuickCreateFieldsCliVersion: () => ({ state: "ok", min: "1.0.0" }),
   readRuntimeCliVersion: () => "1.2.3",
+  runtimeDisplayLabel: () => "Claude Code",
   MIN_QUICK_CREATE_CLI_VERSION: "1.0.0",
 }));
 
@@ -503,7 +505,9 @@ describe("AgentCreatePanel", () => {
     mockCreateSettingsStore.quickCreateFields = ["project"];
     mockQuickCreateStore.keepOpen = false;
     mockIssueDraftStore.draft = emptyIssueDraft();
-    // The prompt now lives in the unified draft's agent slot.
+    // The headline names the dispatch; the prompt lives beside it in the
+    // unified draft's agent slot.
+    mockIssueDraftStore.draft.agent.title = "Persisted task";
     mockIssueDraftStore.draft.agent.prompt = "Persisted draft prompt";
     mockSetShared.mockImplementation((patch: Partial<typeof mockIssueDraftStore.draft.shared>) => {
       mockIssueDraftStore.draft.shared = { ...mockIssueDraftStore.draft.shared, ...patch };
@@ -574,7 +578,7 @@ describe("AgentCreatePanel", () => {
     if (!popoverRow) throw new Error("seat popover row missing");
     await user.click(popoverRow);
     await user.click(screen.getByTestId("project-picker"));
-    await user.click(screen.getByTestId("priority-picker"));
+    await user.click(screen.getByRole("button", { name: "High" }));
     await user.click(screen.getByTestId("due-date-picker"));
 
     expect(mockIssueDraftStore.draft.agent).toEqual(
@@ -593,7 +597,7 @@ describe("AgentCreatePanel", () => {
 
     expect(screen.getByRole("button", { name: /Bohan/ })).toHaveTextContent("Idle");
     expect(screen.getByTestId("project-picker")).toHaveTextContent("Project proj-1");
-    expect(screen.getByTestId("priority-picker")).toHaveTextContent("Priority high");
+    expect(screen.getByRole("button", { name: "High" })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByTestId("due-date-picker")).toHaveTextContent("Due date 2026-08-01");
   });
 
@@ -611,23 +615,45 @@ describe("AgentCreatePanel", () => {
     await user.type(editor, "New agent prompt");
     expect(mockSetAgent).toHaveBeenLastCalledWith({ prompt: "New agent prompt" });
 
-    await user.click(screen.getByRole("button", { name: /^Create$/i }));
+    await user.click(screen.getByRole("button", { name: /^Dispatch$/i }));
 
     await waitFor(() => {
       expect(mockQuickCreateIssue).toHaveBeenCalledWith({
         agent_id: "agent-1",
-        prompt: "New agent prompt",
+        prompt: "# Persisted task\n\nNew agent prompt",
         project_id: undefined,
       });
     });
 
     expect(mockSetLastActor).toHaveBeenCalledWith("agent", "agent-1");
-    // A successful create ends the whole unified draft.
+    // A successful create ends the whole unified draft, then the stamp plays
+    // before the dialog closes.
     expect(mockClearDraft).toHaveBeenCalled();
-    expect(onClose).toHaveBeenCalled();
+    await waitFor(() =>
+      expect(document.querySelector(".qk-create-paper")).toHaveClass("is-stamping"),
+    );
+    await waitFor(() => expect(onClose).toHaveBeenCalled(), { timeout: 1200 });
   });
 
-  it("shows the upgrade recovery immediately when quick create is rejected by the issue preflight", async () => {
+  it("names the missing action instead of dispatching a terse brief", async () => {
+    mockIssueDraftStore.draft.agent.title = "";
+    const onClose = vi.fn();
+    renderPanel({ onClose, isExpanded: false, setIsExpanded: vi.fn() });
+
+    const editor = screen.getByPlaceholderText(
+      'Tell the agent what to do, e.g. "let Bohan fix the inbox loading slowness in the Web project"',
+    );
+    fireEvent.keyDown(editor, { key: "Enter", metaKey: true });
+
+    await waitFor(() =>
+      expect(screen.getByRole("status")).toHaveTextContent(
+        "Give this dispatch note an action",
+      ),
+    );
+    expect(mockQuickCreateIssue).not.toHaveBeenCalled();
+  });
+
+  it("shows the server rejection in the paper when quick create is refused", async () => {
     const user = userEvent.setup();
     const onClose = vi.fn();
     mockQuickCreateIssue.mockRejectedValue(
@@ -639,25 +665,24 @@ describe("AgentCreatePanel", () => {
     );
 
     renderPanel({ onClose, isExpanded: false, setIsExpanded: vi.fn() });
-    await user.click(screen.getByRole("button", { name: /^Create$/i }));
+    await user.click(screen.getByRole("button", { name: /^Dispatch$/i }));
 
     await waitFor(() => {
-      expect(mockShowIssueLimitUpgradePrompt).toHaveBeenCalledTimes(1);
+      expect(screen.getByRole("status")).toHaveTextContent(/issue limit/i);
     });
     expect(mockToastSuccess).not.toHaveBeenCalled();
     expect(mockClearDraft).not.toHaveBeenCalled();
     expect(onClose).not.toHaveBeenCalled();
   });
 
-  it("reveals optional fields from the overflow and submits their values", async () => {
+  it("renders the optional fields inline and submits their values", async () => {
     const user = userEvent.setup();
 
     renderPanel({ onClose: vi.fn(), isExpanded: false, setIsExpanded: vi.fn() });
 
-    expect(screen.queryByTestId("priority-picker")).not.toBeInTheDocument();
-    await user.click(screen.getByText("Set priority..."));
-    await user.click(screen.getByTestId("priority-picker"));
-    await user.click(screen.getByRole("button", { name: /^Create$/i }));
+    expect(screen.getByRole("group", { name: "Priority" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "High" }));
+    await user.click(screen.getByRole("button", { name: /^Dispatch$/i }));
 
     await waitFor(() => {
       expect(mockQuickCreateIssue).toHaveBeenCalledWith(
@@ -686,13 +711,13 @@ describe("AgentCreatePanel", () => {
     expect(mockNavigationPush).toHaveBeenCalledWith("/ws-test/settings?tab=issue");
   });
 
-  it("respects fields enabled in Settings → Issue by rendering them inline", () => {
+  it("always shows the three detail fields in the dark panel", () => {
     mockCreateSettingsStore.quickCreateFields = ["project", "priority", "due_date"];
 
     renderPanel({ onClose: vi.fn(), isExpanded: false, setIsExpanded: vi.fn() });
 
     expect(screen.getByTestId("project-picker")).toBeInTheDocument();
-    expect(screen.getByTestId("priority-picker")).toBeInTheDocument();
+    expect(screen.getByRole("group", { name: "Priority" })).toBeInTheDocument();
     expect(screen.getByTestId("due-date-picker")).toBeInTheDocument();
   });
 
@@ -706,7 +731,7 @@ describe("AgentCreatePanel", () => {
       data: { priority: "urgent", due_date: "2026-08-01" },
     });
 
-    await user.click(screen.getByRole("button", { name: /^Create$/i }));
+    await user.click(screen.getByRole("button", { name: /^Dispatch$/i }));
 
     await waitFor(() => {
       expect(mockQuickCreateIssue).toHaveBeenCalledWith(
@@ -731,7 +756,7 @@ describe("AgentCreatePanel", () => {
       'Tell the agent what to do, e.g. "let Bohan fix the inbox loading slowness in the Web project"',
     );
     fireEvent.change(editor, { target: { value: "Draft A prompt" } });
-    fireEvent.click(screen.getByRole("button", { name: /^Create$/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^Dispatch$/i }));
     await waitFor(() => expect(mockQuickCreateIssue).toHaveBeenCalled());
 
     // Mid-flight edit replaces the singleton draft's object identity.
@@ -762,7 +787,7 @@ describe("AgentCreatePanel", () => {
       'Tell the agent what to do, e.g. "let Bohan fix the inbox loading slowness in the Web project"',
     );
     fireEvent.change(editor, { target: { value: "Draft A prompt" } });
-    fireEvent.click(screen.getByRole("button", { name: /^Create$/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^Dispatch$/i }));
     await waitFor(() => expect(mockQuickCreateIssue).toHaveBeenCalled());
 
     view.unmount();
@@ -790,7 +815,7 @@ describe("AgentCreatePanel", () => {
       'Tell the agent what to do, e.g. "let Bohan fix the inbox loading slowness in the Web project"',
     );
     fireEvent.change(editor, { target: { value: "Draft A prompt" } });
-    fireEvent.click(screen.getByRole("button", { name: /^Create$/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^Dispatch$/i }));
     await waitFor(() => expect(mockQuickCreateIssue).toHaveBeenCalled());
 
     view.unmount();
@@ -821,12 +846,12 @@ describe("AgentCreatePanel", () => {
       },
     });
 
-    await user.click(screen.getByRole("button", { name: /^Create$/i }));
+    await user.click(screen.getByRole("button", { name: /^Dispatch$/i }));
 
     await waitFor(() => {
       expect(mockQuickCreateIssue).toHaveBeenCalledWith({
         agent_id: "agent-1",
-        prompt: "Create issue with ![image](/api/attachments/019ec09d-6222-722b-bdfa-427b105d80be/download)",
+        prompt: "# Persisted task\n\nCreate issue with ![image](/api/attachments/019ec09d-6222-722b-bdfa-427b105d80be/download)",
         project_id: undefined,
         parent_issue_id: undefined,
         attachment_ids: ["019ec09d-6222-722b-bdfa-427b105d80be"],
@@ -867,7 +892,7 @@ describe("AgentCreatePanel", () => {
       ),
       "Ship it",
     );
-    await user.click(screen.getByRole("button", { name: /^Create$/i }));
+    await user.click(screen.getByRole("button", { name: /^Dispatch$/i }));
 
     await waitFor(() => {
       expect(mockQuickCreateIssue).toHaveBeenCalledWith(
@@ -912,7 +937,7 @@ describe("AgentCreatePanel", () => {
         ),
         "Ship it",
       );
-      await user.click(screen.getByRole("button", { name: /^Create$/i }));
+      await user.click(screen.getByRole("button", { name: /^Dispatch$/i }));
 
       await waitFor(() => {
         expect(mockQuickCreateIssue).toHaveBeenCalledWith(
@@ -944,34 +969,17 @@ describe("AgentCreatePanel", () => {
     expect(screen.getByTestId("project-picker")).toHaveTextContent("Project none");
   });
 
-  // Dropping a project used to cost two clicks — open the popover, hit
-  // "No project" — because the pill had no clear affordance of its own
-  // (MUL-5862). The × is part of the pill, so it only exists once the field
-  // has a value to drop.
-  describe("project pill quick-clear", () => {
-    it("has no × while no project is selected", () => {
-      renderPanel({ onClose: vi.fn(), isExpanded: false, setIsExpanded: vi.fn() });
+  // The refresh detail rows carry no separate × — clearing a project lives
+  // inside the project picker's own "No project" row.
+  it("has no separate project clear control", () => {
+    mockIssueDraftStore.draft.shared.projectId = "proj-1";
+    mockProjectsQuery.data = [{ id: "proj-1", title: "Web", icon: null }];
+    mockProjectsQuery.isSuccess = true;
 
-      expect(screen.getByTestId("project-picker")).toHaveTextContent("Project none");
-      expect(screen.queryByRole("button", { name: "Clear project" })).not.toBeInTheDocument();
-    });
+    renderPanel({ onClose: vi.fn(), isExpanded: false, setIsExpanded: vi.fn() });
 
-    it("clears local state and the shared draft in one click", async () => {
-      const user = userEvent.setup();
-      mockIssueDraftStore.draft.shared.projectId = "proj-1";
-      mockProjectsQuery.data = [{ id: "proj-1", title: "Web", icon: null }];
-      mockProjectsQuery.isSuccess = true;
-
-      renderPanel({ onClose: vi.fn(), isExpanded: false, setIsExpanded: vi.fn() });
-      expect(screen.getByTestId("project-picker")).toHaveTextContent("Project proj-1");
-
-      await user.click(screen.getByRole("button", { name: "Clear project" }));
-
-      expect(screen.getByTestId("project-picker")).toHaveTextContent("Project none");
-      expect(mockSetShared).toHaveBeenCalledWith({ projectId: undefined });
-      // The × retires with the value it cleared.
-      expect(screen.queryByRole("button", { name: "Clear project" })).not.toBeInTheDocument();
-    });
+    expect(screen.getByTestId("project-picker")).toHaveTextContent("Project proj-1");
+    expect(screen.queryByRole("button", { name: "Clear project" })).not.toBeInTheDocument();
   });
 
   // Mirror case: while the query is still loading, we must NOT preemptively
@@ -1017,12 +1025,12 @@ describe("AgentCreatePanel", () => {
     await user.clear(editor);
     await user.type(editor, "Investigate the regression");
 
-    await user.click(screen.getByRole("button", { name: /^Create$/i }));
+    await user.click(screen.getByRole("button", { name: /^Dispatch$/i }));
 
     await waitFor(() => {
       expect(mockQuickCreateIssue).toHaveBeenCalledWith({
         agent_id: "agent-1",
-        prompt: "Investigate the regression",
+        prompt: "# Persisted task\n\nInvestigate the regression",
         project_id: undefined,
         parent_issue_id: "parent-uuid-1",
       });
@@ -1038,7 +1046,7 @@ describe("AgentCreatePanel", () => {
     expect(screen.queryByTestId("agent-sub-issue-chip")).toBeNull();
   });
 
-  it("keeps captured context separate from the upstream prompt scroller", () => {
+  it("keeps captured context in its own paper section", () => {
     renderPanel({
       onClose: vi.fn(),
       isExpanded: false,
@@ -1046,20 +1054,16 @@ describe("AgentCreatePanel", () => {
       data: sourceContextPanelData,
     });
 
-    // The editor sits inside the 要什么 card; that card is the internal
-    // scroller, and the source-context card stays a sibling section below it.
-    const promptCard = screen.getByPlaceholderText(
+    const editor = screen.getByPlaceholderText(
       'Tell the agent what to do with this context, e.g. "continue investigating and fix the issue described here"',
-    ).parentElement;
+    );
+    const brief = editor.closest(".qk-brief-editor");
     const sourceContext = document.querySelector<HTMLElement>('[data-slot="source-context-preview"]');
 
-    expect(promptCard).toHaveClass("flex-1", "min-h-[132px]", "overflow-y-auto");
-    expect(sourceContext).toHaveClass("shrink-0");
-    // The card's section is the direct panel-root sibling of the context card.
-    const section = promptCard?.parentElement;
-    expect(section?.parentElement).toBe(sourceContext?.parentElement);
-    expect(section?.nextElementSibling).toBe(sourceContext);
-    expect(promptCard).not.toContainElement(sourceContext);
+    expect(brief).not.toBeNull();
+    expect(sourceContext).not.toBeNull();
+    expect(brief).not.toContainElement(sourceContext);
+    expect(sourceContext?.parentElement).toHaveClass("qk-source-card");
   });
 
   it("submits source-context agent create through the dedicated endpoint", async () => {
@@ -1080,7 +1084,7 @@ describe("AgentCreatePanel", () => {
     );
     await user.clear(editor);
     await user.type(editor, "Investigate with captured context");
-    await user.click(screen.getByRole("button", { name: /^Create$/i }));
+    await user.click(screen.getByRole("button", { name: /^Dispatch$/i }));
 
     await waitFor(() => expect(mockCreateCommentSubIssue).toHaveBeenCalledWith(
       "comment-source",
@@ -1089,7 +1093,7 @@ describe("AgentCreatePanel", () => {
         capture_token: "sha256:preview-token",
         quick_create: expect.objectContaining({
           agent_id: "agent-1",
-          prompt: "Investigate with captured context",
+          prompt: "# Persisted task\n\nInvestigate with captured context",
         }),
       },
     ));
@@ -1159,40 +1163,25 @@ describe("AgentCreatePanel", () => {
     });
   });
 
-  // MUL-6236 — the footer reflows to a 2x2 grid on phones. jsdom has no
-  // layout, so these pin the two structural preconditions the grid depends
-  // on rather than the rendered geometry.
-  describe("phone footer layout", () => {
+  describe("paper and panel footers", () => {
     beforeEach(() => {
       renderPanel({ onClose: vi.fn(), isExpanded: false, setIsExpanded: vi.fn() });
     });
 
-    it("keeps every footer control a direct child of the grid container", () => {
-      const create = screen.getByRole("button", { name: /^Create$/i });
+    it("keeps paper-owned controls in the paper and dispatch in the panel", () => {
+      const create = screen.getByRole("button", { name: /^Dispatch$/i });
       const keepOpen = screen.getByRole("checkbox");
       const attach = screen.getByRole("button", { name: "Upload file" });
 
-      // Mode switching lives in the header strip now; the footer's direct
-      // grid children are attach group / keep-open / Create.
-      const footer = create.parentElement;
-      expect(footer?.className).toContain("grid-cols-[auto_1fr]");
-      // From `sm` up the same children lay out as the original single row.
-      expect(footer?.className).toContain("sm:flex");
-
-      // Grid placement only sees direct children: re-wrapping any of these in
-      // a <div> collapses the 2x2 back to the jammed single row the bug
-      // report showed. The attach button keeps its own wrapper because it can
-      // gain a "N sent" badge — that wrapper is itself the first grid cell.
-      expect(keepOpen.parentElement?.parentElement).toBe(footer);
-      expect(attach.parentElement?.parentElement).toBe(footer);
+      expect(create.closest(".qk-panel-foot")).not.toBeNull();
+      expect(keepOpen.closest(".qk-paper-foot")).not.toBeNull();
+      expect(attach.closest(".qk-files")).not.toBeNull();
       expect(attach).toHaveAttribute("data-size", "sm");
     });
 
     it("hides the send keycaps below the sm breakpoint", () => {
       const keycaps = document.querySelector('[data-slot="shortcut-keycaps"]');
 
-      // Present for pointer devices, display:none on a touch phone that has
-      // no ⌘ key and the least room in the footer row.
       expect(keycaps).not.toBeNull();
       expect(keycaps?.className).toContain("max-sm:hidden");
     });

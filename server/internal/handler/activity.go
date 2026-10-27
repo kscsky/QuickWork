@@ -7,6 +7,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/kscsky/quickwork/server/internal/util"
 	db "github.com/kscsky/quickwork/server/pkg/db/generated"
 )
 
@@ -39,6 +40,9 @@ type TimelineEntry struct {
 	ResolvedByType *string              `json:"resolved_by_type,omitempty"`
 	ResolvedByID   *string              `json:"resolved_by_id,omitempty"`
 	SourceTaskID   *string              `json:"source_task_id,omitempty"`
+	// Present when this comment is leg-scoped (单流分界): the reader holds the
+	// leg (the list query filtered everyone else out), and the room tags it.
+	ChainStepID *string `json:"chain_step_id,omitempty"`
 }
 
 // timelineHardCap bounds the per-issue timeline payload. Sized as a defensive
@@ -144,10 +148,22 @@ func (h *Handler) ListTimeline(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx := r.Context()
 
+	// Leg-scoped comments (chain_step_id set) are only in the response when the
+	// viewer holds that leg; the query enforces it from this id.
+	viewerUserID, ok := requireUserID(w, r)
+	if !ok {
+		return
+	}
+	viewer, err := util.ParseUUID(viewerUserID)
+	if err != nil {
+		writeError(w, http.StatusUnauthorized, "user not authenticated")
+		return
+	}
 	comments, err := h.Queries.ListCommentsForIssue(ctx, db.ListCommentsForIssueParams{
 		IssueID:     issue.ID,
 		WorkspaceID: issue.WorkspaceID,
-		Limit:       timelineProbeLimit,
+		ViewerID:    viewer,
+		RowLimit:    timelineProbeLimit,
 	})
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to list comments")
@@ -296,6 +312,7 @@ func (h *Handler) commentsToEntries(r *http.Request, comments []db.Comment) []Ti
 			ResolvedByType: textToPtr(c.ResolvedByType),
 			ResolvedByID:   uuidToPtr(c.ResolvedByID),
 			SourceTaskID:   uuidToPtr(c.SourceTaskID),
+			ChainStepID:    uuidToPtr(c.ChainStepID),
 		}
 	}
 	return out

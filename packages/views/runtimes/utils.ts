@@ -257,11 +257,16 @@ const MODEL_PRICING: Record<
   //    `deepseek-v4-pro` is currently under a 75%-off promo that ends
   //    2026-05-31 15:59 UTC; we price at the post-promo standard rate
   //    ($1.74/$3.48) so the dashboard does not jump 4× on June 1 — accept
-  //    a brief over-estimate during the promo over a sudden cliff after it. --
-  "deepseek-v4-flash":  { input: 0.14, output: 0.28, cacheRead: 0.0028, cacheWrite: 0.14 },
-  "deepseek-v4-pro":    { input: 1.74, output: 3.48, cacheRead: 0.0145, cacheWrite: 1.74 },
-  "deepseek-chat":      { input: 0.14, output: 0.28, cacheRead: 0.0028, cacheWrite: 0.14 },
-  "deepseek-reasoner":  { input: 0.14, output: 0.28, cacheRead: 0.0028, cacheWrite: 0.14 },
+  //    a brief over-estimate during the promo over a sudden cliff after it.
+  //    `deepseek-v4.1-flash` is the minor-version id newer DeepSeek CLIs
+  //    report; it is the same Flash tier, so it shares the Flash rate rather
+  //    than falling into the unpriced bucket. The `[1m]` context tag is
+  //    stripped by the resolver before lookup. --
+  "deepseek-v4-flash":    { input: 0.14, output: 0.28, cacheRead: 0.0028, cacheWrite: 0.14 },
+  "deepseek-v4.1-flash":  { input: 0.14, output: 0.28, cacheRead: 0.0028, cacheWrite: 0.14 },
+  "deepseek-v4-pro":      { input: 1.74, output: 3.48, cacheRead: 0.0145, cacheWrite: 1.74 },
+  "deepseek-chat":        { input: 0.14, output: 0.28, cacheRead: 0.0028, cacheWrite: 0.14 },
+  "deepseek-reasoner":    { input: 0.14, output: 0.28, cacheRead: 0.0028, cacheWrite: 0.14 },
 
   // -- Moonshot Kimi (kimi.com/resources/kimi-k2-6-pricing).
   //    Only K2.6 is on the official price sheet today; earlier K2 variants

@@ -210,3 +210,44 @@ func TestArchiveCompletedInboxExpandsCustomTerminalStatuses(t *testing.T) {
 		t.Fatalf("archived rows for open issue = %d, want 0", got)
 	}
 }
+
+func TestDeleteAllInboxRemovesActiveAndArchivedRows(t *testing.T) {
+	workspaceID := dbfx.Workspace(t, "Delete all inbox", "delete-all-inbox-"+uuid.NewString())
+	dbfx.Member(t, workspaceID, testUserID, "owner")
+	otherWorkspaceID := dbfx.Workspace(t, "Delete all inbox other", "delete-all-inbox-other-"+uuid.NewString())
+	dbfx.Member(t, otherWorkspaceID, testUserID, "owner")
+
+	insert := func(workspaceID string, recipientID string, archived bool) {
+		t.Helper()
+		dbfx.Insert(t, "inbox_item", testutil.Cols{
+			"workspace_id":   workspaceID,
+			"recipient_type": "member",
+			"recipient_id":   recipientID,
+			"type":           "status_changed",
+			"severity":       "info",
+			"title":          "Notification",
+			"archived":       archived,
+		})
+	}
+	insert(workspaceID, testUserID, false)
+	insert(workspaceID, testUserID, true)
+	insert(workspaceID, uuid.NewString(), false)
+	insert(otherWorkspaceID, testUserID, false)
+
+	testutil.Call(t, inboxWorkspaceHandler(testHandler.DeleteAllInbox),
+		inboxRequest(http.MethodPost, "/api/inbox/delete-all", workspaceID)).
+		Want(http.StatusOK)
+
+	if got := dbfx.Count(t,
+		"SELECT count(*) FROM inbox_item WHERE workspace_id = $1 AND recipient_id = $2", workspaceID, testUserID); got != 0 {
+		t.Fatalf("rows left for recipient = %d, want 0 (active and archived must both be deleted)", got)
+	}
+	if got := dbfx.Count(t,
+		"SELECT count(*) FROM inbox_item WHERE workspace_id = $1 AND recipient_id <> $2", workspaceID, testUserID); got != 1 {
+		t.Fatalf("other recipient's rows = %d, want 1 untouched", got)
+	}
+	if got := dbfx.Count(t,
+		"SELECT count(*) FROM inbox_item WHERE workspace_id = $1", otherWorkspaceID); got != 1 {
+		t.Fatalf("other workspace rows = %d, want 1 untouched", got)
+	}
+}

@@ -6,12 +6,21 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   useTransition,
 } from "react";
 import type { NavigationAdapter } from "./types";
 
 const NavigationContext = createContext<NavigationAdapter | null>(null);
+
+/** The adapter's write actions, stable across route changes. */
+export interface NavigationActions {
+  push: NavigationAdapter["push"];
+  replace: NavigationAdapter["replace"];
+}
+
+const NavigationActionsContext = createContext<NavigationActions | null>(null);
 const NavigationPendingContext = createContext<boolean>(false);
 
 /** `+1` while a reported swap is in flight, `-1` when it settles. */
@@ -50,17 +59,44 @@ export function NavigationProvider({
     }),
     [value],
   );
+  // Consumers that only navigate (the sidebar, the workspace switcher) must not
+  // re-render on every pathname change. This identity is stable; the ref keeps
+  // the callbacks pointed at the latest adapter without subscribing to it.
+  const actionsRef = useRef(wrapped);
+  actionsRef.current = wrapped;
+  const actions = useMemo<NavigationActions>(
+    () => ({
+      push: (path) => actionsRef.current.push(path),
+      replace: (path) => actionsRef.current.replace(path),
+    }),
+    [],
+  );
   return (
     <NavigationContext.Provider value={wrapped}>
-      <NavigationPendingReportContext.Provider value={report}>
-        <NavigationPendingContext.Provider
-          value={isPending || reportedPending > 0}
-        >
-          {children}
-        </NavigationPendingContext.Provider>
-      </NavigationPendingReportContext.Provider>
+      <NavigationActionsContext.Provider value={actions}>
+        <NavigationPendingReportContext.Provider value={report}>
+          <NavigationPendingContext.Provider
+            value={isPending || reportedPending > 0}
+          >
+            {children}
+          </NavigationPendingContext.Provider>
+        </NavigationPendingReportContext.Provider>
+      </NavigationActionsContext.Provider>
     </NavigationContext.Provider>
   );
+}
+
+/**
+ * Stable navigation actions for components that write routes but do not read
+ * the current location. `useNavigation()` returns a new adapter whenever the
+ * pathname changes; depending on it through the whole shell re-rendered every
+ * sidebar row on each click.
+ */
+export function useNavigationActions(): NavigationActions {
+  const ctx = use(NavigationActionsContext);
+  if (!ctx)
+    throw new Error("useNavigationActions must be used within NavigationProvider");
+  return ctx;
 }
 
 /**

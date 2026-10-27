@@ -1,5 +1,5 @@
 {
-  "title": "Analytics",
+  "title": "Usage",
   "tab_usage": "Usage",
   "header": {
     "timezone_and_updated": "{{tz}} · updated {{time}}",
@@ -104,5 +104,200 @@
   },
   "duration": {
     "less_than_minute": "<1m"
+  },
+  "subtitle": "Model, agent, and project breakdown of token spend and cost.",
+  "tabs": {
+    "overview": "Overview",
+    "logs": "Call log"
+  },
+  "range": {
+    "label": "Time range",
+    "days": "{{days}}D"
+  },
+  "overview": {
+    "empty_title": "No usage in this window",
+    "empty_body": "Try a different time range or project.",
+    "error_title": "Usage could not be loaded",
+    "error_body": "Try again in a moment.",
+    "error_retry": "Retry",
+    "hero": {
+      "label": "Total cost · {{range}}",
+      "vs_previous": "vs previous",
+      "daily_avg": "{{value}}/day",
+      "last7": "Last 7 days {{value}}/day"
+    },
+    "kpi": {
+      "calls": "Model calls",
+      "calls_hint": "{{success}} succeeded · {{failed}} failed · {{cancelled}} cancelled",
+      "tokens": "Tokens",
+      "tokens_hint": "Input {{input}} · Output {{output}} · Cache {{cache}}",
+      "cache": "Cache hit rate",
+      "cache_hint": "≈ {{saved}} saved · {{delta}}pp vs previous",
+      "avg_cost": "Average cost",
+      "avg_cost_hint": "Across {{models}} models · {{agents}} agents",
+      "cache_hint_plain": "≈ {{saved}} saved"
+    },
+    "trend": {
+      "title_cost": "Cost trend",
+      "title_tokens": "Token trend",
+      "title_calls": "Call trend",
+      "subtitle": "Stacked by model · {{range}}",
+      "total_label": "Total",
+      "total_value": "Total {{value}}",
+      "average": "avg {{value}}",
+      "metric_label": "Metric",
+      "metric_cost": "Cost",
+      "metric_tokens": "Token",
+      "metric_calls": "Calls",
+      "other": "Other"
+    },
+    "models": {
+      "title": "Model share",
+      "subtitle": "{{range}} · by cost",
+      "total_label": "Total cost",
+      "footer": "{{count}} models. Provider-reported cost is used when available; missing costs are estimated from the current rate table.",
+      "detail_title": "Models",
+      "detail_subtitle": "{{range}} by model; select a row to open its call log",
+      "view_logs": "View all logs",
+      "col_model": "Model",
+      "col_calls": "Calls",
+      "col_input": "Input",
+      "col_output": "Output",
+      "col_cache_read": "Cache read",
+      "col_cache_write": "Cache write",
+      "col_hit": "Hit rate",
+      "col_avg": "Avg",
+      "col_cost": "Cost",
+      "col_share": "Share",
+      "row_action": "View {{model}} call log",
+      "footnote": "Cost prefers the provider-reported amount; when absent it is estimated from the current rate table (≈). Hit rate = cache reads ÷ (cache reads + input). Components are rounded; the total is authoritative.",
+      "subtitle_tokens": "{{range}} · by token",
+      "total_label_tokens": "Total tokens"
+    },
+    "agents": {
+      "title": "Agent spend",
+      "subtitle": "{{range}} · by cost",
+      "row_hint": "{{calls}} calls · {{rate}} failure rate",
+      "footnote": "Failure rate = failed calls ÷ all calls; cancellations are not failures.",
+      "restricted": "Restricted agent",
+      "deleted": "Deleted agent"
+    },
+    "composition": {
+      "title": "Cost composition",
+      "subtitle": "{{range}} · by token type",
+      "input": "Input tokens",
+      "output": "Output tokens",
+      "cache_read": "Cache reads",
+      "cache_write": "Cache writes",
+      "saved_label": "Cache reads · equivalent savings",
+      "saved_hint": "At input pricing · hit rate {{rate}}",
+      "saved_hint_delta": "At input pricing · hit rate {{rate}} ({{delta}}pp vs previous)"
+    },
+    "unpriced_title": "Some models have no rate",
+    "unpriced_body": "Cost excludes {{models}}. Add a rate on the runtimes page to include them."
+  },
+  "logs": {
+    "title": "Model call log",
+    "subtitle": "One row per task × model. Same source as the overview: {{range}} · {{project}}.",
+    "export": "Export CSV",
+    "summary": {
+      "calls": "Calls",
+      "calls_hint": "{{success}} succeeded · {{failed}} failed · {{cancelled}} cancelled",
+      "cost": "Total cost",
+      "cost_hint": "For the current filters and range",
+      "avg": "Average cost",
+      "avg_hint": "Per model call",
+      "fail_rate": "Failure rate",
+      "fail_hint": "{{failed}} failed"
+    },
+    "search_placeholder": "Search tasks, models, or task ID",
+    "status": {
+      "all": "All",
+      "success": "Succeeded",
+      "failed": "Failed",
+      "cancelled": "Cancelled",
+      "running": "Running",
+      "unknown": "Unknown"
+    },
+    "filters": {
+      "all_models": "All models",
+      "all_agents": "All agents",
+      "reset": "Reset",
+      "model_label": "Model filter",
+      "agent_label": "Agent filter"
+    },
+    "table": {
+      "time": "Time",
+      "status": "Status",
+      "agent": "Agent",
+      "issue": "Task",
+      "model": "Model / provider",
+      "input": "Input",
+      "output": "Output",
+      "cache": "Cache read / write",
+      "duration": "Duration",
+      "cost": "Cost",
+      "trigger": "Trigger"
+    },
+    "trigger": {
+      "comment": "Comment",
+      "autopilot": "Autopilot",
+      "direct": "Automatic",
+      "retry": "Retry",
+      "rerun": "Re-run",
+      "chat": "Chat",
+      "quick_create": "Quick create",
+      "other": "Other"
+    },
+    "no_issue": "No linked task",
+    "restricted_agent": "Restricted agent",
+    "unknown_agent": "Unknown agent",
+    "detail": {
+      "tokens": "Token composition",
+      "input": "Input",
+      "output": "Output",
+      "cache_read": "Cache read",
+      "cache_write": "Cache write",
+      "task_id": "task ID",
+      "started": "Started",
+      "completed": "Ended",
+      "agent_project": "Agent / project",
+      "trigger": "Triggered by",
+      "failure": "Failure",
+      "cost": "Cost breakdown",
+      "reported": "Provider-reported",
+      "estimated": "Estimated",
+      "pending": "Pending",
+      "total": "Total",
+      "view_run": "Open the task →",
+      "no_usage": "This failed run reported no usage.",
+      "running_usage": "Running — usage arrives when the run ends.",
+      "unpriced": "No rate for this model; its cost is not included."
+    },
+    "pagination": {
+      "showing": "Showing {{from}}–{{to}} of {{total}}",
+      "per_page": "{{count}}/page",
+      "per_page_label": "Rows per page",
+      "prev": "Previous page",
+      "next": "Next page"
+    },
+    "empty_title": "No matching calls",
+    "empty_body": "Adjust the filters or widen the time range.",
+    "empty_reset": "Reset filters",
+    "error_title": "The call log could not be loaded",
+    "error_body": "Try again in a moment.",
+    "error_retry": "Retry",
+    "note": "One row is one task's usage of one model; model fallback or retries can produce more than one row for a task. Cost prefers the provider-reported amount and is marked ≈ when estimated from the current rate table. Time is the usage report time in {{tz}}. Pagination only affects the table; the summary always covers every filtered row.",
+    "export_empty": "There are no calls to export under the current filters.",
+    "export_failed": "Export failed. Try again in a moment.",
+    "export_success": "Exported {{count}} calls.",
+    "export_too_large": "More than {{limit}} calls match. Narrow the filters before exporting."
+  },
+  "console": {
+    "days_near": "Past {{days}} days",
+    "calls_unit": "calls",
+    "tokens_unit": "tokens",
+    "top5": "TOP 5",
+    "chart_title": "Daily spend"
   }
 }

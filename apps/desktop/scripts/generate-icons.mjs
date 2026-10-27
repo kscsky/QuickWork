@@ -6,12 +6,11 @@
 //
 //   node scripts/generate-icons.mjs
 //
-// The mark is this product's own unit — a machine seat with its status lamp,
-// in the blueprint palette (navy ink #1f344c = --primary, brand blue
-// #1c63b0 = --brand, in-flight amber #c96a00 = --inflight; the same hexes
-// resolve from tokens.css). Rendering goes through the Playwright browser
-// already installed for e2e, at each target size directly so every icon is
-// native-resolution rather than a downscale of one bitmap.
+// The mark is Retro Neko: a black cat with cat-eye green eyes, a red collar
+// and the QuickWork star tag on a teal late-90s sunset. It is drawn here as
+// SVG so every target size is rendered natively (not downscaled) through the
+// Playwright browser already installed for e2e. The maskable variant is
+// full-bleed and scales the cat into Android's safe zone.
 
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
@@ -22,42 +21,78 @@ const here = dirname(fileURLToPath(import.meta.url));
 const desktopRoot = resolve(here, "..");
 const repoRoot = resolve(desktopRoot, "..", "..");
 
-const INK = "#1f344c";
-const BRAND = "#1c63b0";
-const LAMP = "#c96a00";
-
-/** The mark: navy tile, machine-hue band, the white seat, its lamp. */
+/** The mark: late-90s teal sunset, black cat, green eyes, red collar, star tag. */
 function markSvg({ rounded = true, bleed = false } = {}) {
-  const radius = rounded ? 22 : 0;
-  // Maskable/favicon variants need the seat inside the safe zone: scale it
-  // toward the centre instead of touching the tile edges.
-  const seat = bleed
-    ? { x: 26, y: 32, w: 48, h: 41, r: 6 }
-    : { x: 24, y: 32, w: 52, h: 44, r: 7 };
-  // The lamp half-overlaps the seat's corner (like the avatar presence dot).
-  // Sizing it to 24/100 is what keeps it legible at 16 px — the whole point
-  // of the mark is "a seat with its status lamp", so the lamp must survive
-  // the taskbar size.
-  const lampCx = seat.x + seat.w - (bleed ? 11 : 12);
-  const lampCy = seat.y + seat.h + (bleed ? 3 : 4);
-  const lampSize = bleed ? 22 : 24;
-  const ringSize = lampSize + 6;
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  const radius = rounded ? 112 : 0;
+  // Maskable icons get a full-bleed background and the cat scaled into the
+  // central safe zone so Android's launcher crop cannot clip its ears/star.
+  const scale = bleed ? 0.82 : 1;
+  const innerStroke = rounded
+    ? `<rect x="3" y="3" width="506" height="506" rx="110" fill="none" stroke="#fff" stroke-opacity="0.12" stroke-width="2"/>`
+    : "";
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
   <defs>
-    <linearGradient id="band" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0" stop-color="${BRAND}"/>
-      <stop offset="0.62" stop-color="${BRAND}" stop-opacity="0.25"/>
-      <stop offset="1" stop-color="${BRAND}" stop-opacity="0"/>
+    <clipPath id="tile"><rect width="512" height="512" rx="${radius}"/></clipPath>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0f9c93"/>
+      <stop offset="0.6" stop-color="#0b6f78"/>
+      <stop offset="1" stop-color="#123448"/>
     </linearGradient>
-    <clipPath id="tile"><rect width="100" height="100" rx="${radius}"/></clipPath>
+    <linearGradient id="sun" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffd36b"/>
+      <stop offset="0.5" stop-color="#ff8a5c"/>
+      <stop offset="1" stop-color="#ff4d8d"/>
+    </linearGradient>
+    <linearGradient id="cat" x1="0" y1="0" x2="0.6" y2="1">
+      <stop offset="0" stop-color="#20232e"/>
+      <stop offset="1" stop-color="#0c0e15"/>
+    </linearGradient>
+    <clipPath id="sunclip"><circle cx="256" cy="250" r="150"/></clipPath>
   </defs>
   <g clip-path="url(#tile)">
-    <rect width="100" height="100" fill="${INK}"/>
-    <rect width="100" height="9" fill="url(#band)"/>
-    <rect x="${seat.x}" y="${seat.y}" width="${seat.w}" height="${seat.h}" rx="${seat.r}" fill="#ffffff"/>
-    <rect x="${lampCx - ringSize / 2}" y="${lampCy - ringSize / 2}" width="${ringSize}" height="${ringSize}" rx="${ringSize / 3}" fill="${INK}"/>
-    <rect x="${lampCx - lampSize / 2}" y="${lampCy - lampSize / 2}" width="${lampSize}" height="${lampSize}" rx="${lampSize / 4}" fill="${LAMP}"/>
+    <rect width="512" height="512" fill="url(#bg)"/>
+    <circle cx="256" cy="250" r="150" fill="url(#sun)"/>
+    <g clip-path="url(#sunclip)" fill="#0b6f78">
+      <rect x="90" y="220" width="332" height="10"/>
+      <rect x="90" y="248" width="332" height="14"/>
+      <rect x="90" y="282" width="332" height="18"/>
+      <rect x="90" y="320" width="332" height="22"/>
+      <rect x="90" y="362" width="332" height="26"/>
+    </g>
+    <circle cx="256" cy="250" r="150" fill="none" stroke="#ffd36b" stroke-width="6" opacity="0.65"/>
+
+    <g transform="translate(256 256) scale(${scale}) translate(-256 -256)">
+      <path d="M72 126 C120 84 184 74 226 94 C176 104 136 144 128 196 C104 184 84 158 72 126 Z" fill="#ffe9b8" opacity="0.85"/>
+      <path d="M118 294 L142 138 L222 196 C244 186 268 186 290 196 L370 138 L394 294 C404 374 342 424 256 424 C170 424 108 374 118 294 Z" fill="url(#cat)" stroke="#05070c" stroke-width="10" stroke-linejoin="round"/>
+      <path d="M142 138 L156 222 L204 194 Z" fill="#ff8a95"/>
+      <path d="M370 138 L356 222 L308 194 Z" fill="#ff8a95"/>
+      <path d="M150 258 C190 226 222 224 250 252 C220 284 182 284 150 258 Z" fill="#b9ff6b"/>
+      <path d="M362 258 C322 226 290 224 262 252 C292 284 330 284 362 258 Z" fill="#b9ff6b"/>
+      <path d="M176 258 C196 242 216 242 230 256 C214 270 192 270 176 258 Z" fill="#0c0e15"/>
+      <path d="M336 258 C316 242 296 242 282 256 C298 270 320 270 336 258 Z" fill="#0c0e15"/>
+      <circle cx="190" cy="248" r="7" fill="#fff"/>
+      <circle cx="322" cy="248" r="7" fill="#fff"/>
+      <path d="M246 300 L256 310 L266 300 Z" fill="#ff8a95"/>
+      <path d="M256 310 L256 324" stroke="#ff8a95" stroke-width="4" stroke-linecap="round"/>
+      <path d="M232 324 Q244 338 256 324 Q268 338 280 324" fill="none" stroke="#ff8a95" stroke-width="5" stroke-linecap="round"/>
+      <g stroke="#d8d2c4" stroke-width="5" stroke-linecap="round" opacity="0.8">
+        <path d="M112 300 L58 286"/><path d="M110 320 L54 326"/>
+        <path d="M400 300 L454 286"/><path d="M402 320 L458 326"/>
+      </g>
+      <path d="M150 384 C198 406 314 406 362 384 L374 420 C316 448 196 448 138 420 Z" fill="#e23b4a" stroke="#05070c" stroke-width="8"/>
+      <g transform="translate(256 424) scale(0.3)">
+        <path d="M0 -100 L22 -36 L90 -90 L36 -22 L100 0 L36 22 L90 90 L22 36 L0 100 L-22 36 L-90 90 L-36 22 L-100 0 L-36 -22 L-90 -90 L-22 -36 Z" fill="#ffd36b" stroke="#05070c" stroke-width="14"/>
+      </g>
+    </g>
+
+    <g stroke="#ffffff" stroke-opacity="0.05" stroke-width="2">
+      <path d="M0 40 H512"/><path d="M0 72 H512"/><path d="M0 104 H512"/>
+      <path d="M0 440 H512"/><path d="M0 472 H512"/>
+    </g>
+    <rect x="0" y="0" width="512" height="18" fill="#06222b" opacity="0.45"/>
+    <rect x="0" y="494" width="512" height="18" fill="#06222b" opacity="0.45"/>
   </g>
+  ${innerStroke}
 </svg>`;
 }
 

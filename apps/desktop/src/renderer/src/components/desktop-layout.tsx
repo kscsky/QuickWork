@@ -1,6 +1,5 @@
 import { useEffect, useRef, useSyncExternalStore } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { motion } from "motion/react";
 import { useQuery } from "@tanstack/react-query";
 import { cn } from "@quickwork/ui/lib/utils";
 import {
@@ -15,6 +14,7 @@ import {
 import { ModalRegistry } from "@quickwork/views/modals/registry";
 import {
   AppSidebar,
+  CanvasBackdrop,
   GlobalShortcuts,
   NavigationProgress,
 } from "@quickwork/views/layout";
@@ -37,13 +37,6 @@ import { WindowOverlay } from "./window-overlay";
 
 const TOP_BAR_HEIGHT_CLASS = "h-12";
 const WINDOW_TOOLBAR_CLEARANCE = 184;
-const toolbarMotion = {
-  type: "spring",
-  stiffness: 420,
-  damping: 38,
-  mass: 0.8,
-} as const;
-
 function WindowToolbar() {
   const { canGoBack, canGoForward, goBack, goForward } = useTabHistory();
   const navButtonClassName =
@@ -121,24 +114,25 @@ function MainTopBar() {
   const sidebarHidden = state === "collapsed" || isCompact;
 
   return (
-    <motion.header
-      animate={{ paddingLeft: sidebarHidden ? WINDOW_TOOLBAR_CLEARANCE : 0 }}
-      className={cn("relative shrink-0 flex items-center gap-2", TOP_BAR_HEIGHT_CLASS)}
-      initial={false}
-      transition={toolbarMotion}
+    <header
+      className={cn(
+        "relative shrink-0 flex items-center gap-2 transition-[padding-left] duration-200 ease-out motion-reduce:transition-none",
+        TOP_BAR_HEIGHT_CLASS,
+      )}
+      style={{ paddingLeft: sidebarHidden ? WINDOW_TOOLBAR_CLEARANCE : 0 }}
     >
-      <motion.div
+      <div
         aria-hidden
-        animate={{ left: sidebarHidden ? WINDOW_TOOLBAR_CLEARANCE : 0 }}
-        className="absolute inset-y-0 right-0"
-        initial={false}
-        transition={toolbarMotion}
-        style={{ WebkitAppRegion: "drag" } as React.CSSProperties}
+        className="absolute inset-y-0 right-0 transition-[left] duration-200 ease-out motion-reduce:transition-none"
+        style={{
+          left: sidebarHidden ? WINDOW_TOOLBAR_CLEARANCE : 0,
+          WebkitAppRegion: "drag",
+        } as React.CSSProperties}
       />
       <div className="relative z-10 flex h-full min-w-0 max-w-full items-center">
         <TabBar />
       </div>
-    </motion.header>
+    </header>
   );
 }
 
@@ -150,14 +144,13 @@ function MainCanvas({ children }: { children: React.ReactNode }) {
   const sidebarHidden = state === "collapsed" || isCompact;
 
   return (
-    <motion.div
-      animate={{ marginLeft: sidebarHidden ? 8 : 2 }}
-      className="relative flex flex-1 min-h-0 flex-col overflow-hidden mr-2 mb-2 rounded-xl bg-page-canvas ring-1 ring-surface-border shadow-[var(--surface-shadow)]"
-      initial={false}
-      transition={toolbarMotion}
+    <div
+      className="relative flex flex-1 min-h-0 flex-col overflow-hidden mr-2 mb-2 rounded-xl bg-page-canvas ring-1 ring-surface-border shadow-[var(--surface-shadow)] transition-[margin-left] duration-200 ease-out motion-reduce:transition-none"
+      style={{ marginLeft: sidebarHidden ? 8 : 2 }}
     >
-      {children}
-    </motion.div>
+      <CanvasBackdrop />
+      <div className="relative z-[1] flex min-h-0 flex-1 flex-col">{children}</div>
+    </div>
   );
 }
 

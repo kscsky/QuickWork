@@ -16,11 +16,23 @@
 -- The cap is still purely defensive here — issue p99 is ~30 comments and the max
 -- ever observed in prod is ~1.1k — but "defensive" is not a reason to drop the
 -- newest rows when it does fire (MUL-5492).
+-- Leg-scoped comments (chain_step_id set) read back only for the leg's own
+-- holder; everyone else sees a locked placeholder instead. NULL is the room.
 SELECT * FROM (
-    SELECT * FROM comment
-    WHERE issue_id = $1 AND workspace_id = $2
-    ORDER BY created_at DESC, id DESC
-    LIMIT $3
+    SELECT * FROM comment c
+    WHERE c.issue_id = sqlc.arg(issue_id)
+      AND c.workspace_id = sqlc.arg(workspace_id)
+      AND (
+        c.chain_step_id IS NULL
+        OR EXISTS (
+          SELECT 1 FROM issue_chain_step s
+          WHERE s.id = c.chain_step_id
+            AND s.issue_id = c.issue_id
+            AND s.holder_user_id = sqlc.arg(viewer_id)::uuid
+        )
+      )
+    ORDER BY c.created_at DESC, c.id DESC
+    LIMIT sqlc.arg(row_limit)
 ) AS recent
 ORDER BY created_at ASC, id ASC;
 
@@ -61,10 +73,23 @@ LIMIT @row_limit;
 -- name: ListCommentsSinceForIssue :many
 -- Comments created strictly after $3 in chronological order, capped at $4.
 -- Powers the CLI's `--since` agent-polling flow.
-SELECT * FROM comment
-WHERE issue_id = $1 AND workspace_id = $2 AND created_at > $3
-ORDER BY created_at ASC, id ASC
-LIMIT $4;
+-- Same leg boundary as ListCommentsForIssue: this powers the CLI's --since
+-- polling, which authenticates as a person and must see what that person may.
+SELECT * FROM comment c
+WHERE c.issue_id = sqlc.arg(issue_id)
+  AND c.workspace_id = sqlc.arg(workspace_id)
+  AND c.created_at > sqlc.arg(since)
+  AND (
+    c.chain_step_id IS NULL
+    OR EXISTS (
+      SELECT 1 FROM issue_chain_step s
+      WHERE s.id = c.chain_step_id
+        AND s.issue_id = c.issue_id
+        AND s.holder_user_id = sqlc.arg(viewer_id)::uuid
+    )
+  )
+ORDER BY c.created_at ASC, c.id ASC
+LIMIT sqlc.arg(row_limit);
 
 -- name: ListRootCommentsForIssue :many
 -- Top-level comments only, in issue chronological order, each annotated with
@@ -85,6 +110,15 @@ WITH RECURSIVE selected_roots AS (
     WHERE c.issue_id = @issue_id
       AND c.workspace_id = @workspace_id
       AND c.parent_id IS NULL
+      AND (
+        c.chain_step_id IS NULL
+        OR EXISTS (
+          SELECT 1 FROM issue_chain_step s
+          WHERE s.id = c.chain_step_id
+            AND s.issue_id = c.issue_id
+            AND s.holder_user_id = @viewer_id::uuid
+        )
+      )
     ORDER BY c.created_at DESC, c.id DESC
     LIMIT @row_limit
 ),
@@ -131,6 +165,15 @@ WITH RECURSIVE selected_roots AS (
       AND c.workspace_id = @workspace_id
       AND c.parent_id IS NULL
       AND c.created_at > @since
+      AND (
+        c.chain_step_id IS NULL
+        OR EXISTS (
+          SELECT 1 FROM issue_chain_step s
+          WHERE s.id = c.chain_step_id
+            AND s.issue_id = c.issue_id
+            AND s.holder_user_id = @viewer_id::uuid
+        )
+      )
     ORDER BY c.created_at ASC, c.id ASC
     LIMIT @row_limit
 ),
@@ -445,8 +488,8 @@ WITH touched_issue AS (
     WHERE issue.id = sqlc.arg(issue_id) AND issue.workspace_id = sqlc.arg(workspace_id)
     RETURNING issue.id, issue.workspace_id, issue.revision
 ), inserted_comment AS (
-    INSERT INTO comment (issue_id, workspace_id, author_type, author_id, content, type, parent_id, source_task_id, quick_action_id, via_plugin_id, id)
-    SELECT ti.id, ti.workspace_id, sqlc.arg(author_type), sqlc.arg(author_id), sqlc.arg(content), sqlc.arg(type), sqlc.narg(parent_id), sqlc.narg(source_task_id), sqlc.narg(quick_action_id), sqlc.narg(via_plugin_id), COALESCE(sqlc.narg('id')::uuid, gen_random_uuid())
+    INSERT INTO comment (issue_id, workspace_id, author_type, author_id, content, type, parent_id, source_task_id, quick_action_id, via_plugin_id, chain_step_id, id)
+    SELECT ti.id, ti.workspace_id, sqlc.arg(author_type), sqlc.arg(author_id), sqlc.arg(content), sqlc.arg(type), sqlc.narg(parent_id), sqlc.narg(source_task_id), sqlc.narg(quick_action_id), sqlc.narg(via_plugin_id), sqlc.narg(chain_step_id), COALESCE(sqlc.narg('id')::uuid, gen_random_uuid())
     FROM touched_issue ti
     RETURNING *
 )
@@ -527,6 +570,7 @@ WITH locked_issue AS MATERIALIZED (
               comment.parent_id, comment.workspace_id, comment.resolved_at,
               comment.resolved_by_type, comment.resolved_by_id, comment.source_task_id,
               comment.quick_action_id, comment.via_plugin_id, comment.revision,
+              comment.chain_step_id, comment.recovery_settled_at,
               target.did_change
 ), touched_issue AS (
     UPDATE issue
@@ -545,6 +589,7 @@ SELECT updated_comment.id, updated_comment.issue_id, updated_comment.author_type
        updated_comment.resolved_by_type, updated_comment.resolved_by_id,
        updated_comment.source_task_id, updated_comment.quick_action_id,
        updated_comment.via_plugin_id, updated_comment.revision,
+       updated_comment.chain_step_id, updated_comment.recovery_settled_at,
        COALESCE((SELECT revision FROM touched_issue), 0)::bigint AS issue_revision
 FROM updated_comment;
 

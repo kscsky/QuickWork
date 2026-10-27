@@ -39,7 +39,7 @@ export function useStatusOptions(
   wsId: string,
   includeArchivedKeys: readonly IssueStatus[] = NO_ARCHIVED_STATUS_KEYS,
 ): StatusOption[] {
-  const { statuses } = useIssueStatuses(wsId);
+  const { statuses, isLoaded } = useIssueStatuses(wsId);
   const labelOf = useStatusLabel(wsId);
 
   return useMemo(
@@ -51,10 +51,17 @@ export function useStatusOptions(
             entry.category === category &&
             (!entry.archived_at || includedArchived.has(entry.key)),
         );
-        // No catalog row for this category: the fetch is still in flight, or
-        // this workspace predates the seed. Offer the built-in, whose key IS
-        // the category, so a lifecycle step is never missing.
         if (entries.length === 0) {
+          // A LOADED, non-empty catalog with no row for this category is
+          // deliberate: this product does not offer that status (the
+          // legacy backlog / in_review / blocked). Offering it anyway is
+          // what would keep a deleted status alive in every picker.
+          if (isLoaded && statuses.length > 0) {
+            return [];
+          }
+          // Otherwise — still in flight, failed, or an empty catalog (a
+          // pre-seed workspace) — offer the built-in, whose key IS the
+          // category, so a lifecycle step is never missing.
           return [
             {
               key: category as IssueStatus,
@@ -72,6 +79,6 @@ export function useStatusOptions(
         }));
       });
     },
-    [includeArchivedKeys, labelOf, statuses],
+    [includeArchivedKeys, isLoaded, labelOf, statuses],
   );
 }

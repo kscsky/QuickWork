@@ -5,6 +5,7 @@ import { SidebarProvider, SidebarInset } from "@quickwork/ui/components/ui/sideb
 import { ModalRegistry } from "../modals/registry";
 import { SourceBackfillModal } from "../onboarding";
 import { AppSidebar } from "./app-sidebar";
+import { CanvasBackdrop } from "./canvas-backdrop";
 import { DashboardGuard } from "./dashboard-guard";
 import { NavigationProgress } from "./navigation-progress";
 import { WorkspacePresencePrefetch } from "./workspace-presence-prefetch";
@@ -39,11 +40,17 @@ export function DashboardLayout({
         <WorkspacePresencePrefetch />
         <AppSidebar searchSlot={searchSlot} />
         <SidebarInset className="relative overflow-hidden">
-          <NavigationProgress />
-          {children}
-          <ModalRegistry />
-          <SourceBackfillModal />
-          {extra}
+          {/* The workspace canvas paints under everything; the content wrapper
+              lifts the real app above it (positioned spans beat plain flow
+              content at equal z, so the order in the DOM is not enough). */}
+          <CanvasBackdrop />
+          <div className="relative z-[1] flex min-h-0 flex-1 flex-col">
+            <NavigationProgress />
+            {children}
+            <ModalRegistry />
+            <SourceBackfillModal />
+            {extra}
+          </div>
         </SidebarInset>
       </SidebarProvider>
     </DashboardGuard>

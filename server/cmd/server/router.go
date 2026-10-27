@@ -1796,6 +1796,13 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 					r.Get("/chain", h.ListIssueChain)
 					r.Post("/chain", h.CreateIssueChain)
 					r.Post("/chain/skip", h.SkipIssueChainStep)
+					// The leg's own review gate: only its holder approves.
+					r.Post("/chain/approve", h.ApproveIssueChainStep)
+					// The holder's own brief for their leg.
+					r.Post("/chain/plan", h.SetIssueChainStepPlan)
+					// The finished leg's output: the holder asks their leg's
+					// agent to write the handoff document (产出 md).
+					r.Post("/chain/output", h.GenerateIssueChainLegOutput)
 					r.Get("/usage", h.GetIssueUsage)
 					r.Post("/reactions", h.AddIssueReaction)
 					r.Delete("/reactions", h.RemoveIssueReaction)
@@ -1979,6 +1986,7 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 			// (MUL-3130). The handler self-resolves the workspace
 			// from the attachment row.
 			r.Get("/api/attachments/{id}/content", h.GetAttachmentContent)
+			r.Put("/api/attachments/{id}/content", h.UpdateAttachmentContent)
 			r.Delete("/api/attachments/{id}", h.DeleteAttachment)
 
 			// Comments
@@ -2001,7 +2009,7 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 				// caller supplies only a runtime and a language, so a client
 				// cannot mint an agent carrying `system_key` and thereby claim
 				// the system instruction layer. Idempotent per workspace.
-				r.Post("/mika", h.CreateMikaAgent)
+				r.Post("/quill", h.CreateQuillAgent)
 				r.Route("/{id}", func(r chi.Router) {
 					r.Get("/", h.GetAgent)
 					r.Put("/", h.UpdateAgent)
@@ -2081,11 +2089,17 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 			r.Route("/api/dashboard", func(r chi.Router) {
 				r.Get("/usage/daily", h.GetDashboardUsageDaily)
 				r.Get("/usage/by-agent", h.GetDashboardUsageByAgent)
+				r.Get("/usage/overview", h.GetUsageOverview)
+				r.Get("/usage/logs", h.GetUsageLogs)
 				r.Get("/agent-runtime", h.GetDashboardAgentRunTime)
 				r.Get("/runtime/daily", h.GetDashboardRunTimeDaily)
 				r.Get("/failures/daily", h.GetDashboardFailuresDaily)
 				r.Get("/failures/by-agent", h.GetDashboardFailuresByAgent)
 			})
+
+			// Free-model catalog for the model pool settings surface. The
+			// upstream lists are public; no provider key is involved here.
+			r.Get("/api/model-pool/catalog", h.GetModelPoolCatalog)
 
 			// Runtimes
 			r.Route("/api/runtimes", func(r chi.Router) {
@@ -2149,7 +2163,7 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 					r.Patch("/archive", h.SetChatSessionArchived)
 					r.Delete("/", h.DeleteChatSession)
 					r.Post("/messages", h.SendChatMessage)
-					r.Post("/onboarding", h.StartMikaOnboarding)
+					r.Post("/onboarding", h.StartQuillOnboarding)
 					// Explicit "refresh" of a turn's quick actions: re-runs the
 					// daemon suggestion pass for the latest assistant reply (MUL-5149).
 					r.Post("/quick-actions/regenerate", h.RegenerateChatQuickActions)
@@ -2194,12 +2208,18 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 				r.Get("/unread-summary", h.UnreadInboxSummary)
 				r.Post("/mark-all-read", h.MarkAllInboxRead)
 				r.Post("/archive-all", h.ArchiveAllInbox)
+				// Permanent deletion, archived rows included.
+				r.Post("/delete-all", h.DeleteAllInbox)
 				r.Post("/archive-all-read", h.ArchiveAllReadInbox)
 				r.Post("/archive-completed", h.ArchiveCompletedInbox)
+				// Permanent cleanup used by the notification console.
+				r.Post("/delete-read", h.DeleteReadInbox)
+				r.Post("/delete-archived", h.DeleteArchivedInbox)
 				r.Post("/{id}/read", h.MarkInboxRead)
 				r.Post("/{id}/unread", h.MarkInboxUnread)
 				r.Post("/{id}/archive", h.ArchiveInboxItem)
 				r.Post("/{id}/unarchive", h.UnarchiveInboxItem)
+				r.Post("/{id}/delete", h.DeleteInboxItem)
 			})
 
 			// Notification preferences

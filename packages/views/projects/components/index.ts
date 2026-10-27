@@ -1,4 +1,4 @@
-export { ProjectsPage } from "./projects-page";
+export { ProjectsPage } from "./projects-console";
 export { ProjectDetail } from "./project-detail";
 export { ProjectPicker } from "./project-picker";
 export { ProjectChip } from "./project-chip";

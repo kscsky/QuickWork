@@ -33,5 +33,32 @@
   },
   "trigger": {
     "label": "검색..."
+  },
+  "caps": {
+    "pages": "PAGES",
+    "commands": "COMMANDS",
+    "members": "MEMBERS",
+    "projects": "PROJECTS",
+    "issues": "TASKS",
+    "cancelled": "CANCELLED",
+    "recent": "RECENT"
+  },
+  "palette": {
+    "placeholder": "작업, 프로젝트, 에이전트, 멤버, 설정 검색…",
+    "close": "검색 닫기",
+    "scope": "워크스페이스 / {{slug}} · {{count}}개 색인",
+    "result_count_one": "결과 {{count}}개",
+    "result_count_other": "결과 {{count}}개",
+    "no_results_count": "결과 없음",
+    "recent_count": "최근 {{count}}개",
+    "no_results_title": "\"{{query}}\"와 일치하는 결과 없음",
+    "no_results_hint": "작업 ID, 프로젝트, 에이전트, 멤버 또는 설정을 입력해 보세요",
+    "idle_title": "워크스페이스 전체 검색",
+    "idle_hint": "작업 ID, 프로젝트 이름, 에이전트 또는 설정을 입력…",
+    "mark": "QUICKWORK / 검색",
+    "hint_select": "선택",
+    "hint_open": "열기",
+    "hint_close": "닫기",
+    "esc": "esc"
   }
 }

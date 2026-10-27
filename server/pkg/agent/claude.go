@@ -374,7 +374,10 @@ func (b *claudeBackend) handleAssistant(msg claudeSDKMessage, ch chan<- Message,
 	var assistantText strings.Builder
 	toolUseCount := 0
 
-	// Accumulate token usage per model.
+	// Accumulate token usage per model (the run total) and, in parallel, keep
+	// this turn's delta to attach to the message the turn ends on — the run log
+	// prices each step from it.
+	var turnUsage *TokenUsage
 	if content.Usage != nil && content.Model != "" {
 		u := usage[content.Model]
 		u.InputTokens += content.Usage.InputTokens
@@ -382,18 +385,27 @@ func (b *claudeBackend) handleAssistant(msg claudeSDKMessage, ch chan<- Message,
 		u.CacheReadTokens += content.Usage.CacheReadInputTokens
 		u.CacheWriteTokens += content.Usage.CacheCreationInputTokens
 		usage[content.Model] = u
+		turnUsage = &TokenUsage{
+			InputTokens:      content.Usage.InputTokens,
+			OutputTokens:     content.Usage.OutputTokens,
+			CacheReadTokens:  content.Usage.CacheReadInputTokens,
+			CacheWriteTokens: content.Usage.CacheCreationInputTokens,
+		}
 	}
 
+	// Buffer this turn's emissions so the usage lands on the LAST one (one
+	// badge per turn, summed exactly once by the UI).
+	var emitted []Message
 	for _, block := range content.Content {
 		switch block.Type {
 		case "text":
 			if block.Text != "" {
 				assistantText.WriteString(block.Text)
-				trySend(ch, Message{Type: MessageText, Content: block.Text})
+				emitted = append(emitted, Message{Type: MessageText, Content: block.Text})
 			}
 		case "thinking":
 			if block.Text != "" {
-				trySend(ch, Message{Type: MessageThinking, Content: block.Text})
+				emitted = append(emitted, Message{Type: MessageThinking, Content: block.Text})
 			}
 		case "tool_use":
 			toolUseCount++
@@ -401,7 +413,7 @@ func (b *claudeBackend) handleAssistant(msg claudeSDKMessage, ch chan<- Message,
 			if block.Input != nil {
 				_ = json.Unmarshal(block.Input, &input)
 			}
-			trySend(ch, Message{
+			emitted = append(emitted, Message{
 				Type:   MessageToolUse,
 				Tool:   block.Name,
 				CallID: block.ID,
@@ -414,6 +426,15 @@ func (b *claudeBackend) handleAssistant(msg claudeSDKMessage, ch chan<- Message,
 			// addition here, not an accident of falling through.
 			turn.understood = false
 		}
+	}
+	if turnUsage != nil && len(emitted) > 0 {
+		last := &emitted[len(emitted)-1]
+		// A turn can close several logical messages; the delta belongs to the
+		// turn, so it rides the final one rather than being split.
+		last.Usage = turnUsage
+	}
+	for _, m := range emitted {
+		trySend(ch, m)
 	}
 	turn.text = assistantText.String()
 	turn.toolUses = toolUseCount
@@ -820,7 +841,7 @@ var resumeRejectedPhrases = []string{
 	// session found with ID <id>. Run `qwen --resume` without an ID to
 	// choose from existing sessions."
 	"no saved session found",
-	// Reported verbatim in multica-ai/multica#5704 against Claude Code
+	// Reported verbatim in upstream#5704 against Claude Code
 	// 2.1.207 (zh-CN): "400 此 session 已绑定另外的ai账号，请执行 /new 开启新
 	// session". This is the account-switch guardrail this signal exists for.
 	"已绑定另外",

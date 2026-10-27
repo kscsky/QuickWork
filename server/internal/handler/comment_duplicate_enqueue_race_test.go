@@ -216,7 +216,7 @@ func TestCommentEnqueueRaceDifferentHeadNotCoalesced(t *testing.T) {
 	var prID string
 	if err := testPool.QueryRow(ctx, `
 		INSERT INTO github_pull_request (workspace_id, installation_id, repo_owner, repo_name, pr_number, title, state, html_url, pr_created_at, pr_updated_at, head_sha)
-		VALUES ($1, 1, 'multica-ai', 'quickwork', 999313, 'review PR', 'open', 'https://example.test/pr', now(), now(), $2)
+		VALUES ($1, 1, 'kscsky', 'quickwork', 999313, 'review PR', 'open', 'https://example.test/pr', now(), now(), $2)
 		RETURNING id
 	`, testWorkspaceID, dupRaceHeadB).Scan(&prID); err != nil {
 		t.Fatalf("seed PR: %v", err)
@@ -447,7 +447,7 @@ func TestCommentEnqueueRaceNewerDifferentHeadNotDeferred(t *testing.T) {
 	var prID string
 	if err := testPool.QueryRow(ctx, `
 		INSERT INTO github_pull_request (workspace_id, installation_id, repo_owner, repo_name, pr_number, title, state, html_url, pr_created_at, pr_updated_at, head_sha)
-		VALUES ($1, 1, 'multica-ai', 'quickwork', 999317, 'review PR', 'open', 'https://example.test/pr', now(), now(), $2)
+		VALUES ($1, 1, 'kscsky', 'quickwork', 999317, 'review PR', 'open', 'https://example.test/pr', now(), now(), $2)
 		RETURNING id
 	`, testWorkspaceID, dupRaceHeadB).Scan(&prID); err != nil {
 		t.Fatalf("seed PR: %v", err)
@@ -525,7 +525,7 @@ func TestCommentEnqueueRaceMixedCoveringAndNewerNotDeferred(t *testing.T) {
 	var prID string
 	if err := testPool.QueryRow(ctx, `
 		INSERT INTO github_pull_request (workspace_id, installation_id, repo_owner, repo_name, pr_number, title, state, html_url, pr_created_at, pr_updated_at, head_sha)
-		VALUES ($1, 1, 'multica-ai', 'quickwork', 999318, 'review PR', 'open', 'https://example.test/pr', now(), now(), $2)
+		VALUES ($1, 1, 'kscsky', 'quickwork', 999318, 'review PR', 'open', 'https://example.test/pr', now(), now(), $2)
 		RETURNING id
 	`, testWorkspaceID, dupRaceHeadB).Scan(&prID); err != nil {
 		t.Fatalf("seed PR: %v", err)
@@ -638,7 +638,7 @@ func seedDupRacePR(t *testing.T, issueID string, prNumber int) {
 	var prID string
 	if err := testPool.QueryRow(ctx, `
 		INSERT INTO github_pull_request (workspace_id, installation_id, repo_owner, repo_name, pr_number, title, state, html_url, pr_created_at, pr_updated_at, head_sha)
-		VALUES ($1, 1, 'multica-ai', 'quickwork', $2, 'review PR', 'open', 'https://example.test/pr', now(), now(), $3)
+		VALUES ($1, 1, 'kscsky', 'quickwork', $2, 'review PR', 'open', 'https://example.test/pr', now(), now(), $3)
 		RETURNING id
 	`, testWorkspaceID, prNumber, dupRaceHeadB).Scan(&prID); err != nil {
 		t.Fatalf("seed PR: %v", err)

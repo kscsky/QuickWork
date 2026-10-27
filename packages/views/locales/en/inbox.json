@@ -1,13 +1,20 @@
 {
   "page": {
-    "title": "Inbox",
-    "back": "Inbox"
+    "title": "Notifications",
+    "back": "Notifications"
   },
   "menu": {
     "mark_all_read": "Mark all as read",
     "archive_all": "Archive all",
     "archive_all_read": "Archive all read",
-    "archive_completed": "Archive completed"
+    "archive_completed": "Archive completed",
+    "clear_all": "Clear all",
+    "clear_dialog": {
+      "title": "Clear the inbox?",
+      "description": "Every notification, including archived ones, will be permanently deleted. This cannot be undone.",
+      "cancel": "Cancel",
+      "confirm": "Clear all"
+    }
   },
   "filters": {
     "tooltip": "Filter inbox",
@@ -73,7 +80,8 @@
     "quick_create_done": "Created with agent",
     "quick_create_failed": "Create with agent failed",
     "quick_create_unconfirmed": "Create with agent unconfirmed",
-    "flow_handoff": "Flow hand-off"
+    "flow_handoff": "Flow hand-off",
+    "squad_message": "Squad message"
   },
   "labels": {
     "set_status_to": "Set status to",
@@ -92,7 +100,9 @@
   "toasts": {
     "source_context_retry_started": "Retry started with the original context",
     "archived": "Notification archived",
-    "unarchived": "Notification restored"
+    "unarchived": "Notification restored",
+    "archived_all": "All notifications archived",
+    "deleted_all": "Inbox notifications permanently deleted"
   },
   "errors": {
     "source_context_retry_failed": "Could not retry with the original context",
@@ -105,7 +115,68 @@
     "archive_all_failed": "Failed to archive all",
     "archive_all_read_failed": "Failed to archive read items",
     "archive_completed_failed": "Failed to archive completed",
+    "delete_all_failed": "Failed to permanently delete inbox notifications",
     "unarchive_failed": "Failed to unarchive",
     "archived_load_failed": "Failed to load archived notifications"
+  },
+  "console": {
+    "unread_cap": "UNREAD",
+    "task_info": "Task updates",
+    "chat_info": "Chat",
+    "filter_all": "All",
+    "filter_unread": "Unread",
+    "filter_task": "Tasks",
+    "filter_chat": "Chat",
+    "filter_archived": "Archived",
+    "live_task": "task updates",
+    "live_chat": "chat",
+    "live_total_one": "{{count}} notification",
+    "live_total_other": "{{count}} notifications",
+    "sync_hint": "Last synced · just now",
+    "mark_all_read": "Mark all read",
+    "cleanup_read": "Clear read",
+    "clear_archived": "Clear archive",
+    "cleanup_read_title": "Clear read notifications?",
+    "cleanup_read_body_one": "Permanently removes {{count}} read notification. Unread and archived stay.",
+    "cleanup_read_body_other": "Permanently removes {{count}} read notifications. Unread and archived stay.",
+    "clear_archived_title": "Clear archived notifications?",
+    "clear_archived_body_one": "Permanently removes {{count}} archived notification.",
+    "clear_archived_body_other": "Permanently removes {{count}} archived notifications.",
+    "delete_title": "Delete this notification?",
+    "delete_body": "“{{title}}” will be permanently removed from the notification console.",
+    "confirm_delete": "Delete",
+    "cancel": "Cancel",
+    "mark_read": "Mark read",
+    "mark_unread": "Mark unread",
+    "archive": "Archive",
+    "unarchive": "Unarchive",
+    "delete": "Delete",
+    "source_issue": "ISSUE",
+    "source_squad": "SQUAD",
+    "open_task": "Open task",
+    "open_squad": "Open room",
+    "priority": "Priority {{value}}",
+    "no_assignee": "Unassigned",
+    "no_project": "No project",
+    "archived_tag": "Archived",
+    "squad_members_one": "{{count}} member",
+    "squad_members_other": "{{count}} members",
+    "squad_leader": "Leader {{name}}",
+    "empty": "No notifications in this filter",
+    "select_prompt": "Select a notification to read it",
+    "undo": "Undo",
+    "delete_failed": "Couldn't delete the notification",
+    "cleanup_failed": "Couldn't clear read notifications",
+    "clear_failed": "Couldn't clear the archive",
+    "deleted_toast": "Notification deleted",
+    "cleaned_toast_one": "Cleared {{count}} read notification",
+    "cleaned_toast_other": "Cleared {{count}} read notifications",
+    "cleared_toast_one": "Cleared {{count}} archived notification",
+    "cleared_toast_other": "Cleared {{count}} archived notifications",
+    "marked_all_toast": "All notifications marked read",
+    "load_failed": "Couldn't load notifications",
+    "try_again": "Try again",
+    "back": "Notifications",
+    "system_actor": "System"
   }
 }

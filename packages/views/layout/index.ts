@@ -12,6 +12,7 @@ export {
 export type { TabPresentationResult } from "./tab-presentation";
 export { DashboardGuard } from "./dashboard-guard";
 export { DashboardLayout } from "./dashboard-layout";
+export { CanvasBackdrop } from "./canvas-backdrop";
 export { useDashboardGuard } from "./use-dashboard-guard";
 export { WorkspaceLoader } from "./workspace-loader";
 export { WorkspacePresencePrefetch } from "./workspace-presence-prefetch";

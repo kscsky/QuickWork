@@ -126,7 +126,7 @@ func createHeadShaDedupFixture(t *testing.T, ctx context.Context, pool *pgxpool.
 				workspace_id, installation_id, repo_owner, repo_name, pr_number,
 				title, state, html_url, pr_created_at, pr_updated_at, head_sha
 			)
-			VALUES ($1, 1, 'multica-ai', 'quickwork', $2, 'review PR', $3,
+			VALUES ($1, 1, 'kscsky', 'quickwork', $2, 'review PR', $3,
 				'https://example.test/pr', now(), now(), $4)
 			RETURNING id
 		`, workspaceID, 4000+int(suffix%1000), state, prHeadSha).Scan(&prID); err != nil {

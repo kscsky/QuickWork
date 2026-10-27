@@ -1,10 +1,12 @@
 export {
   NavigationProvider,
   useNavigation,
+  useNavigationActions,
   useOptionalNavigation,
   useIsNavigating,
   useReportNavigating,
 } from "./context";
+export type { NavigationActions } from "./context";
 export { AppLink } from "./app-link";
 export { currentPath } from "./current-path";
 export { resolveClickIntent } from "./click-intent";

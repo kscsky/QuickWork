@@ -195,6 +195,39 @@ export function useArchiveAllInbox() {
   });
 }
 
+/**
+ * Permanently delete the recipient's notifications, archived rows included.
+ *
+ * Optimistic because the outcome is locally predictable (both lists become
+ * empty) and the user stays on the inbox. The snapshot restores both caches if
+ * the request fails; the unread badge is derived from the main list, so it
+ * drops in the same pass. The cross-workspace summary is server-computed and
+ * only refreshed on settle.
+ */
+export function useDeleteAllInbox() {
+  const qc = useQueryClient();
+  const wsId = useWorkspaceId();
+  return useMutation({
+    mutationFn: () => api.deleteAllInbox(),
+    onMutate: async () => {
+      await qc.cancelQueries({ queryKey: inboxKeys.all(wsId) });
+      const prev = qc.getQueryData<InboxItem[]>(inboxKeys.list(wsId));
+      const prevArchived = qc.getQueryData<InboxItem[]>(inboxKeys.archived(wsId));
+      qc.setQueryData<InboxItem[]>(inboxKeys.list(wsId), []);
+      qc.setQueryData<InboxItem[]>(inboxKeys.archived(wsId), []);
+      return { prev, prevArchived };
+    },
+    onError: (_err, _vars, ctx) => {
+      if (ctx?.prev) qc.setQueryData(inboxKeys.list(wsId), ctx.prev);
+      if (ctx?.prevArchived) qc.setQueryData(inboxKeys.archived(wsId), ctx.prevArchived);
+    },
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: inboxKeys.all(wsId) });
+      qc.invalidateQueries({ queryKey: inboxKeys.unreadSummary() });
+    },
+  });
+}
+
 export function useArchiveAllReadInbox() {
   const qc = useQueryClient();
   const wsId = useWorkspaceId();
@@ -213,6 +246,73 @@ export function useArchiveCompletedInbox() {
     mutationFn: () => api.archiveCompletedInbox(),
     onSettled: () => {
       qc.invalidateQueries({ queryKey: inboxKeys.all(wsId) });
+    },
+  });
+}
+
+/**
+ * Permanently delete one notification. The console confirms first, so the
+ * optimistic removal is safe to apply without a tombstone; a failure restores
+ * both list caches from the snapshot.
+ */
+export function useDeleteInboxItem() {
+  const qc = useQueryClient();
+  const wsId = useWorkspaceId();
+  return useMutation({
+    mutationFn: (id: string) => api.deleteInboxItem(id),
+    onMutate: async (id) => {
+      await qc.cancelQueries({ queryKey: inboxKeys.all(wsId) });
+      const prev = qc.getQueryData<InboxItem[]>(inboxKeys.list(wsId));
+      const prevArchived = qc.getQueryData<InboxItem[]>(inboxKeys.archived(wsId));
+      qc.setQueryData<InboxItem[]>(inboxKeys.list(wsId), (old) =>
+        old?.filter((item) => item.id !== id),
+      );
+      qc.setQueryData<InboxItem[]>(inboxKeys.archived(wsId), (old) =>
+        old?.filter((item) => item.id !== id),
+      );
+      return { prev, prevArchived };
+    },
+    onError: (_err, _id, ctx) => {
+      if (ctx?.prev) qc.setQueryData(inboxKeys.list(wsId), ctx.prev);
+      if (ctx?.prevArchived) qc.setQueryData(inboxKeys.archived(wsId), ctx.prevArchived);
+    },
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: inboxKeys.all(wsId) });
+      qc.invalidateQueries({ queryKey: inboxKeys.unreadSummary() });
+    },
+  });
+}
+
+/** Permanently remove every read, non-archived notification. */
+export function useDeleteReadInbox() {
+  const qc = useQueryClient();
+  const wsId = useWorkspaceId();
+  return useMutation({
+    mutationFn: () => api.deleteReadInbox(),
+    onSuccess: () => {
+      qc.setQueryData<InboxItem[]>(inboxKeys.list(wsId), (old) =>
+        old?.filter((item) => !item.read || item.archived),
+      );
+    },
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: inboxKeys.all(wsId) });
+      qc.invalidateQueries({ queryKey: inboxKeys.unreadSummary() });
+    },
+  });
+}
+
+/** Permanently empty the recipient's archive. */
+export function useDeleteArchivedInbox() {
+  const qc = useQueryClient();
+  const wsId = useWorkspaceId();
+  return useMutation({
+    mutationFn: () => api.deleteArchivedInbox(),
+    onSuccess: () => {
+      qc.setQueryData<InboxItem[]>(inboxKeys.archived(wsId), []);
+    },
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: inboxKeys.all(wsId) });
+      qc.invalidateQueries({ queryKey: inboxKeys.unreadSummary() });
     },
   });
 }

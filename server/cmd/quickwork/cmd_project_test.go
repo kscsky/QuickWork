@@ -53,7 +53,7 @@ func TestBuildResourceRefFromFlagsGithubMergesHint(t *testing.T) {
 	t.Run("hint-only edit preserves existing url", func(t *testing.T) {
 		cmd := newProjectResourceUpdateTestCmd()
 		_ = cmd.Flags().Set("default-branch-hint", "main")
-		existing := map[string]any{"url": "https://github.com/multica-ai/multica"}
+		existing := map[string]any{"url": "https://github.com/kscsky/QuickWork"}
 
 		ref, has, err := buildResourceRefFromFlags(cmd, "github_repo", existing)
 		if err != nil {
@@ -62,7 +62,7 @@ func TestBuildResourceRefFromFlagsGithubMergesHint(t *testing.T) {
 		if !has {
 			t.Fatalf("expected has=true when default-branch-hint is set")
 		}
-		if ref["url"] != "https://github.com/multica-ai/multica" {
+		if ref["url"] != "https://github.com/kscsky/QuickWork" {
 			t.Errorf("expected merged url, got %v", ref["url"])
 		}
 		if ref["default_branch_hint"] != "main" {
@@ -74,7 +74,7 @@ func TestBuildResourceRefFromFlagsGithubMergesHint(t *testing.T) {
 		cmd := newProjectResourceUpdateTestCmd()
 		_ = cmd.Flags().Set("default-branch-hint", "")
 		existing := map[string]any{
-			"url":                 "https://github.com/multica-ai/multica",
+			"url":                 "https://github.com/kscsky/QuickWork",
 			"default_branch_hint": "stale",
 		}
 		ref, has, err := buildResourceRefFromFlags(cmd, "github_repo", existing)
@@ -84,7 +84,7 @@ func TestBuildResourceRefFromFlagsGithubMergesHint(t *testing.T) {
 		if !has {
 			t.Fatalf("expected has=true")
 		}
-		if ref["url"] != "https://github.com/multica-ai/multica" {
+		if ref["url"] != "https://github.com/kscsky/QuickWork" {
 			t.Errorf("expected url to survive empty-hint clear, got %v", ref["url"])
 		}
 		if _, ok := ref["default_branch_hint"]; ok {
@@ -94,9 +94,9 @@ func TestBuildResourceRefFromFlagsGithubMergesHint(t *testing.T) {
 
 	t.Run("url override survives merge", func(t *testing.T) {
 		cmd := newProjectResourceUpdateTestCmd()
-		_ = cmd.Flags().Set("url", "https://github.com/multica-ai/new-repo")
+		_ = cmd.Flags().Set("url", "https://github.com/kscsky/new-repo")
 		existing := map[string]any{
-			"url":                 "https://github.com/multica-ai/multica",
+			"url":                 "https://github.com/kscsky/QuickWork",
 			"default_branch_hint": "main",
 		}
 		ref, has, err := buildResourceRefFromFlags(cmd, "github_repo", existing)
@@ -106,7 +106,7 @@ func TestBuildResourceRefFromFlagsGithubMergesHint(t *testing.T) {
 		if !has {
 			t.Fatalf("expected has=true")
 		}
-		if ref["url"] != "https://github.com/multica-ai/new-repo" {
+		if ref["url"] != "https://github.com/kscsky/new-repo" {
 			t.Errorf("expected overridden url, got %v", ref["url"])
 		}
 		if ref["default_branch_hint"] != "main" {
@@ -118,7 +118,7 @@ func TestBuildResourceRefFromFlagsGithubMergesHint(t *testing.T) {
 		cmd := newProjectResourceUpdateTestCmd()
 		_ = cmd.Flags().Set("ref", "release/v2")
 		existing := map[string]any{
-			"url":                 "https://github.com/multica-ai/multica",
+			"url":                 "https://github.com/kscsky/QuickWork",
 			"default_branch_hint": "main",
 		}
 		ref, has, err := buildResourceRefFromFlags(cmd, "github_repo", existing)
@@ -128,7 +128,7 @@ func TestBuildResourceRefFromFlagsGithubMergesHint(t *testing.T) {
 		if !has {
 			t.Fatalf("expected has=true")
 		}
-		if ref["url"] != "https://github.com/multica-ai/multica" {
+		if ref["url"] != "https://github.com/kscsky/QuickWork" {
 			t.Errorf("expected merged url, got %v", ref["url"])
 		}
 		if ref["default_branch_hint"] != "main" {
@@ -143,7 +143,7 @@ func TestBuildResourceRefFromFlagsGithubMergesHint(t *testing.T) {
 		cmd := newProjectResourceUpdateTestCmd()
 		_ = cmd.Flags().Set("ref", "")
 		existing := map[string]any{
-			"url": "https://github.com/multica-ai/multica",
+			"url": "https://github.com/kscsky/QuickWork",
 			"ref": "stale",
 		}
 		ref, has, err := buildResourceRefFromFlags(cmd, "github_repo", existing)
@@ -156,7 +156,7 @@ func TestBuildResourceRefFromFlagsGithubMergesHint(t *testing.T) {
 		if _, ok := ref["ref"]; ok {
 			t.Errorf("expected checkout ref to be cleared, got %v", ref["ref"])
 		}
-		if ref["url"] != "https://github.com/multica-ai/multica" {
+		if ref["url"] != "https://github.com/kscsky/QuickWork" {
 			t.Errorf("expected merged url, got %v", ref["url"])
 		}
 	})
@@ -185,8 +185,8 @@ func TestBuildResourceRefFromFlagsGithubMergesHint(t *testing.T) {
 func TestBuildResourceRefFromRefFlagKeepsJSONEscapeHatch(t *testing.T) {
 	t.Run("json payload wins over github shortcuts", func(t *testing.T) {
 		cmd := newProjectResourceUpdateTestCmd()
-		_ = cmd.Flags().Set("url", "https://github.com/multica-ai/ignored")
-		_ = cmd.Flags().Set("ref", `{"url":"https://github.com/multica-ai/multica","ref":"release/v2"}`)
+		_ = cmd.Flags().Set("url", "https://github.com/kscsky/ignored")
+		_ = cmd.Flags().Set("ref", `{"url":"https://github.com/kscsky/QuickWork","ref":"release/v2"}`)
 
 		ref, has, err := buildResourceRefFromRefFlag(cmd, "github_repo", nil)
 		if err != nil {
@@ -199,7 +199,7 @@ func TestBuildResourceRefFromRefFlagKeepsJSONEscapeHatch(t *testing.T) {
 		if !ok {
 			t.Fatalf("expected JSON object payload, got %T", ref)
 		}
-		if payload["url"] != "https://github.com/multica-ai/multica" {
+		if payload["url"] != "https://github.com/kscsky/QuickWork" {
 			t.Errorf("json payload url = %v", payload["url"])
 		}
 		if payload["ref"] != "release/v2" {
@@ -209,7 +209,7 @@ func TestBuildResourceRefFromRefFlagKeepsJSONEscapeHatch(t *testing.T) {
 
 	t.Run("broken json is still rejected", func(t *testing.T) {
 		cmd := newProjectResourceUpdateTestCmd()
-		_ = cmd.Flags().Set("url", "https://github.com/multica-ai/multica")
+		_ = cmd.Flags().Set("url", "https://github.com/kscsky/QuickWork")
 		_ = cmd.Flags().Set("ref", `{"url":`)
 
 		_, _, err := buildResourceRefFromRefFlag(cmd, "github_repo", nil)
@@ -228,7 +228,7 @@ func TestBuildResourceRefFromRefFlagKeepsJSONEscapeHatch(t *testing.T) {
 	t.Run("bare scalar github ref is a checkout ref, not JSON", func(t *testing.T) {
 		for _, gitRef := range []string{"2024", "1234567", "true", "null"} {
 			cmd := newProjectResourceUpdateTestCmd()
-			_ = cmd.Flags().Set("url", "https://github.com/multica-ai/multica")
+			_ = cmd.Flags().Set("url", "https://github.com/kscsky/QuickWork")
 			_ = cmd.Flags().Set("ref", gitRef)
 
 			ref, has, err := buildResourceRefFromRefFlag(cmd, "github_repo", nil)
@@ -242,7 +242,7 @@ func TestBuildResourceRefFromRefFlagKeepsJSONEscapeHatch(t *testing.T) {
 			if !ok {
 				t.Fatalf("ref %q: expected github_repo shortcut map, got %T", gitRef, ref)
 			}
-			if payload["url"] != "https://github.com/multica-ai/multica" {
+			if payload["url"] != "https://github.com/kscsky/QuickWork" {
 				t.Errorf("ref %q: url = %v", gitRef, payload["url"])
 			}
 			if payload["ref"] != gitRef {

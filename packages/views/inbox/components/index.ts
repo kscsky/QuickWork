@@ -1,1 +1,1 @@
-export { InboxPage } from "./inbox-page";
+export { InboxPage } from "./inbox-console";

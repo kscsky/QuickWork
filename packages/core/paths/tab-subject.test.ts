@@ -8,7 +8,8 @@ describe("parseTabSubject", () => {
   // `unknown` — which the presentation layer renders neutrally, never as Issues.
   const cases: Array<[string, TabSubject]> = [
     // Collection / tool pages
-    ["/acme/issues", { kind: "page", page: "issues" }],
+    ["/acme/tasks", { kind: "page", page: "tasks" }],
+    ["/acme/issues", { kind: "unknown" }],
     ["/acme/my-issues", { kind: "page", page: "myIssues" }],
     ["/acme/projects", { kind: "page", page: "projects" }],
     ["/acme/autopilots", { kind: "page", page: "autopilots" }],
@@ -17,7 +18,13 @@ describe("parseTabSubject", () => {
     ["/acme/usage", { kind: "page", page: "usage" }],
     ["/acme/runtimes", { kind: "page", page: "runtimes" }],
     ["/acme/skills", { kind: "page", page: "skills" }],
-    ["/acme/settings", { kind: "page", page: "settings" }],
+    ["/acme/config", { kind: "page", page: "config" }],
+    ["/acme/mcp", { kind: "page", page: "mcp" }],
+    ["/acme/github", { kind: "page", page: "github" }],
+    ["/acme/integrations", { kind: "page", page: "integrations" }],
+    ["/acme/tokens", { kind: "page", page: "tokens" }],
+    ["/acme/account", { kind: "page", page: "account" }],
+    ["/acme/workspace-settings", { kind: "page", page: "workspaceSettings" }],
     // Resource details
     ["/acme/issues/bug-1", { kind: "issue", id: "bug-1" }],
     ["/acme/projects/p1", { kind: "project", id: "p1" }],

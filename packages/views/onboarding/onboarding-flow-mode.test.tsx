@@ -48,7 +48,7 @@ vi.mock("@quickwork/core/onboarding", async () => {
   const actual = await vi.importActual<Record<string, unknown>>(
     "@quickwork/core/onboarding",
   );
-  return { ...actual, useBootstrapMika: () => ({ mutateAsync: vi.fn() }) };
+  return { ...actual, useBootstrapQuill: () => ({ mutateAsync: vi.fn() }) };
 });
 
 import { OnboardingFlow } from "./onboarding-flow";

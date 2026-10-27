@@ -5,9 +5,9 @@ import userEvent from "@testing-library/user-event";
 import { renderWithI18n } from "../test/i18n";
 
 const longRepoUrl =
-  "https://github.com/multica-ai/a-very-long-repository-name-that-needs-a-tooltip";
-const apiRepoUrl = "https://github.com/multica-ai/api";
-const webRepoUrl = "https://github.com/multica-ai/web";
+  "https://github.com/kscsky/a-very-long-repository-name-that-needs-a-tooltip";
+const apiRepoUrl = "https://github.com/kscsky/api";
+const webRepoUrl = "https://github.com/kscsky/web";
 
 vi.mock("@tanstack/react-query", () => ({
   useQuery: () => ({ data: [] }),
@@ -184,21 +184,6 @@ describe("CreateProjectModal", () => {
     // same URL would stack a browser tooltip on top of it (MUL-4836).
     expect(screen.getByRole("tooltip", { name: longRepoUrl })).toBeInTheDocument();
     expect(screen.queryByTitle(longRepoUrl)).toBeNull();
-  });
-
-  it("reveals the start/due date pickers from the ⋯ overflow menu", async () => {
-    const user = userEvent.setup();
-    renderWithI18n(<CreateProjectModal onClose={vi.fn()} />);
-
-    // Dates are collapsed behind the overflow by default (progressive disclosure).
-    expect(screen.queryByRole("button", { name: "Start date" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Due date" })).not.toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: /Set start date/ }));
-    expect(screen.getByRole("button", { name: "Start date" })).toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: /Set due date/ }));
-    expect(screen.getByRole("button", { name: "Due date" })).toBeInTheDocument();
   });
 
   it("filters workspace repositories by search text", async () => {

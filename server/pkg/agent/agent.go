@@ -172,6 +172,11 @@ type Message struct {
 	Status    string         // agent status string (Status)
 	Level     string         // log level (Log)
 	SessionID string         // backend session id (Status), for early resume-pointer pinning
+	// Usage is the token delta of the assistant turn this message closed (set
+	// on ONE message per turn — the last emitted one). Carried so the run log
+	// can price each step instead of only the whole run. Nil when the provider
+	// reports no per-turn usage.
+	Usage *TokenUsage
 }
 
 // TokenUsage tracks token consumption for a single model.

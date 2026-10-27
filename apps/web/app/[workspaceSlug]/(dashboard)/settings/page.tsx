@@ -1,5 +1,10 @@
-import { SettingsPage } from "@quickwork/views/settings";
+import { redirect } from "next/navigation";
 
-export default function Page() {
-  return <SettingsPage />;
+export default async function SettingsRedirect({
+  params,
+}: {
+  params: Promise<{ workspaceSlug: string }>;
+}) {
+  const { workspaceSlug } = await params;
+  redirect(`/${workspaceSlug}/config`);
 }

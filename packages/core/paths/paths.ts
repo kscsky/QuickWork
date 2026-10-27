@@ -25,8 +25,7 @@ export const AGENT_FOCUS_CONVERSATION_STARTERS = "conversation_starters";
 function workspaceScoped(slug: string) {
   const ws = `/${encode(slug)}`;
   return {
-    // The workspace home: the orchestration entry point. Distinct from
-    // `issues()`, which is the list of work already filed.
+    // The workspace home: the orchestration entry point.
     root: () => ws,
     usage: () => `${ws}/usage`,
     // The dispatch stand: squads, the unowned queue, and what each agent is
@@ -36,7 +35,6 @@ function workspaceScoped(slug: string) {
     // The task feed: every task with its relay, who holds it, and where it
     // has stopped.
     tasks: () => `${ws}/tasks`,
-    issues: () => `${ws}/issues`,
     issueDetail: (id: string) => `${ws}/issues/${encode(id)}`,
     projects: () => `${ws}/projects`,
     projectDetail: (id: string) => `${ws}/projects/${encode(id)}`,
@@ -59,6 +57,7 @@ function workspaceScoped(slug: string) {
     // the buttons the viewer just looked at.
     agentConversationStarters: (id: string) =>
       `${ws}/agents/${encode(id)}?view=instructions&focus=${AGENT_FOCUS_CONVERSATION_STARTERS}`,
+    members: () => `${ws}/members`,
     memberDetail: (id: string) => `${ws}/members/${encode(id)}`,
     squads: () => `${ws}/squads`,
     squadDetail: (id: string) => `${ws}/squads/${encode(id)}`,
@@ -74,7 +73,17 @@ function workspaceScoped(slug: string) {
     runtimeSettings: (machineId: string, runtimeId: string) =>
       `${ws}/runtimes/${encode(machineId)}/runtime/${encode(runtimeId)}`,
     skills: () => `${ws}/skills`,
+    skillNew: () => `${ws}/skills/new`,
     skillDetail: (id: string) => `${ws}/skills/${encode(id)}`,
+    config: () => `${ws}/config`,
+    models: () => `${ws}/models`,
+    mcp: () => `${ws}/mcp`,
+    github: () => `${ws}/github`,
+    integrations: () => `${ws}/integrations`,
+    tokens: () => `${ws}/tokens`,
+    account: () => `${ws}/account`,
+    workspaceSettings: () => `${ws}/workspace-settings`,
+    // Kept as a redirect target for old bookmarks; the UI no longer links here.
     settings: () => `${ws}/settings`,
     attachmentPreview: (id: string) => `${ws}/attachments/${encode(id)}/preview`,
   };

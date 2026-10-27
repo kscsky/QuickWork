@@ -107,6 +107,7 @@ vi.mock("../issues/components/status-icon", () => ({ StatusIcon: () => <span /> 
 vi.mock("../navigation", () => ({
   AppLink: ({ children, href }: { children: React.ReactNode; href: string }) => <a href={href}>{children}</a>,
   useNavigation: () => ({ pathname: navigation.current.pathname, push: vi.fn() }),
+  useNavigationActions: () => ({ push: vi.fn(), replace: vi.fn() }),
 }));
 vi.mock("../projects/components/project-icon", () => ({ ProjectIcon: () => <span /> }));
 vi.mock("../workspace/workspace-avatar", () => ({ WorkspaceAvatar: () => <span /> }));
@@ -123,8 +124,8 @@ vi.mock("@quickwork/core/paths", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@quickwork/core/paths")>()),
   paths: {
     workspace: (slug: string) => ({
-      dispatch: () => `/${slug}/dispatch`,
       issues: () => `/${slug}/issues`,
+      tasks: () => `/${slug}/tasks`,
     }),
   },
   useCurrentWorkspace: () => ({ id: "ws-1", name: "Acme", slug: "acme" }),
@@ -132,7 +133,6 @@ vi.mock("@quickwork/core/paths", async (importOriginal) => ({
     inbox: () => "/acme/inbox",
     chat: () => "/acme/chat",
     myIssues: () => "/acme/my-issues",
-    dispatch: () => "/acme/dispatch",
     tasks: () => "/acme/tasks",
     issues: () => "/acme/issues",
     projects: () => "/acme/projects",
@@ -142,7 +142,15 @@ vi.mock("@quickwork/core/paths", async (importOriginal) => ({
     usage: () => "/acme/usage",
     runtimes: () => "/acme/runtimes",
     skills: () => "/acme/skills",
+    config: () => "/acme/config",
+    mcp: () => "/acme/mcp",
+    github: () => "/acme/github",
+    integrations: () => "/acme/integrations",
+    tokens: () => "/acme/tokens",
+    account: () => "/acme/account",
+    workspaceSettings: () => "/acme/workspace-settings",
     settings: () => "/acme/settings",
+    members: () => "/acme/members",
     issueDetail: (id: string) => `/acme/issues/${id}`,
     projectDetail: (id: string) => `/acme/projects/${id}`,
   }),
@@ -428,9 +436,9 @@ describe("cockpit — in flight", () => {
 
     const { container } = renderWithI18n(<AppSidebar />);
 
-    const dispatchNav = container.querySelector('button[data-href="/acme/dispatch"]');
+    const tasksNav = container.querySelector('button[data-href="/acme/tasks"]');
     const agentsNav = container.querySelector('button[data-href="/acme/agents"]');
-    expect(dispatchNav?.textContent).toContain("1 running");
+    expect(tasksNav?.textContent).toContain("1 running");
     expect(agentsNav?.textContent).toContain("1 busy");
     // A count on every row is noise; the rest must stay clean.
     expect(

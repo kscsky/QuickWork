@@ -1,5 +1,5 @@
 {
-  "title": "统计",
+  "title": "用量",
   "tab_usage": "用量",
   "header": {
     "timezone_and_updated": "{{tz}} · 更新于 {{time}}",
@@ -104,5 +104,200 @@
   },
   "duration": {
     "less_than_minute": "<1分钟"
+  },
+  "subtitle": "按模型、智能体与项目核对 Token 消耗和成本。",
+  "tabs": {
+    "overview": "概览",
+    "logs": "调用日志"
+  },
+  "range": {
+    "label": "时间范围",
+    "days": "{{days}} 天"
+  },
+  "overview": {
+    "empty_title": "所选范围内没有用量",
+    "empty_body": "换一个时间范围或项目试试。",
+    "error_title": "用量加载失败",
+    "error_body": "稍后再试。",
+    "error_retry": "重试",
+    "hero": {
+      "label": "总成本 · {{range}}",
+      "vs_previous": "较上期",
+      "daily_avg": "日均 {{value}}",
+      "last7": "最近 7 天 {{value}}/天"
+    },
+    "kpi": {
+      "calls": "调用次数",
+      "calls_hint": "成功 {{success}} · 失败 {{failed}} · 取消 {{cancelled}}",
+      "tokens": "总 Token",
+      "tokens_hint": "输入 {{input}} · 输出 {{output}} · 缓存 {{cache}}",
+      "cache": "缓存命中率",
+      "cache_hint": "等效节省 {{saved}} · 较上期 {{delta}}pp",
+      "avg_cost": "平均单价",
+      "avg_cost_hint": "覆盖 {{models}} 个模型 · {{agents}} 位智能体",
+      "cache_hint_plain": "等效节省 {{saved}}"
+    },
+    "trend": {
+      "title_cost": "成本趋势",
+      "title_tokens": "Token 趋势",
+      "title_calls": "调用趋势",
+      "subtitle": "按模型堆叠 · {{range}}",
+      "total_label": "合计",
+      "total_value": "合计 {{value}}",
+      "average": "日均 {{value}}",
+      "metric_label": "指标",
+      "metric_cost": "成本",
+      "metric_tokens": "Token",
+      "metric_calls": "调用",
+      "other": "其他"
+    },
+    "models": {
+      "title": "模型占比",
+      "subtitle": "{{range}} · 按成本",
+      "total_label": "总成本",
+      "footer": "共 {{count}} 个模型。成本优先采用供应商回传金额；缺失时按当前价目表估算。",
+      "detail_title": "模型明细",
+      "detail_subtitle": "{{range}}按模型汇总；点击任意一行查看对应调用日志",
+      "view_logs": "查看全部日志",
+      "col_model": "模型",
+      "col_calls": "调用",
+      "col_input": "输入",
+      "col_output": "输出",
+      "col_cache_read": "缓存读",
+      "col_cache_write": "缓存写",
+      "col_hit": "命中率",
+      "col_avg": "单均",
+      "col_cost": "成本",
+      "col_share": "占比",
+      "row_action": "查看 {{model}} 的调用日志",
+      "footnote": "成本优先采用供应商回传金额；缺失时按当前价目表估算并标 ≈。命中率 = 缓存读取 ÷（缓存读取 + 输入）。分项按四舍五入展示，合计以汇总值为准。",
+      "subtitle_tokens": "{{range}} · 按 Token",
+      "total_label_tokens": "总 Token"
+    },
+    "agents": {
+      "title": "智能体消耗",
+      "subtitle": "{{range}} · 按成本排序",
+      "row_hint": "{{calls}} 次调用 · 失败率 {{rate}}",
+      "footnote": "失败率 = 失败调用 ÷ 全部调用；取消不计入失败。",
+      "restricted": "受限智能体",
+      "deleted": "已删除智能体"
+    },
+    "composition": {
+      "title": "费用构成",
+      "subtitle": "{{range}} · 按 Token 类型拆分",
+      "input": "输入 Token",
+      "output": "输出 Token",
+      "cache_read": "缓存读取",
+      "cache_write": "缓存写入",
+      "saved_label": "缓存读取 · 等效节省",
+      "saved_hint": "按输入单价折算 · 命中率 {{rate}}",
+      "saved_hint_delta": "按输入单价折算 · 命中率 {{rate}}（较上期 {{delta}}pp）"
+    },
+    "unpriced_title": "部分模型未计价",
+    "unpriced_body": "成本未计入 {{models}}。在运行时页面补充单价后即可计入。"
+  },
+  "logs": {
+    "title": "模型调用日志",
+    "subtitle": "一次 task × 一个模型记一行。口径与概览同源：{{range}} · {{project}}。",
+    "export": "导出 CSV",
+    "summary": {
+      "calls": "调用次数",
+      "calls_hint": "成功 {{success}} · 失败 {{failed}} · 取消 {{cancelled}}",
+      "cost": "合计成本",
+      "cost_hint": "按当前筛选与时间范围",
+      "avg": "平均单价",
+      "avg_hint": "每模型调用",
+      "fail_rate": "失败率",
+      "fail_hint": "{{failed}} 次失败"
+    },
+    "search_placeholder": "搜索任务、模型或 task ID",
+    "status": {
+      "all": "全部",
+      "success": "成功",
+      "failed": "失败",
+      "cancelled": "取消",
+      "running": "进行中",
+      "unknown": "未知"
+    },
+    "filters": {
+      "all_models": "所有模型",
+      "all_agents": "所有智能体",
+      "reset": "重置",
+      "model_label": "模型筛选",
+      "agent_label": "智能体筛选"
+    },
+    "table": {
+      "time": "时间",
+      "status": "状态",
+      "agent": "智能体",
+      "issue": "任务",
+      "model": "模型 / 供应商",
+      "input": "输入",
+      "output": "输出",
+      "cache": "缓存读 / 写",
+      "duration": "耗时",
+      "cost": "成本",
+      "trigger": "触发"
+    },
+    "trigger": {
+      "comment": "评论",
+      "autopilot": "自动化",
+      "direct": "自动",
+      "retry": "重试",
+      "rerun": "重跑",
+      "chat": "聊天",
+      "quick_create": "快速创建",
+      "other": "其他"
+    },
+    "no_issue": "未关联任务",
+    "restricted_agent": "受限智能体",
+    "unknown_agent": "未知智能体",
+    "detail": {
+      "tokens": "Token 构成",
+      "input": "输入",
+      "output": "输出",
+      "cache_read": "缓存读",
+      "cache_write": "缓存写",
+      "task_id": "task ID",
+      "started": "开始时间",
+      "completed": "结束时间",
+      "agent_project": "智能体 / 项目",
+      "trigger": "触发方式",
+      "failure": "失败原因",
+      "cost": "成本拆解",
+      "reported": "供应商回传",
+      "estimated": "按价目表估算",
+      "pending": "待上报",
+      "total": "合计",
+      "view_run": "在任务中查看 →",
+      "no_usage": "本次失败未上报用量。",
+      "running_usage": "进行中，用量将在结束时上报。",
+      "unpriced": "该模型没有价目表，成本未计入。"
+    },
+    "pagination": {
+      "showing": "显示 {{from}}–{{to}}，共 {{total}} 条",
+      "per_page": "{{count}} 条/页",
+      "per_page_label": "每页条数",
+      "prev": "上一页",
+      "next": "下一页"
+    },
+    "empty_title": "没有匹配的调用记录",
+    "empty_body": "调整筛选条件，或把时间范围放宽。",
+    "empty_reset": "重置筛选",
+    "error_title": "调用日志加载失败",
+    "error_body": "稍后再试。",
+    "error_retry": "重试",
+    "note": "一行代表一次 task 对单个模型的用量；模型回退或重试可能让同一 task 出现多行。成本优先采用供应商回传金额，缺失时按当前价目表估算并标 ≈；时间为用量上报时间，时区 {{tz}}。分页只影响表格，汇总始终覆盖全部筛选结果。",
+    "export_empty": "当前筛选没有可导出的记录。",
+    "export_failed": "导出失败，请稍后重试。",
+    "export_success": "已导出 {{count}} 条记录。",
+    "export_too_large": "匹配记录超过 {{limit}} 条，请缩小筛选范围后再导出。"
+  },
+  "console": {
+    "days_near": "近 {{days}} 天",
+    "calls_unit": "次调用",
+    "tokens_unit": "tokens",
+    "top5": "TOP 5",
+    "chart_title": "每日消耗"
   }
 }

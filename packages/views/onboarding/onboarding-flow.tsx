@@ -17,7 +17,7 @@ import { useT } from "../i18n";
 
 /**
  * Shell's onComplete contract carries the workspace plus an optional
- * destination. Runtime-connected onboarding opens the real Mika conversation
+ * destination. Runtime-connected onboarding opens the real Quill conversation
  * started by the final step; other exits land on the workspace issue list.
  *
  * Three exit shapes feed onComplete:
@@ -27,9 +27,9 @@ import { useT } from "../i18n";
  *     onboarded; we push a {choice:"skip"} welcome signal and navigate
  *     to the workspace. The welcome hook in the workspace shell creates
  *     one install-runtime guide issue on landing.
- *   - Runtime-connected: create or repair the workspace's Mika on the selected
+ *   - Runtime-connected: create or repair the workspace's Quill on the selected
  *     runtime, start one hidden onboarding kickoff, mark onboarding complete,
- *     and open Mika's real chat. No fixed specialist team is created.
+ *     and open Quill's real chat. No fixed specialist team is created.
  *
  * This file never touches createAgent / createIssue. The runtime-skipped
  * guide flow remains in `packages/views/workspace/welcome-after-onboarding.tsx`.

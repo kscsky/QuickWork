@@ -49,5 +49,53 @@
     "row_inviter_fallback": "誰か",
     "row_invited_admin": "{{inviter}}さんがあなたをadminとして招待しました",
     "row_invited_member": "{{inviter}}さんがあなたをmemberとして招待しました"
+  },
+  "roles": {
+    "admin": "管理者",
+    "member": "メンバー"
+  },
+  "loading": {
+    "title": "招待を開いています",
+    "description": "招待とスペースを確認しています…"
+  },
+  "console": {
+    "wordmark": "QuickWork",
+    "top_note": "招待 / INVITATION",
+    "brand_initial": "Q",
+    "agent_initial": "AI",
+    "no_prefix": "NO.",
+    "kicker": "招待 / 返信待ち",
+    "headline_prefix": "ようこそ",
+    "headline_suffix": "次のバトンを受け取ってください。",
+    "copy_as": "があなたを",
+    "copy_rest": "として招待しました。参加すると最初のバトンが回ってきます。",
+    "relay_label": "リレー / RELAY",
+    "relay_eng": "PASS THE BATON",
+    "leg_prev_label": "前のバトン",
+    "leg_prev_sub": "作業はすでに進行中",
+    "state_done": "受け渡し済み",
+    "leg_you_label": "あなたのバトン",
+    "leg_you_sub": "確認、実行、受け渡し",
+    "state_now": "現在",
+    "you_initial": "ME",
+    "leg_next_label": "次のバトン",
+    "leg_next_sub": "エージェントまたは仲間",
+    "state_wait": "待機",
+    "relay_note": "すべてのバトンは受け取る人が必要です。今回はあなたです。",
+    "paper_kicker": "招待 / INVITATION",
+    "workspace_path": "QuickWork スペース",
+    "workspace_tag": "WORKSPACE",
+    "lead_invite": "あなたを",
+    "lead_end": "として {{workspace}} に招待しました。",
+    "fact_inviter": "招待者",
+    "fact_role": "あなたのロール",
+    "fact_valid": "有効期限",
+    "paper_note": "作業はバトンごとに進みます。受け取った人が次のバトンを決めます。",
+    "reply_tag": "返信 / REPLY",
+    "reply_as": "{{role}} として参加",
+    "reply_valid": "{{date}} まで有効",
+    "other_account_hint": "招待されたアカウントが違いますか？",
+    "footer_left": "AGENTS AS ASSIGNEES",
+    "footer_right": "PARKED IS A FEATURE"
   }
 }

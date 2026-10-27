@@ -76,7 +76,8 @@ export function parseTabSubject(url: string): TabSubject {
 
   switch (segment) {
     case "issues":
-      return id ? { kind: "issue", id } : { kind: "page", page: "issues" };
+      // The flat issue list is retired; only detail URLs remain valid.
+      return id ? { kind: "issue", id } : { kind: "unknown" };
     case "my-issues":
       return { kind: "page", page: "myIssues" };
     case "projects":
@@ -112,8 +113,15 @@ export function parseTabSubject(url: string): TabSubject {
       return { kind: "machine", machineId: id };
     case "skills":
       return id ? { kind: "skill", id } : { kind: "page", page: "skills" };
-    case "settings":
-      return { kind: "page", page: "settings" };
+    case "config":
+    case "mcp":
+    case "github":
+    case "integrations":
+    case "tokens":
+    case "account":
+      return id ? { kind: "unknown" } : { kind: "page", page: segment };
+    case "workspace-settings":
+      return { kind: "page", page: "workspaceSettings" };
     case "attachments":
       // `/attachments/:id/preview?name=<filename>`.
       return id

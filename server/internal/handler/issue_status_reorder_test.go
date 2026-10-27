@@ -123,7 +123,7 @@ func TestReorderIssueStatusesRejectsForeignInputs(t *testing.T) {
 	}
 	var builtInID string
 	if err := testPool.QueryRow(context.Background(),
-		`SELECT id FROM issue_status WHERE workspace_id = $1 AND key = 'in_review' AND is_system`,
+		`SELECT id FROM issue_status WHERE workspace_id = $1 AND key = 'in_progress' AND is_system`,
 		testWorkspaceID).Scan(&builtInID); err != nil {
 		t.Fatalf("load built-in: %v", err)
 	}

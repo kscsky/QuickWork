@@ -49,6 +49,13 @@ export interface Autopilot {
   trigger_kinds?: string[];
   next_run_at?: string | null;
   last_run_status?: string | null;
+  // Newest-first outcome strip for the list's run dots (at most 7). Absent
+  // on older servers — render empty slots, never a fabricated history.
+  recent_run_statuses?: string[];
+  // The enabled schedule trigger behind `next_run_at`; absent for webhook-only
+  // automations and on older servers.
+  schedule_cron?: string | null;
+  schedule_timezone?: string | null;
   // List endpoint returns []; only the detail endpoint populates this.
   // Treat undefined as empty on older servers.
   subscribers?: AutopilotSubscriber[];

@@ -5,6 +5,7 @@ import {
   AlertCircle,
   AlertTriangle,
   Download,
+  FolderOpen,
   HardDrive,
   Lock,
   Pencil,
@@ -15,7 +16,6 @@ import type {
   Agent,
   AgentRuntime,
   MemberWithUser,
-  Skill,
   SkillSummary,
 } from "@quickwork/core/types";
 import { useQuery } from "@tanstack/react-query";
@@ -32,6 +32,7 @@ import {
 import { runtimeDisplayLabel, runtimeListOptions } from "@quickwork/core/runtimes";
 import { resolvePublicFileUrl } from "@quickwork/core/workspace/avatar-url";
 import { Button } from "@quickwork/ui/components/ui/button";
+import { cn } from "@quickwork/ui/lib/utils";
 import { Checkbox } from "@quickwork/ui/components/ui/checkbox";
 import {
   LIST_GRID_BOTTOM_CLEARANCE,
@@ -60,9 +61,9 @@ import {
   CollectionPageHeaderAction,
   CollectionPageState,
 } from "../../layout/collection-page";
+import { PAGE_GUTTER } from "../../layout/page-header";
 import { canEditSkill } from "../hooks/use-can-edit-skill";
 import { originSourceUrl, readOrigin, type OriginInfo } from "../lib/origin";
-import { CreateSkillDialog } from "./create-skill-dialog";
 import {
   useSkillsViewStore,
   DEFAULT_HIDDEN_COLUMNS,
@@ -76,6 +77,10 @@ import {
   type SkillActionsContext,
 } from "./skill-list-actions";
 import { useT, useTimeAgo } from "../../i18n";
+import {
+  CreateSkillDialog,
+  type CreateSkillMethod,
+} from "./create-skill-dialog";
 
 // Column template — single source of truth for header, rows, and skeletons.
 // Tracks: [edge 0.75rem] [checkbox 1rem] [name, only fr track]
@@ -108,17 +113,17 @@ const GRID_COLS =
   "grid-cols-[0.75rem_1rem_minmax(120px,1fr)_var(--lgc-usedby)_1.75rem_0.75rem] " +
   "@2xl:grid-cols-[0.75rem_1rem_minmax(200px,1fr)_var(--lgc-usedby)_var(--lgc-source)_var(--lgc-creator)_var(--lgc-updated)_var(--lgc-created)_1.75rem_0.75rem]";
 
-// h-12 rows. The virtualizer's fixed-size contract: every row renders at
-// exactly this height, which is what lets it skip per-row measurement.
-const ROW_HEIGHT = 48;
+// Two-line rows (name + purpose) use a fixed 66px height. The virtualizer's
+// fixed-size contract is what lets it skip per-row measurement.
+const ROW_HEIGHT = 66;
 
 // Single source for hideable column widths: track vars and the grid's
 // min-width derive from the same numbers.
 const COLUMN_WIDTHS: Record<SkillColumnKey, number> = {
-  usedBy: 144,
-  source: 152,
+  usedBy: 170,
+  source: 164,
   creator: 144,
-  updated: 104,
+  updated: 96,
   created: 104,
 };
 
@@ -185,8 +190,9 @@ function PageHeaderBar({
         href: "https://quickwork.ai/docs/skills",
         label: t(($) => $.page.learn_more),
       }}
-      actions={
+      leadingAction={
         <CollectionPageHeaderAction
+          variant="default"
           icon={Plus}
           label={t(($) => $.page.new_skill)}
           onClick={onCreate}
@@ -240,20 +246,32 @@ function NameCell({ row }: { row: SkillRow }) {
   const { t } = useT("skills");
   const { skill, canEdit } = row;
   return (
-    <ListGridCell className="gap-1.5">
-      <span className="min-w-0 truncate text-body font-medium">
-        {skill.name}
+    <ListGridCell className="gap-2.5">
+      <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-brand/10 text-brand">
+        <span aria-hidden="true" className="text-caption">✦</span>
       </span>
-      {!canEdit && (
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              <Lock className="h-3 w-3 shrink-0 text-faint-foreground" />
-            }
-          />
-          <TooltipContent>{t(($) => $.table.lock_tooltip)}</TooltipContent>
-        </Tooltip>
-      )}
+      <span className="flex min-w-0 flex-1 flex-col">
+        <span className="flex min-w-0 items-center gap-1.5">
+          <span className="min-w-0 truncate text-body font-semibold">
+            {skill.name}
+          </span>
+          {!canEdit && (
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Lock className="h-3 w-3 shrink-0 text-faint-foreground" />
+                }
+              />
+              <TooltipContent>{t(($) => $.table.lock_tooltip)}</TooltipContent>
+            </Tooltip>
+          )}
+        </span>
+        {skill.description && (
+          <span className="mt-0.5 min-w-0 truncate text-caption text-muted-foreground">
+            {skill.description}
+          </span>
+        )}
+      </span>
     </ListGridCell>
   );
 }
@@ -316,6 +334,9 @@ function UsedByCell({ agents }: { agents: Agent[] }) {
           </span>
         )}
       </div>
+      <span className="shrink-0 text-caption text-muted-foreground">
+        {t(($) => $.table.used_by_count, { n: agents.length })}
+      </span>
     </ListGridCell>
   );
 }
@@ -355,30 +376,43 @@ function SourceCell({
   // Imported skills link to their upstream page; the anchor must not bubble
   // its click OR auxclick into the row's whole-row navigation.
   const sourceUrl = originSourceUrl(origin);
+  const tone =
+    origin.type === "runtime_local"
+      ? "bg-warning/10 text-warning"
+      : origin.type === "manual"
+        ? "bg-muted text-muted-foreground"
+        : "bg-brand/10 text-brand";
 
   return (
-    <ListGridCell className="hidden gap-1.5 text-caption text-muted-foreground @2xl:flex">
-      {icon}
-      {sourceUrl ? (
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              <a
-                href={sourceUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                {...rowLinkInteractiveProps}
-                className="min-w-0 truncate hover:underline"
-              >
-                {label}
-              </a>
-            }
-          />
-          <TooltipContent side="top">{sourceUrl}</TooltipContent>
-        </Tooltip>
-      ) : (
-        <span className="min-w-0 truncate">{label}</span>
-      )}
+    <ListGridCell className="hidden @2xl:flex">
+      <span
+        className={cn(
+          "inline-flex min-w-0 items-center gap-1 rounded-md px-1.5 py-0.5 text-micro font-medium",
+          tone,
+        )}
+      >
+        {icon}
+        {sourceUrl ? (
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <a
+                  href={sourceUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  {...rowLinkInteractiveProps}
+                  className="min-w-0 truncate hover:underline"
+                >
+                  {label}
+                </a>
+              }
+            />
+            <TooltipContent side="top">{sourceUrl}</TooltipContent>
+          </Tooltip>
+        ) : (
+          <span className="min-w-0 truncate">{label}</span>
+        )}
+      </span>
     </ListGridCell>
   );
 }
@@ -407,20 +441,111 @@ function CreatorCell({ creator }: { creator: MemberWithUser | null }) {
 // Empty state
 // ---------------------------------------------------------------------------
 
-function EmptyState({ onCreate }: { onCreate: () => void }) {
+function SkillsEmptyState({
+  onCreate,
+  onImport,
+}: {
+  onCreate: () => void;
+  onImport: (method: CreateSkillMethod) => void;
+}) {
   const { t } = useT("skills");
+  const methods = [
+    { key: "manual", icon: Plus },
+    { key: "local", icon: FolderOpen },
+    { key: "url", icon: Download },
+    { key: "runtime", icon: HardDrive },
+  ] as const;
   return (
-    <CollectionPageState
-      icon={SkillIcon}
-      title={t(($) => $.page.empty.title)}
-      description={t(($) => $.page.empty.description)}
-      actions={
-        <Button type="button" onClick={onCreate} size="sm">
-          <Plus aria-hidden="true" className="size-3" />
-          {t(($) => $.page.new_skill)}
-        </Button>
-      }
-    />
+    <div className="flex-1 overflow-y-auto">
+      <div className="mx-auto w-full max-w-[1100px] p-6">
+        <div className="rounded-xl border bg-card p-6 shadow-[var(--shadow-surface)]">
+          <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_340px]">
+            <div>
+              <h2 className="text-title font-semibold">
+                {t(($) => $.page.empty.title)}
+              </h2>
+              <p className="mt-1.5 max-w-[520px] text-body leading-6 text-muted-foreground">
+                {t(($) => $.page.empty.lead)}
+              </p>
+              <div className="mt-4 flex flex-wrap items-center gap-2">
+                <Button type="button" size="sm" onClick={onCreate}>
+                  <Plus aria-hidden="true" className="size-3.5" />
+                  {t(($) => $.page.new_skill)}
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => onImport("local")}
+                >
+                  {t(($) => $.create.method.local.title)}
+                </Button>
+              </div>
+
+              <div className="mt-5 grid gap-2 sm:grid-cols-2">
+                {methods.map(({ key, icon: Icon }) => (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() =>
+                      key === "manual" ? onCreate() : onImport(key)
+                    }
+                    className={cn(
+                      "flex w-full cursor-pointer items-start gap-2.5 rounded-lg border px-3 py-2.5 text-left transition-colors",
+                      key === "manual"
+                        ? "border-primary/40 bg-primary/5"
+                        : "bg-card hover:border-input hover:bg-accent/40",
+                    )}
+                  >
+                    <span className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-md border bg-background text-muted-foreground">
+                      <Icon className="size-3.5" />
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block text-caption font-semibold">
+                        {t(($) => $.create.method[key].title)}
+                      </span>
+                      <span className="mt-0.5 block text-caption text-muted-foreground">
+                        {t(($) => $.create.method[key].desc)}
+                      </span>
+                    </span>
+                  </button>
+                ))}
+              </div>
+
+              <p className="mt-3 flex items-center gap-2 text-caption text-muted-foreground">
+                <span className="size-1.5 rounded-full bg-success" />
+                {t(($) => $.page.empty.local_note)}
+              </p>
+            </div>
+
+            <div className="overflow-hidden rounded-xl border bg-card">
+              <div className="flex h-9 items-center gap-2 border-b bg-muted/40 px-3">
+                <span className="font-mono text-caption font-medium">
+                  SKILL.md
+                </span>
+                <span className="ml-auto text-micro text-muted-foreground">
+                  {t(($) => $.page.empty.example)}
+                </span>
+              </div>
+              <pre className="m-0 whitespace-pre-wrap break-words p-4 font-mono text-caption leading-5 text-muted-foreground">{`---
+name: pr-review
+description: Review a pull request against our checklist
+---
+
+# PR review
+
+Use this skill when a pull request is ready for review.
+
+## Steps
+1. Read the diff and the linked issue.
+2. Check each item in references/checklist.md.
+3. Call out blocking issues first.
+4. Leave a concise summary.`}</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -555,7 +680,7 @@ function LoadingSkeleton() {
         <span aria-hidden="true" />
       </ListGridHeader>
       {Array.from({ length: 5 }).map((_, i) => (
-        <ListGridRow key={i} className="hover:bg-transparent">
+        <ListGridRow key={i} style={{ height: ROW_HEIGHT }} className="hover:bg-transparent">
           <span aria-hidden="true" />
           <ListGridCell>
             <Skeleton className="h-3.5 w-40 max-w-full" />
@@ -608,7 +733,8 @@ export default function SkillsPage() {
     runtimeListOptions(wsId),
   );
 
-  const [createOpen, setCreateOpen] = useState(false);
+  const [scope, setScope] = useState<"all" | "used" | "unused" | "mine">("all");
+  const [importMethod, setImportMethod] = useState<CreateSkillMethod | null>(null);
   const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(
     new Set(),
   );
@@ -687,10 +813,30 @@ export default function SkillsPage() {
     });
   }, [skills, assignments, membersById, runtimesById, currentUserId, myRole]);
 
-  // Visible rows: name search + filters, then sort.
+  const scopeCounts = useMemo(
+    () => ({
+      all: allRows.length,
+      used: allRows.filter((row) => row.agents.length > 0).length,
+      unused: allRows.filter((row) => row.agents.length === 0).length,
+      mine: allRows.filter(
+        (row) => !!currentUserId && row.skill.created_by === currentUserId,
+      ).length,
+    }),
+    [allRows, currentUserId],
+  );
+
+  // Visible rows: scope + name search + filters, then sort.
   const rows = useMemo<SkillRow[]>(() => {
     const q = search.trim().toLowerCase();
     const filtered = allRows.filter((row) => {
+      if (scope === "used" && row.agents.length === 0) return false;
+      if (scope === "unused" && row.agents.length > 0) return false;
+      if (
+        scope === "mine" &&
+        (!currentUserId || row.skill.created_by !== currentUserId)
+      ) {
+        return false;
+      }
       if (q && !row.skill.name.toLowerCase().includes(q)) return false;
       if (filters.usage.length > 0) {
         const usage = row.agents.length > 0 ? "used" : "unused";
@@ -740,7 +886,7 @@ export default function SkillsPage() {
       );
     });
     return filtered;
-  }, [allRows, search, filters, sortField, sortDirection]);
+  }, [allRows, scope, currentUserId, search, filters, sortField, sortDirection]);
 
   // Row virtualization — Linear-style: the virtualizer only does the math
   // (visible index range + offsets); the DOM stays ours. Offsets become
@@ -757,10 +903,6 @@ export default function SkillsPage() {
     overscan: 10,
   });
 
-  const handleCreated = (skill: Skill) => {
-    navigation.push(paths.skillDetail(skill.id));
-  };
-
   const selectedRows = rows.filter((row) => selectedIds.has(row.skill.id));
   const allSelected = rows.length > 0 && selectedRows.length === rows.length;
   const someSelected = selectedRows.length > 0 && !allSelected;
@@ -774,7 +916,7 @@ export default function SkillsPage() {
   if (listError) {
     return (
       <div className="flex flex-1 min-h-0 flex-col">
-        <PageHeaderBar totalCount={0} onCreate={() => setCreateOpen(true)} />
+        <PageHeaderBar totalCount={0} onCreate={() => navigation.push(paths.skillNew())} />
         <CollectionPageState
           role="alert"
           tone="destructive"
@@ -823,7 +965,7 @@ export default function SkillsPage() {
     <div className="relative flex flex-1 min-h-0 flex-col">
       <PageHeaderBar
         totalCount={totalCount}
-        onCreate={() => setCreateOpen(true)}
+        onCreate={() => navigation.push(paths.skillNew())}
       />
 
       {supportingQueryDown && (
@@ -841,11 +983,40 @@ export default function SkillsPage() {
           <LoadingSkeleton />
         </div>
       ) : showEmpty ? (
-        <div className="flex flex-1 items-center justify-center">
-          <EmptyState onCreate={() => setCreateOpen(true)} />
-        </div>
+        <SkillsEmptyState
+          onCreate={() => navigation.push(paths.skillNew())}
+          onImport={(method) => setImportMethod(method)}
+        />
       ) : (
         <>
+          <div className={cn("flex shrink-0 flex-wrap items-center gap-2 pb-1 pt-3", PAGE_GUTTER)}>
+            {(["all", "used", "unused", "mine"] as const).map((key) => (
+              <button
+                key={key}
+                type="button"
+                aria-pressed={scope === key}
+                onClick={() => setScope(key)}
+                className={cn(
+                  "inline-flex cursor-pointer items-center gap-1.5 rounded-full border px-2.5 py-1 text-caption transition-colors",
+                  scope === key
+                    ? "border-primary bg-primary font-medium text-primary-foreground"
+                    : "border-transparent text-muted-foreground hover:bg-muted hover:text-foreground",
+                )}
+              >
+                {t(($) => $.page.scopes[key].label)}
+                <span
+                  className={cn(
+                    "font-mono text-micro tabular-nums",
+                    scope === key
+                      ? "text-primary-foreground/70"
+                      : "text-faint-foreground",
+                  )}
+                >
+                  {scopeCounts[key]}
+                </span>
+              </button>
+            ))}
+          </div>
           <SkillListToolbar
             search={search}
             onSearchChange={setSearch}
@@ -863,8 +1034,9 @@ export default function SkillsPage() {
           />
           <div
             ref={listScrollRef}
-            className="min-h-0 flex-1 overflow-auto @container"
+            className="min-h-0 flex-1 overflow-auto px-4 pb-6 pt-3 @container"
           >
+          <div className="overflow-hidden rounded-xl border border-surface-border bg-card shadow-[var(--shadow-surface)]">
           <ListGrid
             className={`${GRID_COLS} @2xl:min-w-[var(--lgc-minw)]`}
             style={columnTrackVars(isColVisible)}
@@ -896,6 +1068,7 @@ export default function SkillsPage() {
                 return (
               <ListGridRow
                 key={row.skill.id}
+                style={{ height: ROW_HEIGHT }}
                 className={`cursor-pointer ${
                   selectedIds.has(row.skill.id) ? "bg-accent/30" : ""
                 }`}
@@ -944,6 +1117,7 @@ export default function SkillsPage() {
             </ListGridBody>
           </ListGrid>
           </div>
+          </div>
         </>
       )}
 
@@ -953,10 +1127,14 @@ export default function SkillsPage() {
         onClear={() => setSelectedIds(new Set())}
       />
 
-      {createOpen && (
+      {importMethod && (
         <CreateSkillDialog
-          onClose={() => setCreateOpen(false)}
-          onCreated={handleCreated}
+          initialMethod={importMethod}
+          onClose={() => setImportMethod(null)}
+          onCreated={(skill) => {
+            setImportMethod(null);
+            navigation.push(paths.skillDetail(skill.id));
+          }}
         />
       )}
     </div>

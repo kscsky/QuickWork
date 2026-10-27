@@ -47,8 +47,13 @@ type CommentResponse struct {
 	// request field for it — which is exactly why the card keys off this id
 	// rather than a `type` value the client controls.
 	QuickActionID *string              `json:"quick_action_id,omitempty"`
-	Reactions     []ReactionResponse   `json:"reactions"`
-	Attachments   []AttachmentResponse `json:"attachments"`
+	// ChainStepID marks a leg-scoped comment (单流分界). Present in responses
+	// only when the reader may see the comment at all — the list query already
+	// filtered by the viewer — so its presence doubles as the "this one stays
+	// inside a leg" signal the timeline tags.
+	ChainStepID *string              `json:"chain_step_id,omitempty"`
+	Reactions   []ReactionResponse   `json:"reactions"`
+	Attachments []AttachmentResponse `json:"attachments"`
 	// Orientation stats — populated only on the roots_only path and omitted in
 	// every other mode, so the default response shape stays byte-identical for
 	// existing callers. ReplyCount is the number of descendants in the thread;
@@ -115,6 +120,7 @@ func commentToResponse(c db.Comment, reactions []ReactionResponse, attachments [
 		ResolvedByID:   uuidToPtr(c.ResolvedByID),
 		SourceTaskID:   uuidToPtr(c.SourceTaskID),
 		QuickActionID:  uuidToPtr(c.QuickActionID),
+		ChainStepID:    uuidToPtr(c.ChainStepID),
 		Reactions:      reactions,
 		Attachments:    attachments,
 	}
@@ -586,8 +592,18 @@ func (h *Handler) ListComments(w http.ResponseWriter, r *http.Request) {
 		threadTailSet = true
 	}
 
+	viewerUserID, ok := requireUserID(w, r)
+	if !ok {
+		return
+	}
+	viewer, err := util.ParseUUID(viewerUserID)
+	if err != nil {
+		writeError(w, http.StatusUnauthorized, "user not authenticated")
+		return
+	}
 	result, err := h.fetchCommentsForList(r.Context(), fetchCommentsArgs{
 		Issue:         issue,
+		ViewerID:      viewer,
 		Since:         sinceTime,
 		ThreadAnchor:  threadStr,
 		ThreadTail:    threadTail,
@@ -692,7 +708,10 @@ func (h *Handler) ListComments(w http.ResponseWriter, r *http.Request) {
 // "user did not pass --tail" and "user passed --tail 0" into the same state,
 // which would silently downgrade the latter to the full-thread path.
 type fetchCommentsArgs struct {
-	Issue         db.Issue
+	Issue db.Issue
+	// The caller, for the leg boundary: leg-scoped comments read back only for
+	// the leg's holder. Zero means "no legs visible".
+	ViewerID      pgtype.UUID
 	Since         pgtype.Timestamptz
 	RootsOnly     bool
 	ThreadAnchor  string
@@ -1025,6 +1044,7 @@ func (h *Handler) fetchCommentsForList(ctx context.Context, args fetchCommentsAr
 			rows, err := h.Queries.ListRootCommentsSinceForIssue(ctx, db.ListRootCommentsSinceForIssueParams{
 				IssueID:     issue.ID,
 				WorkspaceID: issue.WorkspaceID,
+				ViewerID:    args.ViewerID,
 				Since:       args.Since,
 				RowLimit:    commentProbeLimit,
 			})
@@ -1089,8 +1109,9 @@ func (h *Handler) fetchCommentsForList(ctx context.Context, args fetchCommentsAr
 		comments, err := h.Queries.ListCommentsSinceForIssue(ctx, db.ListCommentsSinceForIssueParams{
 			IssueID:     issue.ID,
 			WorkspaceID: issue.WorkspaceID,
-			CreatedAt:   args.Since,
-			Limit:       commentProbeLimit,
+			ViewerID:    args.ViewerID,
+			Since:       args.Since,
+			RowLimit:    commentProbeLimit,
 		})
 		if err != nil {
 			return fetchCommentsResult{}, err
@@ -1104,7 +1125,8 @@ func (h *Handler) fetchCommentsForList(ctx context.Context, args fetchCommentsAr
 	comments, err := h.Queries.ListCommentsForIssue(ctx, db.ListCommentsForIssueParams{
 		IssueID:     issue.ID,
 		WorkspaceID: issue.WorkspaceID,
-		Limit:       commentProbeLimit,
+		ViewerID:    args.ViewerID,
+		RowLimit:    commentProbeLimit,
 	})
 	if err != nil {
 		return fetchCommentsResult{}, err
@@ -1464,6 +1486,10 @@ type CreateCommentRequest struct {
 	ParentID         *string  `json:"parent_id"`
 	AttachmentIDs    []string `json:"attachment_ids"`
 	SuppressAgentIDs []string `json:"suppress_agent_ids"`
+	// Posts this comment into the caller's own leg (单流分界) instead of the
+	// room. Accepted only from that leg's holder; replies ignore it and inherit
+	// their parent's lane.
+	ChainStepID *string `json:"chain_step_id"`
 }
 
 type CommentTriggerPreviewRequest struct {
@@ -1497,6 +1523,7 @@ const (
 	commentTriggerSourceMentionSquadLeader commentAgentTriggerSource = "mention_squad_leader"
 	commentTriggerSourceThreadParent       commentAgentTriggerSource = "thread_parent"
 	commentTriggerSourceConversation       commentAgentTriggerSource = "conversation_continuation"
+	commentTriggerSourceChainStep          commentAgentTriggerSource = "chain_step"
 )
 
 const defaultCommentRoutingEscalationDelay = 5 * time.Minute
@@ -1552,6 +1579,11 @@ type commentTriggerComputeOptions struct {
 	// when OriginatorUserID is empty. Authorization input only — attribution/audit
 	// read OriginatorUserID, never this, so the enqueued run stays unattributed.
 	AutopilotDelegationAuthorityUserID string
+
+	// ChainStepID is the relay leg this comment is scoped to (单流分界), when it
+	// is scoped at all. A leg-scoped comment is addressed to that leg's own
+	// agent — see routeRelayStepComment. Zero for room comments.
+	ChainStepID pgtype.UUID
 }
 
 // effectiveInvoker is the human principal the A2A invoke gate (canInvokeAgent)
@@ -1580,6 +1612,8 @@ func commentAgentTriggerReason(trigger commentAgentTrigger) string {
 		return "This reply will trigger the parent comment's author."
 	case commentTriggerSourceConversation:
 		return "This follow-up will continue the recent agent conversation."
+	case commentTriggerSourceChainStep:
+		return "This comment will reach the agent on the relay leg it belongs to."
 	default:
 		return "This comment will trigger this agent."
 	}
@@ -1865,6 +1899,53 @@ func (h *Handler) CreateComment(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Leg attribution (单流分界): a comment can belong to a leg instead of the
+	// room. Three sources, in this order:
+	//   1. a reply inherits its parent's lane — threads stay where they started;
+	//   2. an agent's own comment is attributed to the leg that agent is running
+	//      right now (its work inside the leg);
+	//   3. a member's explicit chain_step_id, accepted only from that leg's
+	//      holder (the workbench composer). Someone else's leg is not writable.
+	var chainStepID pgtype.UUID
+	if parentComment != nil {
+		chainStepID = parentComment.ChainStepID
+	} else if authorType == "agent" {
+		steps, stepsErr := h.Queries.ListIssueChainSteps(r.Context(), issue.ID)
+		if stepsErr == nil {
+			agentUUID := parseUUID(authorID)
+			for _, step := range steps {
+				if step.AgentID != agentUUID {
+					continue
+				}
+				if step.State == service.ChainStateDoing || step.State == service.ChainStateReviewing {
+					chainStepID = step.ID
+					break
+				}
+			}
+		}
+	} else if req.ChainStepID != nil && *req.ChainStepID != "" {
+		parsed, ok := parseUUIDOrBadRequest(w, *req.ChainStepID, "chain_step_id")
+		if !ok {
+			return
+		}
+		steps, stepsErr := h.Queries.ListIssueChainSteps(r.Context(), issue.ID)
+		if stepsErr != nil {
+			writeError(w, http.StatusInternalServerError, "failed to load the task's chain")
+			return
+		}
+		caller := parseUUID(userID)
+		for _, step := range steps {
+			if step.ID == parsed && step.HolderUserID == caller {
+				chainStepID = step.ID
+				break
+			}
+		}
+		if !chainStepID.Valid {
+			writeError(w, http.StatusForbidden, "only the step's holder can post into that leg")
+			return
+		}
+	}
+
 	// NOTE: Comment content is stored as Markdown source. XSS is handled at the
 	// rendering layer (rehype-sanitize) and at the editor layer
 	// (@tiptap/markdown with html:false). Running an HTML sanitizer here would
@@ -1895,6 +1976,7 @@ func (h *Handler) CreateComment(w http.ResponseWriter, r *http.Request) {
 		Type:         req.Type,
 		ParentID:     parentID,
 		SourceTaskID: sourceTaskID,
+		ChainStepID:  chainStepID,
 	})
 	if err != nil {
 		slog.Warn("create comment failed", append(logger.RequestAttrs(r), "error", err, "issue_id", issueID)...)
@@ -1913,14 +1995,34 @@ func (h *Handler) CreateComment(w http.ResponseWriter, r *http.Request) {
 	resp := commentToResponse(comment, nil, groupedAtt[uuidToString(comment.ID)])
 	resp.IssueRevision = created.IssueRevision
 	slog.Info("comment created", append(logger.RequestAttrs(r), "comment_id", uuidToString(comment.ID), "issue_id", issueID)...)
-	h.publish(protocol.EventCommentCreated, uuidToString(issue.WorkspaceID), authorType, authorID, map[string]any{
-		"comment":             resp,
-		"issue_title":         issue.Title,
-		"issue_assignee_type": textToPtr(issue.AssigneeType),
-		"issue_assignee_id":   uuidToPtr(issue.AssigneeID),
-		"issue_status":        issue.Status,
-		"issue_revision":      created.IssueRevision,
-	})
+	if chainStepID.Valid {
+		// Leg content: the event is a POINTER, not a payload. The workspace
+		// channel reaches every member, so carrying the comment body here would
+		// hand the leg's interior to everyone the query just refused. Clients
+		// invalidate on the id; the leg's holder is the only reader whose
+		// refetch brings the content back.
+		h.publish(protocol.EventCommentCreated, uuidToString(issue.WorkspaceID), authorType, authorID, map[string]any{
+			"comment": map[string]any{
+				"id":            uuidToString(comment.ID),
+				"issue_id":      uuidToString(issue.ID),
+				"chain_step_id": uuidToString(chainStepID),
+			},
+			"issue_title":         issue.Title,
+			"issue_assignee_type": textToPtr(issue.AssigneeType),
+			"issue_assignee_id":   uuidToPtr(issue.AssigneeID),
+			"issue_status":        issue.Status,
+			"issue_revision":      created.IssueRevision,
+		})
+	} else {
+		h.publish(protocol.EventCommentCreated, uuidToString(issue.WorkspaceID), authorType, authorID, map[string]any{
+			"comment":             resp,
+			"issue_title":         issue.Title,
+			"issue_assignee_type": textToPtr(issue.AssigneeType),
+			"issue_assignee_id":   uuidToPtr(issue.AssigneeID),
+			"issue_status":        issue.Status,
+			"issue_revision":      created.IssueRevision,
+		})
+	}
 
 	// A reply in a resolved thread re-opens it. Done after CreateComment commits
 	// so the reply is visible regardless of the unresolve outcome. Shared with
@@ -1989,6 +2091,7 @@ func (h *Handler) triggerTasksForComment(ctx context.Context, issue db.Issue, co
 		ExcludeTriggerCommentID:            comment.ID,
 		OriginatorUserID:                   originatorUserID,
 		AutopilotDelegationAuthorityUserID: delegationAuthorityUserID,
+		ChainStepID:                        comment.ChainStepID,
 	})
 	triggers = filterSuppressedCommentAgentTriggers(triggers, suppressAgentIDs)
 	h.noteBlockedRuntimeTargets(ctx, issue, targets)
@@ -2613,6 +2716,15 @@ func (h *Handler) enqueueSingleCommentTrigger(ctx context.Context, issue db.Issu
 				"agent_id", uuidToString(trigger.Agent.ID))
 			return err
 		}
+	case commentTriggerSourceChainStep:
+		// The relay leg's own agent, as a WORKER: no leader flag and no squad
+		// context — the leg does the work, it does not coordinate.
+		if _, err := h.TaskService.EnqueueTaskForMention(ctx, issue, trigger.Agent.ID, triggerCommentID); err != nil {
+			logCommentEnqueueFailure("enqueue relay leg agent task failed", err,
+				"issue_id", uuidToString(issue.ID),
+				"agent_id", uuidToString(trigger.Agent.ID))
+			return err
+		}
 	case commentTriggerSourceThreadParent, commentTriggerSourceConversation:
 		var task db.AgentTaskQueue
 		var err error
@@ -2694,10 +2806,29 @@ func (h *Handler) computeCommentAgentTriggers(ctx context.Context, issue db.Issu
 		// routeAssignedSquadLeaderFallback. Explicit @agent / @squad mentions
 		// are already handled above, so this never double-enqueues a mentioned
 		// target alongside the assigned leader.
-		if issue.AssigneeType.Valid && issue.AssigneeType.String == "squad" {
+		//
+		// A relay issue never wakes a squad leader: on a relay the baton moves
+		// on the holder's own 通过 (ApproveChainStep dispatches the next leg
+		// itself) and every leg's work belongs to that leg's agent, so there is
+		// no coordinator loop to close. The worker→leader wake therefore only
+		// applies to squad issues that have no relay.
+		if issue.AssigneeType.Valid && issue.AssigneeType.String == "squad" &&
+			!h.issueHasRelay(ctx, issue.ID) {
 			if trigger, ok := h.routeAssignedSquadLeaderFallback(ctx, issue, actorType, actorID, opts); ok {
 				return []commentAgentTrigger{trigger}, nil
 			}
+		}
+		return nil, nil
+	}
+
+	// A leg-scoped comment (单流分界) is addressed to that leg's own agent: the
+	// holder is its only author and the leg is the holder's conversation with
+	// their agent — so route to the leg before any room conversation routing.
+	// The squad leader is never the audience of a leg; when the leg has no
+	// runnable agent the comment simply reaches no agent.
+	if opts.ChainStepID.Valid {
+		if trigger, ok := h.routeRelayStepComment(ctx, issue, opts.ChainStepID, actorType, actorID, opts); ok {
+			return []commentAgentTrigger{trigger}, nil
 		}
 		return nil, nil
 	}
@@ -2918,6 +3049,16 @@ func (h *Handler) routeAssigneeFallback(ctx context.Context, issue db.Issue, aut
 	if !issue.AssigneeType.Valid || !issue.AssigneeID.Valid {
 		return commentAgentTrigger{}, false
 	}
+	// On a relay, the implicit fallback is the leg holding the baton — the
+	// squad-leader coordinator role does not exist here (接力: work moves on
+	// the holder's 通过, not on mentions). A relay whose legs are all parked,
+	// pending or finished holds no baton: nothing can run, so nobody wakes.
+	if steps, err := h.Queries.ListIssueChainSteps(ctx, issue.ID); err == nil && len(steps) > 0 {
+		if target := relayBatonStep(steps); target != nil {
+			return h.relayStepTrigger(ctx, issue, *target, authorType, authorID, opts)
+		}
+		return commentAgentTrigger{}, false
+	}
 	switch issue.AssigneeType.String {
 	case "agent":
 		agent, hasPending, ok := h.assigneeFallbackAgent(ctx, issue, authorType, authorID, opts)
@@ -2930,6 +3071,72 @@ func (h *Handler) routeAssigneeFallback(ctx context.Context, issue db.Issue, aut
 	default:
 		return commentAgentTrigger{}, false
 	}
+}
+
+// issueHasRelay reports whether the issue runs as a relay (小队接力): it has
+// chain steps. The relay — not the squad-leader roster — is the coordination
+// model on such issues, so the leader fallbacks stay off.
+func (h *Handler) issueHasRelay(ctx context.Context, issueID pgtype.UUID) bool {
+	steps, err := h.Queries.ListIssueChainSteps(ctx, issueID)
+	return err == nil && len(steps) > 0
+}
+
+// relayBatonStep returns the step that currently holds the relay's baton: the
+// leg that is running, or the leg waiting on its holder's review. Parked,
+// pending and finished legs hold no baton — nothing on them can run.
+func relayBatonStep(steps []db.IssueChainStep) *db.IssueChainStep {
+	for i := range steps {
+		if steps[i].State == service.ChainStateDoing {
+			return &steps[i]
+		}
+	}
+	for i := range steps {
+		if steps[i].State == service.ChainStateReviewing {
+			return &steps[i]
+		}
+	}
+	return nil
+}
+
+// routeRelayStepComment routes a leg-scoped comment to that leg's own agent.
+func (h *Handler) routeRelayStepComment(ctx context.Context, issue db.Issue, stepID pgtype.UUID, actorType, actorID string, opts commentTriggerComputeOptions) (commentAgentTrigger, bool) {
+	steps, err := h.Queries.ListIssueChainSteps(ctx, issue.ID)
+	if err != nil {
+		return commentAgentTrigger{}, false
+	}
+	for i := range steps {
+		if steps[i].ID == stepID {
+			return h.relayStepTrigger(ctx, issue, steps[i], actorType, actorID, opts)
+		}
+	}
+	return commentAgentTrigger{}, false
+}
+
+// relayStepTrigger resolves ONE relay step's agent into a runnable trigger.
+// Gated by canInvokeAgent like every other hop: a member wakes only agents
+// they may invoke — on a relay that is their own lent agent (a leg's holder is
+// its only author), and nobody can steer someone else's private agent. That
+// boundary is the point: the baton moves on the holder's 通过, not on
+// mentions, and the leg's agent is the leg's own.
+func (h *Handler) relayStepTrigger(ctx context.Context, issue db.Issue, step db.IssueChainStep, actorType, actorID string, opts commentTriggerComputeOptions) (commentAgentTrigger, bool) {
+	if !step.AgentID.Valid {
+		return commentAgentTrigger{}, false
+	}
+	agent, err := h.Queries.GetAgentInWorkspace(ctx, db.GetAgentInWorkspaceParams{
+		ID:          step.AgentID,
+		WorkspaceID: issue.WorkspaceID,
+	})
+	if err != nil || !agent.RuntimeID.Valid || agent.ArchivedAt.Valid {
+		return commentAgentTrigger{}, false
+	}
+	if !h.canInvokeAgent(ctx, agent, actorType, actorID, opts.effectiveInvoker(), uuidToString(issue.WorkspaceID)) {
+		return commentAgentTrigger{}, false
+	}
+	hasPending, err := h.hasPendingTaskForIssueAndAgent(ctx, issue.ID, step.AgentID, opts)
+	if err != nil {
+		return commentAgentTrigger{}, false
+	}
+	return commentAgentTrigger{Agent: agent, Source: commentTriggerSourceChainStep, AlreadyPending: hasPending}, true
 }
 
 func (h *Handler) routeAssignedSquadLeaderFallback(ctx context.Context, issue db.Issue, authorType, authorID string, opts commentTriggerComputeOptions) (commentAgentTrigger, bool) {
@@ -3671,6 +3878,7 @@ func (h *Handler) retriggerCancelledTaskSurvivors(ctx context.Context, issue db.
 			ExcludeTriggerCommentID:            comment.ID,
 			OriginatorUserID:                   originatorUserID,
 			AutopilotDelegationAuthorityUserID: delegationAuthority,
+			ChainStepID:                        comment.ChainStepID,
 		})
 		targets := targetsByComment[uuidToString(comment.ID)]
 		scoped := make([]commentAgentTrigger, 0, len(targets))

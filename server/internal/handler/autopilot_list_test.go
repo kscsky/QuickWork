@@ -104,12 +104,29 @@ func TestListAutopilots_DerivedFields(t *testing.T) {
 	if rich["last_run_status"] != "failed" {
 		t.Errorf("last_run_status: expected most recent run (failed), got %v", rich["last_run_status"])
 	}
+	recent, _ := rich["recent_run_statuses"].([]any)
+	if len(recent) != 2 || recent[0] != "failed" || recent[1] != "completed" {
+		t.Errorf("recent_run_statuses: expected [failed completed] newest first, got %v", rich["recent_run_statuses"])
+	}
+	if rich["schedule_cron"] != "0 9 * * *" {
+		t.Errorf("schedule_cron: expected the enabled schedule's expression, got %v", rich["schedule_cron"])
+	}
+	if rich["schedule_timezone"] != "UTC" {
+		t.Errorf("schedule_timezone: expected the enabled schedule's zone, got %v", rich["schedule_timezone"])
+	}
 
 	plain, ok := rows[bare]
 	if !ok {
 		t.Fatalf("autopilot %s missing from list", bare)
 	}
-	for _, key := range []string{"trigger_kinds", "next_run_at", "last_run_status"} {
+	for _, key := range []string{
+		"trigger_kinds",
+		"next_run_at",
+		"last_run_status",
+		"recent_run_statuses",
+		"schedule_cron",
+		"schedule_timezone",
+	} {
 		if _, present := plain[key]; present {
 			t.Errorf("%s: expected field omitted for autopilot with no triggers/runs, got %v", key, plain[key])
 		}

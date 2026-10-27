@@ -51,8 +51,9 @@ import { useT } from "../../i18n";
 import { isNameConflictError } from "../lib/utils";
 
 type Method = "chooser" | "manual" | "local" | "url" | "runtime";
+export type CreateSkillMethod = Exclude<Method, "chooser">;
 
-function seedAfterCreate(
+export function seedAfterCreate(
   qc: ReturnType<typeof useQueryClient>,
   wsId: string,
   skill: Skill,
@@ -611,12 +612,15 @@ function LocalForm({
 export function CreateSkillDialog({
   onClose,
   onCreated,
+  initialMethod,
 }: {
   onClose: () => void;
   onCreated?: (skill: Skill) => void;
+  /** Open straight into an import method instead of the chooser. */
+  initialMethod?: CreateSkillMethod;
 }) {
   const { t } = useT("skills");
-  const [method, setMethod] = useState<Method>("chooser");
+  const [method, setMethod] = useState<Method>(initialMethod ?? "chooser");
   const [localPrepared, setLocalPrepared] = useState<PreparedSkillArchive | null>(
     null,
   );

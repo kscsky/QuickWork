@@ -30,7 +30,7 @@ import {
 import { useWorkspaceId } from "@quickwork/core/hooks";
 import { useIssueStatuses } from "@quickwork/core/issue-statuses/hooks";
 import { useStatusOptions } from "../utils/status-options";
-import { issueKeys } from "@quickwork/core/issues/queries";
+import { issueChainOptions, issueKeys } from "@quickwork/core/issues/queries";
 import { StatusIcon } from "../components/status-icon";
 import { PriorityIcon } from "../components/priority-icon";
 import {
@@ -122,6 +122,15 @@ export function IssueActionsMenuItems({
     openDeleteConfirm,
   } = actions;
 
+  // A task WITH A CHAIN runs as a relay — the chain is the definition, not
+  // the assignee column (a chain can sit on a member-assigned issue). Its
+  // status is a projection of the chain and its shape is the 编排, not a set
+  // of fields, so the full solo-task menu would only sell controls the flow
+  // owns. Base UI mounts this component only when the menu opens, so the
+  // chain read is free while closed.
+  const { data: chain } = useQuery(issueChainOptions(issue.id));
+  const relay = (chain?.steps.length ?? 0) > 0 || issue.assignee_type === "squad";
+
   // Subscribe to the issue's task list so the cache is warm by the time the
   // user clicks "Copy local workdir path". The query only fires while the
   // menu is open (Base UI portals the menu content lazily) — list views
@@ -129,11 +138,13 @@ export function IssueActionsMenuItems({
   // menu actually opens.
   //
   // The query shares its key with ExecutionLogSection, so navigating from
-  // the issue detail page is a free cache hit.
+  // the issue detail page is a free cache hit. Relay tasks never render the
+  // item, so they never fire the query.
   const { data: tasks } = useQuery({
     queryKey: issueKeys.tasks(issue.id),
     queryFn: () => api.listTasksByIssue(issue.id),
     staleTime: 30_000,
+    enabled: !relay,
   });
   const workdirCopyTarget = useMemo(
     () => resolveWorkdirCopyTarget(tasks),
@@ -171,6 +182,11 @@ export function IssueActionsMenuItems({
 
   return (
     <>
+      {/* Fields the relay owns. A squad task's status is derived from its
+          chain, its shape is the 编排 (not a field), and dates and priority
+          belong to a solo task's planner — none of it is offered here. */}
+      {!relay ? (
+      <>
       {/* Status */}
       <P.Sub>
         <P.SubTrigger>
@@ -295,6 +311,8 @@ export function IssueActionsMenuItems({
       </P.Sub>
 
       <P.Separator />
+      </>
+      ) : null}
 
       {/* Leads the "do something with this issue itself" group: the only
           discoverable way to open an issue elsewhere for users who don't know
@@ -315,19 +333,25 @@ export function IssueActionsMenuItems({
         <Link2 className="h-3.5 w-3.5" />
         {t(($) => $.actions.copy_link)}
       </P.Item>
-      <P.Item onClick={handleCopyWorkdirPath}>
-        <FolderOpen className="h-3.5 w-3.5" />
-        {workdirCopyTarget?.source === "durable_project_directory"
-          ? t(($) => $.actions.copy_project_directory_path)
-          : t(($) => $.actions.copy_workdir_path)}
-      </P.Item>
+      {/* The workdir path is where an agent runs a solo dispatch; a relay
+          task's legs run on each holder's own machine. */}
+      {!relay ? (
+        <P.Item onClick={handleCopyWorkdirPath}>
+          <FolderOpen className="h-3.5 w-3.5" />
+          {workdirCopyTarget?.source === "durable_project_directory"
+            ? t(($) => $.actions.copy_project_directory_path)
+            : t(($) => $.actions.copy_workdir_path)}
+        </P.Item>
+      ) : null}
 
       <P.Separator />
 
       {/* Relationship actions live under "Relations" — a semantically explicit
           label (unlike the old "More") so the first level tells you what the
           submenu does. Holds parent/sub-issue links today, and will grow
-          (blocks, duplicates, related) as we add more relation types. */}
+          (blocks, duplicates, related) as we add more relation types. Relay
+          tasks do not do sub-issues: the legs ARE the substructure. */}
+      {!relay ? (
       <P.Sub>
         <P.SubTrigger>
           <Network className="h-3.5 w-3.5" />
@@ -354,6 +378,7 @@ export function IssueActionsMenuItems({
           </P.Item>
         </P.SubContent>
       </P.Sub>
+      ) : null}
 
       {/* Manual plugin hooks. Rendered by the host rather than by the plugin
           because the trigger decides identity: a `manual` call acts as the
@@ -365,7 +390,9 @@ export function IssueActionsMenuItems({
           it, never on the plugin's own initiative. */}
       <PluginModalMenuItems issueId={issue.id} Item={P.Item} />
 
-      <P.Separator />
+      {/* Solo flow only: the relay menu already ends its list above this
+          point, so its delete item keeps a single separator. */}
+      {!relay ? <P.Separator /> : null}
 
       <P.Item
         variant="destructive"

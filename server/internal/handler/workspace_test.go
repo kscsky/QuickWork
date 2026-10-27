@@ -171,17 +171,17 @@ INSERT INTO github_pending_check_suite (
 	workspace_id, installation_id, repo_owner, repo_name, pr_number,
 	suite_id, head_sha, app_id, status, suite_updated_at
 )
-VALUES ($1, 123456789, 'multica-ai', 'quickwork', 3366, 987654321, 'abc123', 15368, 'completed', now())
+VALUES ($1, 123456789, 'kscsky', 'quickwork', 3366, 987654321, 'abc123', 15368, 'completed', now())
 `, wsID)
 	githubPRID := dbfx.Insert(t, "github_pull_request", testutil.Cols{
 		"workspace_id":    wsID,
 		"installation_id": 123456789,
-		"repo_owner":      "multica-ai",
+		"repo_owner":      "kscsky",
 		"repo_name":       "quickwork",
 		"pr_number":       5265,
 		"title":           "Workspace cleanup snapshot",
 		"state":           "open",
-		"html_url":        "https://github.com/multica-ai/multica/pull/5265",
+		"html_url":        "https://github.com/kscsky/QuickWork/pull/5265",
 		"pr_created_at":   testutil.Raw("now()"),
 		"pr_updated_at":   testutil.Raw("now()"),
 		"head_sha":        "head-a",
@@ -717,14 +717,14 @@ VALUES ($1, $2, 'owner')
 		req := newRequest("PATCH", "/api/workspaces/"+wsID, map[string]any{
 			"repos": []map[string]any{
 				{
-					"url":         "  https://github.com/multica-ai/multica.git  ",
+					"url":         "  https://github.com/kscsky/QuickWork.git  ",
 					"description": "  main monorepo  ",
 				},
 				{
-					"url": "https://github.com/multica-ai/multica.git",
+					"url": "https://github.com/kscsky/QuickWork.git",
 				},
 				{
-					"url": "git@github.com:multica-ai/multica-cloud.git",
+					"url": "git@github.com:kscsky/quickwork-cloud.git",
 				},
 			},
 		})
@@ -740,10 +740,10 @@ VALUES ($1, $2, 'owner')
 		if len(repos) != 2 {
 			t.Fatalf("expected duplicate URL to be deduped, got %d repos: %s", len(repos), raw)
 		}
-		if repos[0].URL != "https://github.com/multica-ai/multica.git" || repos[0].Description != "main monorepo" {
+		if repos[0].URL != "https://github.com/kscsky/QuickWork.git" || repos[0].Description != "main monorepo" {
 			t.Fatalf("first repo not normalized: %+v", repos[0])
 		}
-		if repos[1].URL != "git@github.com:multica-ai/multica-cloud.git" {
+		if repos[1].URL != "git@github.com:kscsky/quickwork-cloud.git" {
 			t.Fatalf("second repo not preserved: %+v", repos[1])
 		}
 	})

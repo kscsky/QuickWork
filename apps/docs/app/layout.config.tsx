@@ -1,30 +1,6 @@
 import type { BaseLayoutProps } from "fumadocs-ui/layouts/shared";
 import { ArrowUpRight } from "lucide-react";
-
-// Docs-local stateless QuickWork mark — matches @quickwork/ui's QuickWorkIcon
-// visually (same 8-pointed-asterisk clip-path), but without useState/
-// useEffect so it's safe to render from Server Components such as
-// layout.config.tsx / layout.tsx. Keep in sync with
-// packages/ui/components/common/quickwork-icon.tsx if the mark changes.
-const QUICKWORK_CLIP = `polygon(
-  45% 62.1%, 45% 100%, 55% 100%, 55% 62.1%,
-  81.8% 88.9%, 88.9% 81.8%, 62.1% 55%, 100% 55%,
-  100% 45%, 62.1% 45%, 88.9% 18.2%, 81.8% 11.1%,
-  55% 37.9%, 55% 0%, 45% 0%, 45% 37.9%,
-  18.2% 11.1%, 11.1% 18.2%, 37.9% 45%, 0% 45%,
-  0% 55%, 37.9% 55%, 11.1% 81.8%, 18.2% 88.9%
-)`;
-
-function QuickWorkMark() {
-  return (
-    <span className="inline-block size-[1em]" aria-hidden="true">
-      <span
-        className="block size-full bg-current"
-        style={{ clipPath: QUICKWORK_CLIP }}
-      />
-    </span>
-  );
-}
+import { RetroNekoMark } from "@quickwork/ui/components/common/retro-neko-mark";
 
 // GitHub mark — inlined SVG (lucide-react dropped the Github icon for brand
 // trademark reasons). Path matches apps/web/features/landing/components/
@@ -43,7 +19,7 @@ function GitHubMark() {
 }
 
 // External links shown at the top of the sidebar (and in the top nav on
-// desktop). Leading icon = brand identity (GitHub mark / QuickWork asterisk);
+// desktop). Leading icon = brand identity (GitHub mark / Retro Neko mark);
 // trailing ArrowUpRight = "opens externally" glyph, same pattern as
 // `packages/views/layout/help-launcher.tsx` from PR #1560.
 const externalLinkText = (label: string) => (
@@ -67,7 +43,7 @@ export const baseOptions: BaseLayoutProps = {
       external: true,
     },
     {
-      icon: <QuickWorkMark />,
+      icon: <RetroNekoMark className="size-[1em]" />,
       text: externalLinkText("QuickWork"),
       url: "https://quickwork.ai",
       external: true,

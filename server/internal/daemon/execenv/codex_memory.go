@@ -29,7 +29,7 @@ import (
 //   - Codex CLI may also read user-level state from `~/.codex/memories/`
 //     entirely outside the daemon's per-task isolation, dragging
 //     unrelated host-project context into QuickWork tasks. The reproduction
-//     in github.com/multica-ai/multica#3130 saw Raw Memories from
+//     in upstream#3130 saw Raw Memories from
 //     `D:\Project\MoHaYu\WowChat` (a host-local project) injected into a
 //     brand-new QuickWork issue's first Codex turn.
 //

@@ -2,7 +2,6 @@
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { Skill } from "@quickwork/core/types";
 import { I18nProvider } from "@quickwork/core/i18n/react";
@@ -44,6 +43,9 @@ vi.mock("@quickwork/core/runtimes", () => ({
   }),
   runtimeDisplayLabel: (r: { name?: string }) => r.name ?? "runtime",
 }));
+vi.mock("@quickwork/core/agents", () => ({
+  useWorkspacePresenceMap: () => ({ byAgent: new Map() }),
+}));
 vi.mock("@quickwork/core/auth", () => {
   const state = () => ({ user: { id: "user-1" } });
   return {
@@ -54,17 +56,12 @@ vi.mock("@quickwork/core/auth", () => {
     ),
   };
 });
-// Partial: `WORKSPACE_PAGES` also comes from here and backs the shared
-// SkillIcon, so the real module has to stay reachable.
 vi.mock("@quickwork/core/paths", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@quickwork/core/paths")>()),
   useWorkspacePaths: () => ({ skills: () => "/acme/skills" }),
 }));
 vi.mock("@quickwork/core/permissions", () => ({
   useSkillPermissions: () => ({ canEdit: { allowed: true, reason: null } }),
-}));
-vi.mock("@quickwork/core/workspace/avatar-url", () => ({
-  resolvePublicFileUrl: (v: string | null) => v,
 }));
 vi.mock("@quickwork/core/api", () => ({
   api: { updateSkill: vi.fn(), deleteSkill: vi.fn() },
@@ -73,21 +70,11 @@ vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 vi.mock("../hooks/use-can-edit-skill", () => ({
   useCanEditSkill: () => canEditRef.current,
 }));
-
-// Heavy leaves that carry no behaviour under test.
-vi.mock("../../rich-content", () => ({
-  RichContent: ({ content }: { content: string }) => (
-    <div data-testid="preview">{content}</div>
-  ),
-}));
-vi.mock("../../labels/resource-label-picker", () => ({
-  ResourceLabelPicker: () => <div data-testid="labels" />,
-}));
 vi.mock("./skill-list-actions", () => ({ AddToAgentDialog: () => null }));
 vi.mock("@quickwork/ui/components/common/capability-banner", () => ({
   CapabilityBanner: () => <div data-testid="capability-banner" />,
 }));
-vi.mock("@quickwork/ui/components/common/actor-avatar", () => ({
+vi.mock("../../common/actor-avatar", () => ({
   ActorAvatar: () => <div />,
 }));
 
@@ -106,13 +93,14 @@ const baseSkill: Skill = {
   created_by: "user-1",
   created_at: "2026-07-28T18:11:37Z",
   updated_at: "2026-07-28T18:14:40Z",
-  content: "---\nname: aiforui-animations\n---\n\n# Interface Animations\n",
+  content:
+    "---\nname: aiforui-animations\n---\n\n# Interface Animations\n\n## Working notes\n- keep evidence\n",
   files: [
     { id: "f-1", path: "patterns.md", content: "# Patterns\n" } as Skill["files"][number],
   ],
 };
 
-function renderPage(searchParams = new URLSearchParams()) {
+function renderPage() {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
@@ -122,7 +110,7 @@ function renderPage(searchParams = new URLSearchParams()) {
     replace,
     back: vi.fn(),
     pathname: "/acme/skills/skill-1",
-    searchParams,
+    searchParams: new URLSearchParams(),
     hash: "",
     getShareableUrl: (path) => path,
   };
@@ -157,178 +145,143 @@ beforeEach(() => {
   canEditRef.current = true;
 });
 
-describe("SkillDetailPage tabs", () => {
-  it("opens on Overview and exposes exactly two tabs", async () => {
+describe("SkillDetailPage document", () => {
+  it("renders the file rail and the SKILL.md body", async () => {
     renderPage();
-    const tabs = await screen.findAllByRole("tab", { name: /Overview|Files/ });
-    expect(tabs.map((t) => t.textContent)).toEqual(["Overview", "Files 2"]);
-    // A Settings tab would only hold a delete button and a read-only
-    // sentence — the skill update payload has no settings-shaped fields.
-    expect(screen.queryByRole("tab", { name: "Settings" })).toBeNull();
-    expect(
-      screen.getByRole("tab", { name: "Overview" }).getAttribute("aria-selected"),
-    ).toBe("true");
+
+    expect(await screen.findByRole("button", { name: "SKILL.md" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "patterns.md" })).toBeTruthy();
+    expect(screen.getByText("Working notes")).toBeTruthy();
+    expect(screen.getByText("keep evidence")).toBeTruthy();
+    // Frontmatter and the leading H1 belong to the header, not the body.
+    expect(screen.queryByText(/name: aiforui-animations/)).toBeNull();
+    expect(screen.queryByText("Interface Animations")).toBeNull();
   });
 
-  it("shows resource labels in Overview without a release flag", async () => {
+  it("switches the document when a supporting file is selected", async () => {
     renderPage();
-    expect(await screen.findByTestId("labels")).toBeTruthy();
-  });
 
-  it("mirrors the active tab into ?view= so the pane survives a reload", async () => {
-    const { replace } = renderPage();
-    fireEvent.click(await screen.findByRole("tab", { name: "Files 2" }));
-    expect(replace).toHaveBeenCalledWith("/acme/skills/skill-1?view=files");
-  });
+    fireEvent.click(await screen.findByRole("button", { name: "patterns.md" }));
 
-  it("restores the Files tab from ?view=files", async () => {
-    renderPage(new URLSearchParams("view=files"));
-    expect(
-      (await screen.findByRole("tab", { name: "Files 2" })).getAttribute(
-        "aria-selected",
-      ),
-    ).toBe("true");
+    expect(screen.getByRole("heading", { name: "patterns.md" })).toBeTruthy();
+    expect(screen.getByText("Supporting file for aiforui-animations")).toBeTruthy();
+    expect(screen.getByText("Patterns")).toBeTruthy();
   });
 });
 
-describe("SkillDetailPage file mode", () => {
-  it("keeps plain-text mode when switching files", async () => {
-    renderPage(new URLSearchParams("view=files"));
+describe("SkillDetailPage editing", () => {
+  it("toggles between the rendered document and the raw editor", async () => {
+    renderPage();
 
     fireEvent.click(await screen.findByRole("button", { name: "Edit" }));
-    expect(screen.getByRole("textbox", { name: /SKILL\.md/ })).toBeTruthy();
-
-    // Mode used to live inside FileViewer, which the per-path `key`
-    // remounted — selecting another file silently snapped back to preview.
-    fireEvent.click(screen.getByRole("tab", { name: "patterns.md" }));
-    expect(screen.getByRole("textbox", { name: /patterns\.md/ })).toBeTruthy();
-    expect(screen.queryByTestId("preview")).toBeNull();
-  });
-
-  it("strips frontmatter from the preview so name/description are not shown twice", async () => {
-    renderPage(new URLSearchParams("view=files"));
-    const preview = await screen.findByTestId("preview");
-    expect(preview.textContent).toContain("# Interface Animations");
-    expect(preview.textContent).not.toContain("name: aiforui-animations");
-  });
-});
-
-describe("SkillDetailPage edit action (MUL-5654)", () => {
-  /** Opens a file row's action menu the way the rail exposes it. */
-  async function openRowMenu(path: string | RegExp) {
-    // The file-name button carries role="tab", so a "button" match on the row
-    // is the trailing "..." trigger.
-    await userEvent.click(await screen.findByRole("button", { name: path }));
-  }
-
-  it("opens a supporting file in a focused editor", async () => {
-    renderPage(new URLSearchParams("view=files"));
-
-    await openRowMenu(/patterns\.md/);
-    await userEvent.click(
-      await screen.findByRole("menuitem", { name: "Edit" }),
-    );
-
-    // One gesture owes all three: the file is open, the pane is the editor
-    // rather than the preview, and the caret is already in it.
-    const editor = screen.getByRole("textbox", { name: /patterns\.md/ });
-    expect(screen.queryByTestId("preview")).toBeNull();
-    expect(document.activeElement).toBe(editor);
-  });
-
-  it("focuses the editor for the file that is already open", async () => {
-    renderPage(new URLSearchParams("view=files"));
-
-    // SKILL.md opens selected, so this path mounts nothing new. A mount-only
-    // autoFocus would silently do nothing here.
-    await openRowMenu(/SKILL\.md/);
-    await userEvent.click(
-      await screen.findByRole("menuitem", { name: "Edit" }),
-    );
-
-    expect(document.activeElement).toBe(
-      screen.getByRole("textbox", { name: /SKILL\.md/ }),
-    );
-  });
-
-  it("leaves the caret at the top rather than the end of the file", async () => {
-    renderPage(new URLSearchParams("view=files"));
-
-    await openRowMenu(/patterns\.md/);
-    await userEvent.click(
-      await screen.findByRole("menuitem", { name: "Edit" }),
-    );
 
     const editor = screen.getByRole("textbox", {
-      name: /patterns\.md/,
+      name: /SKILL\.md/,
     }) as HTMLTextAreaElement;
-    expect([editor.selectionStart, editor.selectionEnd]).toEqual([0, 0]);
+    expect(editor.value).toBe(baseSkill.content);
+    expect(screen.getByLabelText("Name")).toBeTruthy();
+    expect(screen.getByLabelText("Description")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Preview" }));
+    expect(screen.queryByRole("textbox", { name: /SKILL\.md/ })).toBeNull();
+    expect(screen.getByText("Working notes")).toBeTruthy();
   });
 
-  it("offers read-only viewers a plain-text view, not an edit they cannot make", async () => {
+  it("offers read-only viewers a plain-text view, not an edit", async () => {
     canEditRef.current = false;
-    renderPage(new URLSearchParams("view=files"));
+    renderPage();
 
     expect(await screen.findByRole("button", { name: "Plain text" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Edit" })).toBeNull();
-    // No row menus either — the tree offers no action the page would refuse.
-    expect(screen.queryByRole("button", { name: /Actions for/ })).toBeNull();
+    expect(screen.getByTestId("capability-banner")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Plain text" }));
+    const editor = screen.getByRole("textbox", {
+      name: /SKILL\.md/,
+    }) as HTMLTextAreaElement;
+    expect(editor.readOnly).toBe(true);
+    expect(screen.queryByRole("button", { name: /Save changes/ })).toBeNull();
+  });
+
+  it("counts a supporting-file edit as one changed file", async () => {
+    renderPage();
+
+    fireEvent.click(await screen.findByRole("button", { name: "patterns.md" }));
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    fireEvent.change(screen.getByRole("textbox", { name: /patterns\.md/ }), {
+      target: { value: "edited content" },
+    });
+
+    expect(screen.getByText("Changed: 1 file")).toBeTruthy();
+  });
+
+  it("renames a supporting file from the document bar", async () => {
+    renderPage();
+
+    fireEvent.click(await screen.findByRole("button", { name: "patterns.md" }));
+    fireEvent.click(screen.getByRole("button", { name: "Rename" }));
+    const field = screen.getByLabelText("File path");
+    fireEvent.change(field, { target: { value: "notes/patterns.md" } });
+    const renameButtons = screen.getAllByRole("button", { name: "Rename" });
+    fireEvent.click(renameButtons[renameButtons.length - 1]!);
+
+    expect(screen.getByRole("button", { name: "notes/patterns.md" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "patterns.md" })).toBeNull();
   });
 });
 
-describe("SkillDetailPage save pill", () => {
-  it("is absent while clean and floats in with a change summary once dirty", async () => {
+describe("SkillDetailPage save state", () => {
+  it("appears in the top bar once the draft is dirty", async () => {
     renderPage();
-    await screen.findByRole("tab", { name: "Overview" });
+
+    fireEvent.click(await screen.findByRole("button", { name: "Edit" }));
     expect(screen.queryByRole("button", { name: /Save changes/ })).toBeNull();
 
     fireEvent.change(screen.getByLabelText("Description"), {
       target: { value: "changed" },
     });
+
     expect(screen.getByText("Changed: Description")).toBeTruthy();
     expect(
       screen.getByRole("button", { name: /Save changes/ }).hasAttribute("disabled"),
     ).toBe(false);
   });
 
-  it("lists every dirty part in the summary, reusing the field labels", async () => {
+  it("lists every dirty part reusing the field labels", async () => {
     renderPage();
-    fireEvent.change(await screen.findByLabelText("Name"), {
+
+    fireEvent.click(await screen.findByRole("button", { name: "Edit" }));
+    fireEvent.change(screen.getByLabelText("Name"), {
       target: { value: "renamed-skill" },
     });
     fireEvent.change(screen.getByLabelText("Description"), {
       target: { value: "changed" },
     });
+
     expect(screen.getByText("Changed: Name · Description")).toBeTruthy();
   });
 
-  it("counts a supporting-file edit as one changed file", async () => {
-    renderPage(new URLSearchParams("view=files"));
-    fireEvent.click(await screen.findByRole("tab", { name: "patterns.md" }));
-    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
-    fireEvent.change(screen.getByRole("textbox", { name: /patterns\.md/ }), {
-      target: { value: "edited content" },
+  it("saves the draft through the API", async () => {
+    const { api } = await import("@quickwork/core/api");
+    const updated = {
+      ...baseSkill,
+      description: "changed",
+      updated_at: new Date().toISOString(),
+    };
+    vi.mocked(api.updateSkill).mockResolvedValue(updated);
+
+    renderPage();
+    fireEvent.click(await screen.findByRole("button", { name: "Edit" }));
+    fireEvent.change(screen.getByLabelText("Description"), {
+      target: { value: "changed" },
     });
-    expect(screen.getByText("Changed: 1 file")).toBeTruthy();
-  });
+    fireEvent.click(screen.getByRole("button", { name: /Save changes/ }));
 
-  it("is absent for read-only viewers, who get the capability banner instead", async () => {
-    canEditRef.current = false;
-    renderPage();
-    expect(await screen.findByTestId("capability-banner")).toBeTruthy();
-    expect(screen.queryByRole("button", { name: /Save changes/ })).toBeNull();
-  });
-});
-
-describe("SkillDetailPage properties", () => {
-  it("renders the whole description in an editable field sized for it", async () => {
-    renderPage();
-    const field = (await screen.findByLabelText("Description")) as HTMLTextAreaElement;
-    expect(field.value).toBe(LONG_DESCRIPTION);
-    expect(Number(field.rows)).toBeGreaterThanOrEqual(4);
-    expect(
-      screen.getByText(`${LONG_DESCRIPTION.length} characters.`, { exact: false }),
-    ).toBeTruthy();
+    expect(api.updateSkill).toHaveBeenCalledWith(
+      "skill-1",
+      expect.objectContaining({ description: "changed" }),
+    );
+    expect(await screen.findByText("Saved · just now")).toBeTruthy();
   });
 });
 
@@ -350,72 +303,56 @@ describe("SkillDetailPage draft baseline (MUL-5645)", () => {
   it("opens clean when the description carries a trailing newline", async () => {
     skillRef.current = { ...baseSkill, description: `${LONG_DESCRIPTION}\n` };
     renderPage();
-    await screen.findAllByRole("tab", { name: /Overview|Files/ });
+
+    await screen.findByRole("button", { name: "Edit" });
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
     expect(screen.queryByText(/^Changed:/)).toBeNull();
   });
 
   it("stays clean after Discard on a trailing-newline description", async () => {
     skillRef.current = { ...baseSkill, description: `${LONG_DESCRIPTION}\n` };
     renderPage();
-    const field = (await screen.findByLabelText(
-      "Description",
-    )) as HTMLTextAreaElement;
-    fireEvent.change(field, { target: { value: "edited" } });
-    fireEvent.click(await screen.findByRole("button", { name: "Discard" }));
+
+    fireEvent.click(await screen.findByRole("button", { name: "Edit" }));
+    const field = screen.getByLabelText("Description");
+    fireEvent.change(field, { target: { value: "typo" } });
+    fireEvent.click(screen.getByRole("button", { name: "Discard" }));
+
     expect(screen.queryByText(/^Changed:/)).toBeNull();
+    expect(
+      (screen.getByLabelText("Description") as HTMLTextAreaElement).value,
+    ).toBe(LONG_DESCRIPTION);
   });
 
   it("pulls a remote edit in silently while the draft is untouched", async () => {
     const { queryClient } = renderPage();
-    await screen.findAllByRole("tab", { name: /Overview|Files/ });
 
+    fireEvent.click(await screen.findByRole("button", { name: "Edit" }));
     await remoteUpdate(queryClient, { description: "Rewritten by the agent" });
 
-    // The new text reaching the field IS the fix: the old code left the editor
-    // frozen on the pre-update value behind a conflict banner.
     expect(await screen.findByDisplayValue("Rewritten by the agent")).toBeTruthy();
     expect(screen.queryByText(CONFLICT_BANNER)).toBeNull();
     expect(screen.queryByText(/^Changed:/)).toBeNull();
   });
 
   it("pulls a remote SKILL.md edit in silently too", async () => {
-    const { queryClient } = renderPage(new URLSearchParams("view=files"));
-    await screen.findAllByRole("tab", { name: /Overview|Files/ });
+    const { queryClient } = renderPage();
 
+    await screen.findByText("Working notes");
     await remoteUpdate(queryClient, {
       content: `${baseSkill.content}\n## Added remotely\n`,
     });
 
-    const preview = await screen.findByTestId("preview");
-    expect(preview.textContent).toContain("Added remotely");
+    expect(await screen.findByText("Added remotely")).toBeTruthy();
     expect(screen.queryByText(CONFLICT_BANNER)).toBeNull();
     expect(screen.queryByText(/^Changed:/)).toBeNull();
   });
 
-  it("releases the conflict once the user reverts their own edits", async () => {
+  it("keeps local edits behind a conflict banner", async () => {
     const { queryClient } = renderPage();
-    const field = (await screen.findByLabelText(
-      "Description",
-    )) as HTMLTextAreaElement;
-    fireEvent.change(field, { target: { value: "my unsaved edit" } });
 
-    await remoteUpdate(queryClient, { description: "Rewritten by the agent" });
-    expect(await screen.findByText(CONFLICT_BANNER)).toBeTruthy();
-
-    // Reverting by hand leaves nothing to protect. The save bar is dirty-gated,
-    // so if the page held the conflict here the banner would sit above stale
-    // text with no Discard left to press — a dead end short of a reload.
-    fireEvent.change(field, { target: { value: LONG_DESCRIPTION } });
-
-    expect(await screen.findByDisplayValue("Rewritten by the agent")).toBeTruthy();
-    expect(screen.queryByText(CONFLICT_BANNER)).toBeNull();
-  });
-
-  it("keeps the draft and warns when a remote edit lands on real local edits", async () => {
-    const { queryClient } = renderPage();
-    const field = (await screen.findByLabelText(
-      "Description",
-    )) as HTMLTextAreaElement;
+    fireEvent.click(await screen.findByRole("button", { name: "Edit" }));
+    const field = screen.getByLabelText("Description");
     fireEvent.change(field, { target: { value: "my unsaved edit" } });
 
     await remoteUpdate(queryClient, { description: "Rewritten by the agent" });
@@ -425,12 +362,34 @@ describe("SkillDetailPage draft baseline (MUL-5645)", () => {
       (screen.getByLabelText("Description") as HTMLTextAreaElement).value,
     ).toBe("my unsaved edit");
   });
+
+  it("releases the conflict once the user reverts their own edits", async () => {
+    const { queryClient } = renderPage();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Edit" }));
+    const field = screen.getByLabelText("Description");
+    fireEvent.change(field, { target: { value: "typo" } });
+
+    await remoteUpdate(queryClient, { description: "Rewritten by the agent" });
+    expect(await screen.findByText(CONFLICT_BANNER)).toBeTruthy();
+
+    fireEvent.change(screen.getByLabelText("Description"), {
+      target: { value: LONG_DESCRIPTION },
+    });
+
+    await vi.waitFor(() => {
+      expect(screen.queryByText(CONFLICT_BANNER)).toBeNull();
+    });
+    expect(
+      (screen.getByLabelText("Description") as HTMLTextAreaElement).value,
+    ).toBe("Rewritten by the agent");
+  });
 });
 
 describe("SkillDetailPage origin link", () => {
   const SOURCE_URL = "https://github.com/anthropics/skills/tree/main/animations";
 
-  it("links the imported-origin chip to its source", async () => {
+  it("links the imported origin to its source", async () => {
     skillRef.current = {
       ...baseSkill,
       config: { origin: { type: "github", source_url: SOURCE_URL } },
@@ -446,17 +405,13 @@ describe("SkillDetailPage origin link", () => {
 
   it("keeps manual origins as plain text", async () => {
     renderPage();
-    expect(await screen.findByText("Created manually")).toBeTruthy();
+    expect((await screen.findAllByText("Created manually")).length).toBeGreaterThan(0);
     expect(
       screen.queryByRole("link", { name: "Created manually" }),
     ).toBeNull();
   });
 
-  // Which source_urls are linkable is originSourceUrl's contract; its full
-  // matrix lives in ../lib/origin.test.ts. What belongs here is the chip's
-  // behaviour when the helper refuses: it degrades to plain text, still
-  // naming the origin, rather than dropping the label along with the href.
-  it("degrades a refused source_url to plain text, keeping the chip", async () => {
+  it("degrades a refused source_url to plain text, keeping the label", async () => {
     skillRef.current = {
       ...baseSkill,
       config: {
@@ -464,7 +419,7 @@ describe("SkillDetailPage origin link", () => {
       },
     };
     renderPage();
-    expect(await screen.findByText("Imported · GitHub")).toBeTruthy();
+    expect((await screen.findAllByText("Imported · GitHub")).length).toBeGreaterThan(0);
     expect(
       screen.queryByRole("link", { name: "Imported · GitHub" }),
     ).toBeNull();

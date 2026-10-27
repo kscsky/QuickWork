@@ -138,6 +138,16 @@
   color: var(--muted-foreground);
 }
 
+/* The solo/relay brief draws its own 01/02 step boxes (base.css .qw-solo-rich).
+   Keep the generic editor list's native markers and indentation out of it. */
+.rich-text-editor.qw-solo-rich > ol {
+  list-style: none;
+  padding-inline-start: 0;
+}
+.rich-text-editor.qw-solo-rich > ol > li {
+  list-style: none;
+}
+
 /* Remove paragraph margins inside list items (Tiptap wraps li content in <p>) */
 .rich-text-editor li > p {
   margin: 0;

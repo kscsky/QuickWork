@@ -247,7 +247,7 @@ type ArchiveAgentsByRuntimeParams struct {
 //
 // System agents are exempt: they belong to the workspace rather than to the
 // member who happened to create them, and the workspace's entry point runs
-// through one. Archiving Mika because a colleague left would take the default
+// through one. Archiving Quill because a colleague left would take the default
 // agent away from everyone. Its runtime does go offline with the departure, so
 // it needs rebinding — but it stays visible and recoverable instead of
 // vanishing.
@@ -3213,7 +3213,7 @@ type CreateSystemUserAgentParams struct {
 // because the system half ships with the binary and is layered in at claim
 // time, leaving this column free for the workspace's own notes.
 //
-// CONTRACT: call only while holding the per-workspace mika advisory lock. The
+// CONTRACT: call only while holding the per-workspace quill advisory lock. The
 // one-per-workspace invariant rests on a check inside that lock, not on a
 // unique index — migration 172's index keys on (workspace_id, owner_id,
 // runtime_id, system_key), so two different owners or runtimes are distinct
@@ -5709,7 +5709,7 @@ func (q *Queries) ListChatFinalizeDeferredExpired(ctx context.Context, arg ListC
 }
 
 const listPendingDelegatedFailureRecoveries = `-- name: ListPendingDelegatedFailureRecoveries :many
-SELECT recovery.id, recovery.issue_id, recovery.author_type, recovery.author_id, recovery.content, recovery.type, recovery.created_at, recovery.updated_at, recovery.parent_id, recovery.workspace_id, recovery.resolved_at, recovery.resolved_by_type, recovery.resolved_by_id, recovery.source_task_id, recovery.quick_action_id, recovery.via_plugin_id, recovery.revision, recovery.recovery_settled_at
+SELECT recovery.id, recovery.issue_id, recovery.author_type, recovery.author_id, recovery.content, recovery.type, recovery.created_at, recovery.updated_at, recovery.parent_id, recovery.workspace_id, recovery.resolved_at, recovery.resolved_by_type, recovery.resolved_by_id, recovery.source_task_id, recovery.quick_action_id, recovery.via_plugin_id, recovery.revision, recovery.recovery_settled_at, recovery.chain_step_id
 FROM comment recovery
 JOIN agent_task_queue failed ON failed.id = recovery.source_task_id
 JOIN agent_task_queue source ON source.id = failed.delegated_from_task_id
@@ -5809,6 +5809,7 @@ func (q *Queries) ListPendingDelegatedFailureRecoveries(ctx context.Context, max
 			&i.ViaPluginID,
 			&i.Revision,
 			&i.RecoverySettledAt,
+			&i.ChainStepID,
 		); err != nil {
 			return nil, err
 		}

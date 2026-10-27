@@ -1,48 +1,88 @@
 {
   "title": "Tasks",
-  "subtitle": "Every task is a relay. It moves down the chain, and stops — visibly — when it reaches someone who has not bound an agent.",
-  "new_task": "New task",
+  "create": "New task",
+  "tagline": "Solo tasks go to one person or agent; squad tasks run as a relay — each leg passes before the next begins.",
   "filter": {
     "all": "All {{count}}",
-    "mine": "My turn {{count}}",
+    "single": "Solo {{count}}",
+    "squad": "Squad {{count}}",
+    "mine": "Mine {{count}}",
     "parked": "Stuck {{count}}"
   },
-  "state": {
-    "pending": "Not started",
-    "doing": "In progress",
-    "done": "Done",
-    "parked": "Stuck · waiting",
-    "skipped": "Skipped",
-    "unknown": "Unknown"
+  "pager": {
+    "sum": "{{count}} total · {{size}} per page · page {{page}} / {{pages}}",
+    "prev": "Prev",
+    "next": "Next"
   },
   "row": {
-    "parked_at": "Stuck on {{name}} · {{step}}",
-    "doing_at": "{{name}} is working · {{step}}",
-    "waiting_at": "Waiting for {{name}}'s machine to pick it up · {{step}}",
-    "running_at": "Running on {{name}}'s machine · {{step}}",
-    "interrupted_at": "{{name}}'s side stopped · {{step}}",
-    "finished": "All steps done",
-    "head_pending": "Waiting to start · {{step}}",
-    "no_chain": "No relay",
+    "leg_parent": "Parent",
+    "leg_seq": "Leg {{seq}}/{{total}}",
+    "type_single": "Solo",
+    "type_squad": "Squad",
     "unassigned": "Unassigned",
-    "assignee": "Assigned to {{name}}"
+    "select_task": "Select {{identifier}}",
+    "delete_task": "Delete task"
+  },
+  "bulk": {
+    "selected": "{{count}} selected",
+    "clear": "Clear selection",
+    "select_page": "Select page",
+    "delete": "Delete",
+    "delete_title": "Delete {{count}} tasks?",
+    "delete_desc": "This cannot be undone. The selected tasks and all their comments will be permanently deleted.",
+    "delete_warning": "Any space member can delete tasks.",
+    "cancel": "Cancel",
+    "delete_success": "Deleted {{count}} tasks",
+    "delete_failed": "Failed to delete tasks"
   },
   "empty": {
     "title": "No tasks yet",
-    "body": "Tasks you create in the dispatch tower land here, with their relay.",
-    "filtered_title": "Nothing matches this filter",
+    "body": "Create one with New task — a solo task goes to one person or agent; a squad task runs as a relay.",
+    "filtered_title": "No tasks match this filter",
     "filtered_body": "Try another filter."
   },
-  "load_error": "Could not load tasks",
   "chain": {
     "parked_dot": "Stuck",
-    "none": "No relay yet. Assign it to a squad and every handoff shows up here.",
-    "parked_at": "Stopped at {{name}} — no agent bound",
-    "delivered": "{{name}} delivered",
-    "skipped_at": "{{name}} skipped",
-    "running": "{{name}} is running",
-    "awaiting_pickup": "{{name}} hasn't picked it up",
-    "waiting": "{{name}} waiting",
-    "open_task": "Open task"
-  }
+    "none": "No relay yet",
+    "chip_done": "Passed on",
+    "chip_doing": "In progress",
+    "chip_queued": "Awaiting pickup",
+    "chip_review": "Awaiting review",
+    "chip_parked": "Stuck · waiting",
+    "chip_skipped": "Skipped",
+    "chip_waiting": "Waiting"
+  },
+  "mast": {
+    "running": "in flight",
+    "review": "awaiting you",
+    "quiet": "quiet",
+    "sync_hint": "Last sync · just now",
+    "info": "Solo tasks go to one person or agent; squad tasks run as a relay. A stuck leg waits for someone to pick it up.",
+    "sort_recent": "Recent activity",
+    "sort_oldest": "Oldest activity",
+    "sort_label": "Toggle sort"
+  },
+  "filter_name": {
+    "all": "All",
+    "single": "Solo",
+    "squad": "Squad",
+    "mine": "Mine",
+    "parked": "Stuck"
+  },
+  "board": {
+    "task": "Task",
+    "state": "State",
+    "actions": "Actions"
+  },
+  "state": {
+    "open": "Open",
+    "view": "View",
+    "review": "Review",
+    "fill": "Fill",
+    "needs_fill": "Needs someone",
+    "delivered": "Delivered"
+  },
+  "quick_create_failed_banner": "{{count}} quick task(s) failed",
+  "quick_create_failed_view": "Open inbox",
+  "quick_create_failed_fallback": "Open the inbox for the error details."
 }

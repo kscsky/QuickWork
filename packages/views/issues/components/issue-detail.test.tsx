@@ -609,12 +609,12 @@ function createTestQueryClient() {
   });
 }
 
-function renderIssueDetail(issueId = "issue-1") {
+function renderIssueDetail(issueId = "issue-1", layout?: "legacy" | "refresh") {
   const queryClient = createTestQueryClient();
   return render(
     <I18nProvider locale="en" resources={TEST_RESOURCES}>
       <QueryClientProvider client={queryClient}>
-        <IssueDetail issueId={issueId} />
+        <IssueDetail issueId={issueId} layout={layout} />
       </QueryClientProvider>
     </I18nProvider>,
   );
@@ -684,6 +684,26 @@ function hasHighlightedCommentBackground(root: ParentNode | null): boolean {
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
+
+describe("IssueDetail refresh archive", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockApiObj.getIssue.mockResolvedValue(mockIssue);
+    mockApiObj.listTimeline.mockResolvedValue(mockTimeline);
+    mockApiObj.listIssueReactions.mockResolvedValue([]);
+    mockApiObj.listIssueSubscribers.mockResolvedValue([]);
+    mockApiObj.listChildIssues.mockResolvedValue({ issues: [] });
+    mockApiObj.getChildIssueProgress.mockResolvedValue({ progress: [] });
+  });
+
+  it("renders the full-route archive shell around a solo task", async () => {
+    const { container } = renderIssueDetail("issue-1", "refresh");
+    await screen.findByText(mockIssue.title);
+    expect(container.querySelector(".rd-content")).not.toBeNull();
+    expect(container.querySelector(".rd-rail")).not.toBeNull();
+    expect(container.querySelector(".qw-solo-page")).toBeNull();
+  });
+});
 
 describe("IssueDetail (shared)", () => {
   beforeEach(() => {
@@ -789,20 +809,20 @@ describe("IssueDetail (shared)", () => {
     mockApiObj.getIssue.mockReturnValue(new Promise(() => {}));
     const loadingRender = renderIssueDetail();
     const skeletonGutters = horizontalGutters(
-      loadingRender.container.querySelector(".max-w-4xl"),
+      loadingRender.container.querySelector("[data-issue-column]"),
     );
     loadingRender.unmount();
 
     mockApiObj.getIssue.mockResolvedValue(mockIssue);
     const { container } = renderIssueDetail();
     await waitFor(() => {
-      expect(screen.getByText("Implement authentication")).toBeInTheDocument();
+      expect(screen.getAllByText("Implement authentication").length).toBeGreaterThan(0);
     });
 
     // Non-empty guard: without it a renamed column class passes vacuously.
     expect(skeletonGutters.length).toBeGreaterThan(0);
     expect(skeletonGutters).toEqual(
-      horizontalGutters(container.querySelector(".max-w-4xl")),
+      horizontalGutters(container.querySelector("[data-issue-column]")),
     );
   });
 
@@ -823,10 +843,12 @@ describe("IssueDetail (shared)", () => {
     // layout jump caused by swapping a long react-markdown tree for ProseMirror.
     // Title and comment/reply composers remain readonly-first.
     expect(await screen.findByDisplayValue("Add JWT auth to the backend")).toBeInTheDocument();
-    expect(screen.getByText("Implement authentication")).toBeInTheDocument();
+    expect(screen.getAllByText("Implement authentication").length).toBeGreaterThan(0);
     expect(screen.queryByTestId("title-editor")).not.toBeInTheDocument();
-    expect(screen.getAllByTestId("rich-text-editor")).toHaveLength(1);
-    expect(contentEditorMounts.count).toBe(1);
+    // The solo composer is eager too: the blank input is immediately
+    // typeable, and the description keeps its own eager editor.
+    expect(screen.getAllByTestId("rich-text-editor")).toHaveLength(2);
+    expect(contentEditorMounts.count).toBe(2);
   });
 
   it("reconciles a cached list snapshot so source context appears on first entry", async () => {
@@ -974,25 +996,49 @@ describe("IssueDetail (shared)", () => {
     expect(await screen.findByDisplayValue("Second description")).toBeInTheDocument();
     expect(screen.queryByDisplayValue("Add JWT auth to the backend")).not.toBeInTheDocument();
     expect(screen.queryByTestId("title-editor")).not.toBeInTheDocument();
-    expect(contentEditorMounts.count).toBe(mountsBeforeSwitch + 1);
+    // Both the description and the solo composer remount for the new issue.
+    expect(contentEditorMounts.count).toBe(mountsBeforeSwitch + 2);
   });
 
-  it("renders the issue title leaf as a link to the issue detail page", async () => {
+  it("accepts delivery from the solo header", async () => {
     renderIssueDetail();
 
-    // The breadcrumb leaf is the whole "identifier + title" string wrapped in a
-    // single link to the issue's own detail route (used to open the full page
-    // from the inline Inbox pane). A bare issue has no ancestor crumbs.
-    const leaf = await screen.findByText("TES-1 Implement authentication");
-    expect(leaf.closest("a")).toHaveAttribute("href", "/test/issues/issue-1");
+    const buttons = await screen.findAllByRole("button", {
+      name: "Accept delivery",
+    });
+    fireEvent.click(buttons[0]!);
+
+    await waitFor(() => {
+      expect(mockApiObj.updateIssue).toHaveBeenCalledWith(
+        "issue-1",
+        expect.objectContaining({ status: "done" }),
+      );
+    });
+  });
+
+  it("renders the solo header with the tasks crumb and the editable title", async () => {
+    renderIssueDetail();
+
+    // The solo layout replaces the breadcrumb leaf with a page header:
+    // Tasks / TES-1, then the title editor. The identifier also appears in
+    // the sticky summary.
+    const identifiers = await screen.findAllByText("TES-1");
+    expect(identifiers.length).toBeGreaterThan(0);
+    expect(screen.getByRole("link", { name: "Tasks" })).toHaveAttribute(
+      "href",
+      "/test/tasks",
+    );
+    expect(
+      screen.getAllByText("Implement authentication").length,
+    ).toBeGreaterThan(0);
   });
 
   it("omits the project breadcrumb segment when the issue has no project_id", async () => {
     // Default fixture has project_id: null.
     renderIssueDetail();
 
-    // Leaf renders once loaded; a bare issue has no ancestor crumbs at all.
-    await screen.findByText("TES-1 Implement authentication");
+    // Page renders once loaded; a bare issue has no ancestor crumbs at all.
+    await screen.findAllByText("TES-1");
 
     // Project is never fetched and no project crumb appears.
     expect(mockApiObj.getProject).not.toHaveBeenCalled();
@@ -1026,55 +1072,22 @@ describe("IssueDetail (shared)", () => {
     expect(projectLink.closest("a")).toHaveAttribute("href", "/test/projects/p-1");
   });
 
-  it("renders properties sidebar with all core rows plus set optional rows", async () => {
+  it("renders the requirement clarification and execution inline for a solo task", async () => {
     renderIssueDetail();
 
     await waitFor(() => {
-      expect(screen.getByText("Properties")).toBeInTheDocument();
+      expect(screen.getByText("Requirement clarification")).toBeInTheDocument();
     });
-
-    // Core rows — always rendered regardless of whether the issue has a value.
-    expect(screen.getByText("Status")).toBeInTheDocument();
-    expect(screen.getByText("Assignee")).toBeInTheDocument();
-    // "Project" appears twice (row label + picker stub), so disambiguate by id.
-    expect(screen.getByTestId("project-picker")).toBeInTheDocument();
-    // priority="high" + due_date are set in the fixture, so both optional rows show.
-    expect(screen.getByText("Priority")).toBeInTheDocument();
-    expect(screen.getByText("Due date")).toBeInTheDocument();
-    // No labels are attached in the fixture — the Labels optional row
-    // must stay hidden by default.
-    expect(screen.queryByText("Labels")).not.toBeInTheDocument();
-    // Parent issue lives in its own section and only renders when the
-    // issue actually has a parent — the fixture has none.
-    expect(screen.queryByText("Parent issue")).not.toBeInTheDocument();
-    // The "+ Add property" affordance is always offered while any
-    // optional field is still hidden.
-    expect(screen.getByText("Add property")).toBeInTheDocument();
-  });
-
-  it("hides every optional property row when none are set", async () => {
-    // Override the default fixture: nothing optional set.
-    mockApiObj.getIssue.mockResolvedValue({
-      ...mockIssue,
-      priority: "none",
-      start_date: null,
-      due_date: null,
-    });
-
-    renderIssueDetail();
-
-    await waitFor(() => {
-      expect(screen.getByText("Properties")).toBeInTheDocument();
-    });
-
-    expect(screen.queryByText("Priority")).not.toBeInTheDocument();
-    expect(screen.queryByText("Due date")).not.toBeInTheDocument();
-    expect(screen.queryByText("Labels")).not.toBeInTheDocument();
-    // Project stays as a core row regardless of value.
-    expect(screen.getByTestId("project-picker")).toBeInTheDocument();
-    // No parent → no standalone Parent issue section either.
-    expect(screen.queryByText("Parent issue")).not.toBeInTheDocument();
-    expect(screen.getByText("Add property")).toBeInTheDocument();
+    // Solo tasks have no properties rail: clarification sits in the document
+    // flow and the execution record is its own section.
+    expect(screen.getByText("Execution")).toBeInTheDocument();
+    expect(screen.queryByText("Execution log")).not.toBeInTheDocument();
+    expect(screen.queryByText("Properties")).not.toBeInTheDocument();
+    expect(screen.queryByText("Details")).not.toBeInTheDocument();
+    expect(screen.queryByText("Pull requests")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /^Metadata/ }),
+    ).not.toBeInTheDocument();
   });
 
   it("uses a non-resizable layout with the sidebar sheet closed by default on mobile", async () => {
@@ -1083,7 +1096,7 @@ describe("IssueDetail (shared)", () => {
     renderIssueDetail();
 
     await waitFor(() => {
-      expect(screen.getByText("Implement authentication")).toBeInTheDocument();
+      expect(screen.getAllByText("Implement authentication").length).toBeGreaterThan(0);
     });
 
     expect(screen.queryByTestId("panel-group")).not.toBeInTheDocument();
@@ -1094,7 +1107,7 @@ describe("IssueDetail (shared)", () => {
     const { container } = renderIssueDetail();
 
     await waitFor(() => {
-      expect(screen.getByText("Implement authentication")).toBeInTheDocument();
+      expect(screen.getAllByText("Implement authentication").length).toBeGreaterThan(0);
     });
 
     // `bottom-0` is unique to the composer wrapper — the sticky affordances
@@ -1110,7 +1123,7 @@ describe("IssueDetail (shared)", () => {
     const { container } = renderIssueDetail();
 
     await waitFor(() => {
-      expect(screen.getByText("Implement authentication")).toBeInTheDocument();
+      expect(screen.getAllByText("Implement authentication").length).toBeGreaterThan(0);
     });
 
     expect(container.querySelector(".sticky.bottom-0")).toBeNull();
@@ -1130,12 +1143,11 @@ describe("IssueDetail (shared)", () => {
     });
     renderIssueDetail();
 
-    await screen.findByText("Implement authentication");
-    fireEvent.click(screen.getByTestId("comment-composer-shell"));
-    const editor = await screen.findByPlaceholderText("Leave a comment...");
+    await screen.findAllByText("Implement authentication");
+    const composer = document.querySelector<HTMLElement>(".qw-solo-composer-card")!;
+    const editor = within(composer).getByTestId("rich-text-editor");
     fireEvent.change(editor, { target: { value: "A new update" } });
-    const composer = editor.closest<HTMLElement>("[aria-busy], .relative.flex.flex-col.rounded-lg")!;
-    fireEvent.click(within(composer).getByRole("button", { name: "Send" }));
+    fireEvent.click(within(composer).getByRole("button", { name: "Publish" }));
 
     expect(scrollToIndexSpy).not.toHaveBeenCalled();
     await waitFor(() => {
@@ -1152,119 +1164,12 @@ describe("IssueDetail (shared)", () => {
     const { container } = renderIssueDetail();
 
     await waitFor(() => {
-      expect(screen.getByText("Implement authentication")).toBeInTheDocument();
+      expect(screen.getAllByText("Implement authentication").length).toBeGreaterThan(0);
     });
 
     // Unpinned, the composer lands in that corner once the reader reaches the
     // bottom, so the column has to end above the launcher rather than under it.
     expect(container.querySelector(".max-md\\:pb-chat-launcher")).not.toBeNull();
-  });
-
-  it("hides metadata content from the sidebar and shows a button when the bag has keys", async () => {
-    // Metadata is agent-facing; the sidebar only exposes a button that opens
-    // the raw JSON on demand. Keys are NOT rendered inline anywhere.
-    mockApiObj.getIssue.mockResolvedValue({
-      ...mockIssue,
-      metadata: {
-        pr_url: "https://example.com/pr/1",
-        pipeline_status: "running",
-      },
-    });
-
-    renderIssueDetail();
-
-    await waitFor(() => {
-      // Trigger label includes a "· N" count so users can see payload size
-      // before clicking — accept any count via regex.
-      expect(screen.getByRole("button", { name: /^Metadata\b/ })).toBeInTheDocument();
-    });
-
-    // Key names are not rendered in the sidebar prior to opening the dialog.
-    expect(screen.queryByText("pr_url")).not.toBeInTheDocument();
-    expect(screen.queryByText("pipeline_status")).not.toBeInTheDocument();
-  });
-
-  it("opens a dialog with formatted JSON when the Metadata button is clicked", async () => {
-    mockApiObj.getIssue.mockResolvedValue({
-      ...mockIssue,
-      metadata: {
-        pr_url: "https://example.com/pr/1",
-        pipeline_status: "running",
-      },
-    });
-
-    renderIssueDetail();
-
-    const button = await screen.findByRole("button", { name: /^Metadata\b/ });
-    fireEvent.click(button);
-
-    // The dialog renders a <pre> containing the formatted JSON; checking the
-    // exact serialized payload also verifies the indent / structure.
-    const expected = JSON.stringify(
-      { pr_url: "https://example.com/pr/1", pipeline_status: "running" },
-      null,
-      2,
-    );
-    await waitFor(() => {
-      const pre = document.querySelector("pre");
-      expect(pre).not.toBeNull();
-      expect(pre!.textContent).toBe(expected);
-    });
-  });
-
-  it("hides the Metadata button entirely when the bag is empty", async () => {
-    // Default fixture already has metadata: {}, asserted explicitly here.
-    renderIssueDetail();
-
-    await waitFor(() => {
-      expect(screen.getByText("Details")).toBeInTheDocument();
-    });
-
-    expect(screen.queryByRole("button", { name: /^Metadata\b/ })).not.toBeInTheDocument();
-  });
-
-  it("renders Details section with Created by and dates", async () => {
-    renderIssueDetail();
-
-    await waitFor(() => {
-      expect(screen.getByText("Details")).toBeInTheDocument();
-    });
-
-    expect(screen.getByText("Created by")).toBeInTheDocument();
-    expect(screen.getByText("Created")).toBeInTheDocument();
-    expect(screen.getByText("Updated")).toBeInTheDocument();
-  });
-
-  // Details is creator + immutable timestamps, so it ranks below the
-  // execution log, which is what people actually open the sidebar for.
-  it("orders the Details section after the execution log", async () => {
-    mockApiObj.listTasksByIssue.mockResolvedValue([
-      {
-        id: "task-past",
-        agent_id: "agent-1",
-        runtime_id: "runtime-1",
-        issue_id: "issue-1",
-        status: "completed",
-        priority: 0,
-        dispatched_at: null,
-        started_at: "2026-06-08T08:00:00Z",
-        completed_at: "2026-06-08T08:05:00Z",
-        result: null,
-        error: null,
-        created_at: "2026-06-08T08:00:00Z",
-        trigger_summary: "Started from comment",
-      },
-    ]);
-
-    renderIssueDetail();
-
-    const executionLog = await screen.findByText("Execution log");
-    const details = screen.getByText("Details");
-
-    // DOCUMENT_POSITION_FOLLOWING: Details comes after the execution log.
-    expect(
-      executionLog.compareDocumentPosition(details) & Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
   });
 
   it("shows 'not found' message when issue does not exist", async () => {
@@ -1274,7 +1179,7 @@ describe("IssueDetail (shared)", () => {
 
     await waitFor(() => {
       expect(
-        screen.getByText("This issue does not exist or has been deleted in this workspace."),
+        screen.getByText("This issue does not exist or has been deleted in this space."),
       ).toBeInTheDocument();
     });
   });
@@ -1289,11 +1194,11 @@ describe("IssueDetail (shared)", () => {
     });
   });
 
-  it("renders Activity section header", async () => {
+  it("renders the Discussion section header", async () => {
     renderIssueDetail();
 
     await waitFor(() => {
-      expect(screen.getAllByText("Activity").length).toBeGreaterThanOrEqual(1);
+      expect(screen.getAllByText("Discussion").length).toBeGreaterThanOrEqual(1);
     });
   });
 
@@ -2546,7 +2451,7 @@ describe("IssueDetail (shared)", () => {
 
       // Wait for the issue itself, so this asserts on a rendered page rather
       // than on the loading skeleton.
-      await screen.findByText("Implement authentication");
+      await screen.findAllByText("Implement authentication");
 
       expect(screen.queryByText("Subscribe")).toBeNull();
       expect(screen.queryByText("Unsubscribe")).toBeNull();
@@ -2568,13 +2473,13 @@ describe("IssueDetail (shared)", () => {
   // (server/pkg/db/queries/subscriber.sql), discarding a delegated
   // subscription or a deliberate opt-out (MUL-5714).
   describe("subscriber picker before the query resolves", () => {
-    // The picker sits next to the subscribe control in the Activity header.
-    // Anchor on the heading, not on that control — the whole point of these
-    // cases is that it is not rendered yet.
+    // The picker sits in the solo header action cluster. Anchor on that
+    // container, not on the subscribe control — the point of these cases is
+    // that the control itself is not rendered yet.
     async function openSubscriberPicker() {
-      const heading = await screen.findByText("Activity");
-      const header = heading.parentElement?.parentElement;
-      const trigger = header?.querySelector('[data-slot="popover-trigger"]');
+      await screen.findAllByText("TES-1");
+      const actions = document.querySelector(".qw-solo-actions");
+      const trigger = actions?.querySelector('[data-slot="popover-trigger"]');
       if (!trigger) throw new Error("subscriber picker trigger not found");
       fireEvent.click(trigger);
       return waitFor(() => {

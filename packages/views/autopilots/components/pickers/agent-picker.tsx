@@ -4,15 +4,15 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Bot } from "lucide-react";
 import { useWorkspaceId } from "@quickwork/core/hooks";
+import { useCurrentMember } from "@quickwork/core/permissions";
 import { isAgentRuntimeBound } from "@quickwork/core/agents";
-import { agentListOptions, squadListOptions } from "@quickwork/core/workspace/queries";
+import { agentListOptions } from "@quickwork/core/workspace/queries";
 import type { AutopilotAssigneeType } from "@quickwork/core/types";
 import { ActorAvatar } from "../../../common/actor-avatar";
 import {
   PropertyPicker,
   PickerItem,
   PickerSection,
-  PickerEmpty,
 } from "../../../issues/components/pickers/property-picker";
 import { useT } from "../../../i18n";
 import { matchesPinyin } from "../../../editor/extensions/pinyin-match";
@@ -37,37 +37,35 @@ export function AgentPicker({
 }) {
   const { t } = useT("autopilots");
   const wsId = useWorkspaceId();
+  const { userId } = useCurrentMember(wsId);
   const [open, setOpen] = useState(false);
   const [filter, setFilter] = useState("");
   const { data: agents = [] } = useQuery(agentListOptions(wsId));
-  const { data: squads = [] } = useQuery(squadListOptions(wsId));
 
-  const activeAgents = useMemo(() => agents.filter((a) => !a.archived_at), [agents]);
-  const activeSquads = useMemo(() => squads.filter((s) => !s.archived_at), [squads]);
-  const agentsById = useMemo(
-    () => new Map(activeAgents.map((agent) => [agent.id, agent])),
-    [activeAgents],
+  // An autopilot runs as the person configuring it, on that person's runtime.
+  // Offering a squad or another member's agent here creates an autopilot the
+  // creator cannot invoke — the run is rejected at claim time. Scope the list
+  // to agents this user owns; shared agents stay available to the tasks that
+  // already use them, not to new autopilots.
+  const ownedAgents = useMemo(
+    () =>
+      agents.filter(
+        (agent) =>
+          !agent.archived_at && userId !== null && agent.owner_id === userId,
+      ),
+    [agents, userId],
   );
 
   const selectedAgent =
-    assignee?.type === "agent" ? activeAgents.find((a) => a.id === assignee.id) : undefined;
-  const selectedSquad =
-    assignee?.type === "squad" ? activeSquads.find((s) => s.id === assignee.id) : undefined;
-  const selectedName = selectedAgent?.name ?? selectedSquad?.name;
+    assignee?.type === "agent"
+      ? ownedAgents.find((agent) => agent.id === assignee.id)
+      : undefined;
+  const selectedName = selectedAgent?.name;
 
   const query = filter.trim().toLowerCase();
   const matches = (name: string) =>
     !query || name.toLowerCase().includes(query) || matchesPinyin(name, query);
-  const filteredAgents = activeAgents.filter((a) => matches(a.name));
-  const filteredSquads = activeSquads.filter((s) => matches(s.name));
-
-  const isSelected = (type: AutopilotAssigneeType, id: string) =>
-    assignee?.type === type && assignee?.id === id;
-
-  const handlePick = (type: AutopilotAssigneeType, id: string) => {
-    onChange({ type, id });
-    setOpen(false);
-  };
+  const filteredAgents = ownedAgents.filter((agent) => matches(agent.name));
 
   return (
     <PropertyPicker
@@ -82,13 +80,13 @@ export function AgentPicker({
       trigger={
         customTrigger ?? (
           <>
-            {assignee && (selectedAgent || selectedSquad) ? (
+            {assignee && selectedAgent ? (
               <>
                 <ActorAvatar
-                  actorType={assignee.type}
+                  actorType="agent"
                   actorId={assignee.id}
                   size="sm"
-                  showStatusDot={assignee.type === "agent"}
+                  showStatusDot
                 />
                 <span className="truncate">{selectedName}</span>
               </>
@@ -102,58 +100,37 @@ export function AgentPicker({
         )
       }
     >
-      {filteredAgents.length === 0 && filteredSquads.length === 0 ? (
-        <PickerEmpty />
+      {filteredAgents.length === 0 ? (
+        <div className="px-3 py-4 text-center text-caption leading-5 text-muted-foreground">
+          {t(($) => $.agent_picker.no_owned_agents)}
+        </div>
       ) : (
-        <>
-          {filteredAgents.length > 0 && (
-            <PickerSection label={t(($) => $.agent_picker.agents_group)}>
-              {filteredAgents.map((a) => {
-                const runtimeBound = isAgentRuntimeBound(a);
-                return (
-                  <PickerItem
-                    key={a.id}
-                    selected={isSelected("agent", a.id)}
-                    disabled={!runtimeBound}
-                    tooltip={
-                      runtimeBound
-                        ? undefined
-                        : t(($) => $.agent_picker.agent_runtime_required)
-                    }
-                    onClick={() => handlePick("agent", a.id)}
-                  >
-                    <ActorAvatar actorType="agent" actorId={a.id} size="sm" showStatusDot />
-                    <span className="truncate">{a.name}</span>
-                  </PickerItem>
-                );
-              })}
-            </PickerSection>
-          )}
-          {filteredSquads.length > 0 && (
-            <PickerSection label={t(($) => $.agent_picker.squads_group)}>
-              {filteredSquads.map((s) => {
-                const leader = agentsById.get(s.leader_id);
-                const runtimeBound = !!leader && isAgentRuntimeBound(leader);
-                return (
-                  <PickerItem
-                    key={s.id}
-                    selected={isSelected("squad", s.id)}
-                    disabled={!runtimeBound}
-                    tooltip={
-                      runtimeBound
-                        ? undefined
-                        : t(($) => $.agent_picker.squad_runtime_required)
-                    }
-                    onClick={() => handlePick("squad", s.id)}
-                  >
-                    <ActorAvatar actorType="squad" actorId={s.id} size="sm" />
-                    <span className="truncate">{s.name}</span>
-                  </PickerItem>
-                );
-              })}
-            </PickerSection>
-          )}
-        </>
+        <PickerSection label={t(($) => $.agent_picker.agents_group)}>
+          {filteredAgents.map((agent) => {
+            const runtimeBound = isAgentRuntimeBound(agent);
+            return (
+              <PickerItem
+                key={agent.id}
+                selected={
+                  assignee?.type === "agent" && assignee.id === agent.id
+                }
+                disabled={!runtimeBound}
+                tooltip={
+                  runtimeBound
+                    ? undefined
+                    : t(($) => $.agent_picker.agent_runtime_required)
+                }
+                onClick={() => {
+                  onChange({ type: "agent", id: agent.id });
+                  setOpen(false);
+                }}
+              >
+                <ActorAvatar actorType="agent" actorId={agent.id} size="sm" showStatusDot />
+                <span className="truncate">{agent.name}</span>
+              </PickerItem>
+            );
+          })}
+        </PickerSection>
       )}
     </PropertyPicker>
   );

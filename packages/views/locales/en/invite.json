@@ -50,5 +50,53 @@
     "row_inviter_fallback": "Someone",
     "row_invited_admin": "{{inviter}} invited you as an admin",
     "row_invited_member": "{{inviter}} invited you as a member"
+  },
+  "roles": {
+    "admin": "Admin",
+    "member": "Member"
+  },
+  "loading": {
+    "title": "Opening your invitation",
+    "description": "Checking this invitation and the space behind it…"
+  },
+  "console": {
+    "wordmark": "QuickWork",
+    "top_note": "INVITATION",
+    "brand_initial": "Q",
+    "agent_initial": "AI",
+    "no_prefix": "NO.",
+    "kicker": "INVITATION / RESPONSE NEEDED",
+    "headline_prefix": "Step into",
+    "headline_suffix": "and take the next baton.",
+    "copy_as": "invited you as a",
+    "copy_rest": "Accept to join the space and pick up your first baton.",
+    "relay_label": "RELAY / 接力",
+    "relay_eng": "PASS THE BATON",
+    "leg_prev_label": "Previous baton",
+    "leg_prev_sub": "The work is already in motion",
+    "state_done": "Handed off",
+    "leg_you_label": "Your baton",
+    "leg_you_sub": "Review, act, hand off",
+    "state_now": "Now",
+    "you_initial": "ME",
+    "leg_next_label": "Next baton",
+    "leg_next_sub": "An agent or a teammate",
+    "state_wait": "Waiting",
+    "relay_note": "Every baton needs someone to catch it. This time it is you.",
+    "paper_kicker": "INVITATION / 邀请",
+    "workspace_path": "QuickWork space",
+    "workspace_tag": "WORKSPACE",
+    "lead_invite": "invited you to join as a",
+    "lead_end": ", in {{workspace}}.",
+    "fact_inviter": "Inviter",
+    "fact_role": "Your role",
+    "fact_valid": "Valid until",
+    "paper_note": "Work moves baton by baton. The person who accepts each handoff decides whether it moves on.",
+    "reply_tag": "REPLY / 回复",
+    "reply_as": "Join as {{role}}",
+    "reply_valid": "Valid until {{date}}",
+    "other_account_hint": "Invited account not yours?",
+    "footer_left": "AGENTS AS ASSIGNEES",
+    "footer_right": "PARKED IS A FEATURE"
   }
 }

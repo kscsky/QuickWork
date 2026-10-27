@@ -31,6 +31,7 @@ import { useAutoSave } from "../../settings/components/use-auto-save";
 import { useT } from "../../i18n";
 import { CharCounter } from "./char-counter";
 import { ModelPicker } from "./inspector/model-picker";
+import { ModelPoolDialog } from "./inspector/model-pool-dialog";
 import {
   buildModelChangeUpdate,
   type ModelCatalog,
@@ -287,6 +288,14 @@ export function AgentExecutionCard({
           value={agent.model ?? ""}
           canEdit={canEdit}
           onChange={handleModelChange}
+        />
+      </SettingsRow>
+      <SettingsRow label="模型池" size="none">
+        <ModelPoolDialog
+          runtime={runtime}
+          canEdit={canEdit}
+          currentModel={agent.model ?? ""}
+          onBind={handleModelChange}
         />
       </SettingsRow>
       <ThinkingSettingField

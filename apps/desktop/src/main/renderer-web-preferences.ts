@@ -56,6 +56,13 @@ export function createRendererWebPreferences(
     // in a dedicated WebContentsView with `plugins: true` scoped to that view,
     // keeping the main renderer plugin-free.
     plugins: true,
+    // QuickWork is a live workspace: inbox counts, agent presence and task
+    // relays keep moving while the window sits behind another app. Electron's
+    // default throttles rAF/timers for occluded windows, which makes the shell
+    // feel frozen for a second after every click and can strand a compositor
+    // transition mid-flight. Desktop clients keep the renderer at full rate;
+    // this is the main window, not a background tab.
+    backgroundThrottling: false,
     additionalArguments: [
       `--quickwork-locale=${systemLocale}`,
       ...additionalArguments,

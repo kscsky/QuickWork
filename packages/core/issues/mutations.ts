@@ -35,7 +35,7 @@ import type {
   MoveIssueRequest,
   UpdateIssueRequest,
 } from "../types";
-import type { TimelineEntry, IssueSubscriber, Reaction } from "../types";
+import type { TimelineEntry, IssueSubscriber, Reaction, IssueChainHandoffFile } from "../types";
 import { sortTimelineEntriesAsc } from "./timeline-sort";
 import {
   onIssueAuxiliaryRevision,
@@ -126,6 +126,48 @@ export function useSkipChainStep(issueId: string) {
     onSuccess: (chain) => {
       qc.setQueryData(issueKeys.chain(issueId), chain);
     },
+  });
+}
+
+/**
+ * The holder's own 通过: it marks their leg done, publishes the curated
+ * handoff package, and starts the next person's step. The response IS the
+ * chain as it now stands. Not optimistic — the relay moving is the server's
+ * call, and a failure leaves the step reviewing.
+ */
+export function useApproveChainStep(issueId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (handoff?: { summary: string; files: IssueChainHandoffFile[] }) =>
+      api.approveIssueChainStep(issueId, handoff),
+    onSuccess: (chain) => {
+      qc.setQueryData(issueKeys.chain(issueId), chain);
+    },
+  });
+}
+
+/**
+ * Saves the caller's brief for their own leg. Same shape as the skip/approve
+ * mutations: the response is the chain as it now stands.
+ */
+export function useSetChainStepPlan(issueId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (plan: string) => api.setIssueChainStepPlan(issueId, plan),
+    onSuccess: (chain) => {
+      qc.setQueryData(issueKeys.chain(issueId), chain);
+    },
+  });
+}
+
+/**
+ * The holder asks their leg's own agent for the leg's output (产出 md). The
+ * document arrives as the run's comment in the leg, not in this response —
+ * nothing to cache here; the timeline's own realtime path carries it.
+ */
+export function useGenerateChainLegOutput(issueId: string) {
+  return useMutation({
+    mutationFn: () => api.generateChainLegOutput(issueId),
   });
 }
 
@@ -773,13 +815,16 @@ export function useCreateComment(issueId: string) {
       parentId,
       attachmentIds,
       suppressAgentIds,
+      chainStepId,
     }: {
       content: string;
       type?: string;
       parentId?: string;
       attachmentIds?: string[];
       suppressAgentIds?: string[];
-    }) => api.createComment(issueId, content, type, parentId, attachmentIds, suppressAgentIds),
+      /** Posts into the caller's own leg instead of the room (单流分界). */
+      chainStepId?: string;
+    }) => api.createComment(issueId, content, type, parentId, attachmentIds, suppressAgentIds, chainStepId),
     onSuccess: (comment) => {
       if (comment.issue_revision) {
         onIssueAuxiliaryRevision(qc, wsId, issueId, comment.issue_revision);

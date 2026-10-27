@@ -60,8 +60,9 @@ export type SkillColumnKey =
   | "updated"
   | "created";
 
-/** Source and created are opt-in: hidden until the user enables them. */
-export const DEFAULT_HIDDEN_COLUMNS: SkillColumnKey[] = ["source", "created"];
+/** Created is opt-in; source is part of the default read (provenance matters
+ *  when deciding whether a skill is safe to keep). */
+export const DEFAULT_HIDDEN_COLUMNS: SkillColumnKey[] = ["created"];
 
 export interface SkillsViewState {
   sortField: SkillSortField;

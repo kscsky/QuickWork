@@ -28,7 +28,11 @@ export type InboxItemType =
   // A cross-workspace flow handed the baton to a machine this recipient owns.
   // The card is parked waiting for them, so this notification is the "start
   // your leg" call rather than a status report. (fork: single-card flows)
-  | "flow_handoff";
+  | "flow_handoff"
+  // A human posted in a squad room the recipient belongs to. The notification
+  // links to the squad room rather than an issue; `details.squad_id` carries
+  // the destination.
+  | "squad_message";
 
 /**
  * One workspace's unread inbox count in the cross-workspace summary

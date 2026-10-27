@@ -30,6 +30,7 @@ import { copyText } from "@quickwork/ui/lib/clipboard";
 import { useActorName } from "@quickwork/core/workspace/hooks";
 import { useLocale, useTimeAgo } from "../../i18n";
 import { ContentEditor, type ContentEditorRef, ReadonlyContent, useFileDropZone, FileDropOverlay, Attachment as AttachmentRenderer, AttachmentDownloadProvider, useUploadGate, useComposerSubmit } from "../../editor";
+import { ArtifactPanel } from "./comment-artifacts";
 import { useCommentUploads } from "./use-comment-uploads";
 import { FileUploadButton } from "@quickwork/ui/components/common/file-upload-button";
 import { api, dispatchReasonCode, errorCode } from "@quickwork/core/api";
@@ -130,6 +131,8 @@ interface CommentCardProps {
   onResolvedExpandChange?: (rootId: string, expand: boolean) => void;
   /** ID of the comment to highlight (flash animation). */
   highlightedCommentId?: string | null;
+  /** Solo task: attachments live in the Delivery section, not in each card. */
+  hideAttachments?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -195,16 +198,20 @@ export function AttachmentList({
 
   return (
     <AttachmentDownloadProvider attachments={attachments}>
-      <div className={cn("flex flex-col gap-1", className)}>
-        {standalone.map((a) => (
-          <AttachmentRenderer
-            key={a.id}
-            attachment={{ kind: "record", attachment: a }}
-            editable={!!onRemove}
-            onDelete={onRemove ? () => onRemove(a.id) : undefined}
-          />
-        ))}
-      </div>
+      {!onRemove && standalone.length >= 2 ? (
+        <ArtifactPanel attachments={standalone} className={className} />
+      ) : (
+        <div className={cn("flex flex-col gap-1", className)}>
+          {standalone.map((a) => (
+            <AttachmentRenderer
+              key={a.id}
+              attachment={{ kind: "record", attachment: a }}
+              editable={!!onRemove}
+              onDelete={onRemove ? () => onRemove(a.id) : undefined}
+            />
+          ))}
+        </div>
+      )}
     </AttachmentDownloadProvider>
   );
 }
@@ -597,6 +604,7 @@ function CommentRow({
   onToggleReaction,
   onCreateSubIssue,
   onResolveToggle,
+  hideAttachments = false,
 }: {
   issueId: string;
   entry: TimelineEntry;
@@ -611,6 +619,7 @@ function CommentRow({
   onToggleReaction: (commentId: string, emoji: string) => void;
   onCreateSubIssue?: (commentId: string) => void;
   onResolveToggle?: (commentId: string, resolved: boolean) => void;
+  hideAttachments?: boolean;
 }) {
   const { t } = useT("issues");
   const locale = useLocale();
@@ -814,9 +823,11 @@ function CommentRow({
       ) : (
         <>
           <div className="relative pl-12 pr-4 max-md:pl-3 max-md:pr-3 pt-1 text-body leading-relaxed text-foreground">
-            <ReadonlyContent content={entry.content ?? ""} attachments={entry.attachments} />
+            <ReadonlyContent content={entry.content ?? ""} attachments={hideAttachments ? undefined : entry.attachments} />
           </div>
-          <AttachmentList attachments={entry.attachments} content={entry.content} className="mt-1.5 pl-12 pr-4 max-md:pl-3 max-md:pr-3" />
+          {hideAttachments ? null : (
+            <AttachmentList attachments={entry.attachments} content={entry.content} className="mt-1.5 pl-12 pr-4 max-md:pl-3 max-md:pr-3" />
+          )}
           {retryableAgentFailureComment(entry) && (
             <TaskCommentRetryButton
               issueId={issueId}
@@ -865,6 +876,7 @@ function CommentCardImpl({
   expandedResolvedIds,
   onResolvedExpandChange,
   highlightedCommentId,
+  hideAttachments = false,
 }: CommentCardProps) {
   const { t } = useT("issues");
   const locale = useLocale();
@@ -1153,9 +1165,11 @@ function CommentCardImpl({
             ) : (
               <>
                 <div className="relative pr-32 pl-10 max-md:pr-3 max-md:pl-0 text-body leading-relaxed text-foreground">
-                  <ReadonlyContent content={entry.content ?? ""} attachments={entry.attachments} />
+                  <ReadonlyContent content={entry.content ?? ""} attachments={hideAttachments ? undefined : entry.attachments} />
                 </div>
-                <AttachmentList attachments={entry.attachments} content={entry.content} className="mt-1.5 pl-10 max-md:pl-0" />
+                {hideAttachments ? null : (
+                  <AttachmentList attachments={entry.attachments} content={entry.content} className="mt-1.5 pl-10 max-md:pl-0" />
+                )}
                 {retryableAgentFailureComment(entry) && (
                   <TaskCommentRetryButton
                     issueId={issueId}
@@ -1212,6 +1226,7 @@ function CommentCardImpl({
                     onToggleReaction={onToggleReaction}
                     onCreateSubIssue={onCreateSubIssue}
                     onResolveToggle={onResolveToggle}
+                    hideAttachments={hideAttachments}
                   />
                 </div>
               )}
@@ -1252,6 +1267,7 @@ function CommentCardImpl({
                     onToggleReaction={onToggleReaction}
                     onCreateSubIssue={onCreateSubIssue}
                     onResolveToggle={onResolveToggle}
+                    hideAttachments={hideAttachments}
                   />
                 </div>
               ))}

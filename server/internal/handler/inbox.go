@@ -53,6 +53,30 @@ func inboxToResponse(i db.InboxItem) InboxItemResponse {
 	}
 }
 
+// inboxItemEventPayload is the map shape the realtime listeners expect for an
+// inbox:new payload (they read the recipient off the nested item).
+func inboxItemEventPayload(i db.InboxItem) map[string]any {
+	return map[string]any{
+		"id":             uuidToString(i.ID),
+		"workspace_id":   uuidToString(i.WorkspaceID),
+		"recipient_type": i.RecipientType,
+		"recipient_id":   uuidToString(i.RecipientID),
+		"type":           i.Type,
+		"severity":       i.Severity,
+		"issue_id":       uuidToPtr(i.IssueID),
+		"title":          i.Title,
+		"body":           textToPtr(i.Body),
+		"read":           i.Read,
+		"archived":       i.Archived,
+		"created_at":     timestampToString(i.CreatedAt),
+		"actor_type":     textToPtr(i.ActorType),
+		"actor_id":       uuidToPtr(i.ActorID),
+		"details":        json.RawMessage(i.Details),
+		"issue_status":   nil,
+		"issue_priority": nil,
+	}
+}
+
 func inboxRowToResponse(r db.ListInboxItemsRow) InboxItemResponse {
 	return InboxItemResponse{
 		ID:            uuidToString(r.ID),
@@ -407,6 +431,136 @@ func (h *Handler) ArchiveAllInbox(w http.ResponseWriter, r *http.Request) {
 		"count":        count,
 	})
 
+	writeJSON(w, http.StatusOK, map[string]any{"count": count})
+}
+
+// DeleteAllInbox permanently removes the recipient's notifications in this
+// workspace, archived rows included. It is the destructive counterpart of
+// ArchiveAllInbox and deliberately has no inverse — the confirm dialog in the
+// UI warns about that.
+func (h *Handler) DeleteAllInbox(w http.ResponseWriter, r *http.Request) {
+	userID, ok := requireUserID(w, r)
+	if !ok {
+		return
+	}
+	workspaceID := ctxWorkspaceID(r.Context())
+	wsUUID, ok := parseUUIDOrBadRequest(w, workspaceID, "workspace id")
+	if !ok {
+		return
+	}
+
+	count, err := h.Queries.DeleteAllInbox(r.Context(), db.DeleteAllInboxParams{
+		WorkspaceID: wsUUID,
+		RecipientID: parseUUID(userID),
+	})
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to delete all inbox")
+		return
+	}
+
+	slog.Info("inbox: delete all", append(logger.RequestAttrs(r), "user_id", userID, "count", count)...)
+	h.publish(protocol.EventInboxBatchDeleted, workspaceID, "member", userID, map[string]any{
+		"recipient_id": userID,
+		"count":        count,
+	})
+
+	writeJSON(w, http.StatusOK, map[string]any{"count": count})
+}
+
+// DeleteInboxItem permanently removes one of the caller's notifications.
+// Scoped by recipient so a stale id from another account cannot be used to
+// delete someone else's row.
+func (h *Handler) DeleteInboxItem(w http.ResponseWriter, r *http.Request) {
+	userID, ok := requireUserID(w, r)
+	if !ok {
+		return
+	}
+	workspaceID := ctxWorkspaceID(r.Context())
+	wsUUID, ok := parseUUIDOrBadRequest(w, workspaceID, "workspace id")
+	if !ok {
+		return
+	}
+	itemID := chi.URLParam(r, "id")
+	itemUUID, ok := parseUUIDOrBadRequest(w, itemID, "inbox item id")
+	if !ok {
+		return
+	}
+
+	count, err := h.Queries.DeleteInboxItem(r.Context(), db.DeleteInboxItemParams{
+		ID:          itemUUID,
+		WorkspaceID: wsUUID,
+		RecipientID: parseUUID(userID),
+	})
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to delete inbox item")
+		return
+	}
+	if count == 0 {
+		writeError(w, http.StatusNotFound, "notification not found")
+		return
+	}
+
+	h.publish(protocol.EventInboxBatchDeleted, workspaceID, "member", userID, map[string]any{
+		"recipient_id": userID,
+		"count":        count,
+	})
+	writeJSON(w, http.StatusOK, map[string]any{"count": count})
+}
+
+// DeleteReadInbox permanently removes the caller's read, non-archived
+// notifications. Unread and archived rows stay put.
+func (h *Handler) DeleteReadInbox(w http.ResponseWriter, r *http.Request) {
+	userID, ok := requireUserID(w, r)
+	if !ok {
+		return
+	}
+	workspaceID := ctxWorkspaceID(r.Context())
+	wsUUID, ok := parseUUIDOrBadRequest(w, workspaceID, "workspace id")
+	if !ok {
+		return
+	}
+
+	count, err := h.Queries.DeleteReadInbox(r.Context(), db.DeleteReadInboxParams{
+		WorkspaceID: wsUUID,
+		RecipientID: parseUUID(userID),
+	})
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to delete read inbox")
+		return
+	}
+
+	h.publish(protocol.EventInboxBatchDeleted, workspaceID, "member", userID, map[string]any{
+		"recipient_id": userID,
+		"count":        count,
+	})
+	writeJSON(w, http.StatusOK, map[string]any{"count": count})
+}
+
+// DeleteArchivedInbox permanently empties the caller's archive.
+func (h *Handler) DeleteArchivedInbox(w http.ResponseWriter, r *http.Request) {
+	userID, ok := requireUserID(w, r)
+	if !ok {
+		return
+	}
+	workspaceID := ctxWorkspaceID(r.Context())
+	wsUUID, ok := parseUUIDOrBadRequest(w, workspaceID, "workspace id")
+	if !ok {
+		return
+	}
+
+	count, err := h.Queries.DeleteArchivedInbox(r.Context(), db.DeleteArchivedInboxParams{
+		WorkspaceID: wsUUID,
+		RecipientID: parseUUID(userID),
+	})
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to delete archived inbox")
+		return
+	}
+
+	h.publish(protocol.EventInboxBatchDeleted, workspaceID, "member", userID, map[string]any{
+		"recipient_id": userID,
+		"count":        count,
+	})
 	writeJSON(w, http.StatusOK, map[string]any{"count": count})
 }
 

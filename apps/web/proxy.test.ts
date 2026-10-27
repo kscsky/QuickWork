@@ -57,7 +57,9 @@ describe("proxy legacy workspace route redirects", () => {
   };
 
   it.each([
-    ["issues", "/acme/issues"],
+    // The flat issue list is retired; its root URL lands on the task feed.
+    ["issues", "/acme/tasks"],
+    ["tasks", "/acme/tasks"],
     ["projects", "/acme/projects"],
     ["agents", "/acme/agents"],
     ["squads", "/acme/squads"],

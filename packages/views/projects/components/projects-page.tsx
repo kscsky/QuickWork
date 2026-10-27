@@ -1016,8 +1016,9 @@ export function ProjectsPage() {
         icon={FolderKanban}
         title={t(($) => $.page.title)}
         count={projects.length}
-        actions={
+        leadingAction={
           <CollectionPageHeaderAction
+            variant="default"
             icon={Plus}
             label={t(($) => $.page.new_project)}
             onClick={openCreateProject}

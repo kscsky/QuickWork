@@ -1,7 +1,7 @@
 "use client";
 
 import { issueStatusCategory } from "@quickwork/core/issues";
-import { useState, useRef, useEffect, useLayoutEffect } from "react";
+import { useState, useRef, useEffect, useLayoutEffect, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { AppLink, resolveClickIntent, useNavigation } from "../navigation";
 import {
@@ -198,12 +198,15 @@ export function ManualCreatePanel({
   data,
   isExpanded,
   setIsExpanded,
+  typeSwitch,
 }: {
   onClose: () => void;
   data?: Record<string, unknown> | null;
   /** Lifted to the shell so DialogContent's className can react. */
   isExpanded: boolean;
   setIsExpanded: (v: boolean) => void;
+  /** The 单人/小队 switch, owned by the shell; rendered into the top strip. */
+  typeSwitch?: ReactNode;
 }) {
   const { t } = useT("modals");
   const { t: tIssues } = useT("issues");
@@ -822,6 +825,7 @@ export function ManualCreatePanel({
               isExpanded={isExpanded}
               onToggleExpanded={() => setIsExpanded(!isExpanded)}
               onClose={onClose}
+              leading={typeSwitch}
             />
 
             {/* Title */}

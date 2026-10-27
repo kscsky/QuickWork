@@ -25,11 +25,11 @@ import type { OnboardingStep } from "./types";
  *     what the member does and what they want QuickWork for. It sat between
  *     the intro and the setup, which is the one place a new member has no
  *     basis to answer yet — they had not used the product, and the answers
- *     only ever fed Mika's kickoff copy. The step is gone; the answers are
+ *     only ever fed Quill's kickoff copy. The step is gone; the answers are
  *     still collected by the same server-persisted field, so anyone who
  *     answered before this change keeps their context.
  *
- * Runtime is the final form step. A connected path provisions Mika and opens
+ * Runtime is the final form step. A connected path provisions Quill and opens
  * the interactive onboarding chat as part of the runtime step's submit action;
  * that chat is the product experience itself, not another progress-screen step.
  */

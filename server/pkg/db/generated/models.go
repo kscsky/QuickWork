@@ -550,6 +550,7 @@ type Comment struct {
 	ViaPluginID       pgtype.UUID        `json:"via_plugin_id"`
 	Revision          int64              `json:"revision"`
 	RecoverySettledAt pgtype.Timestamptz `json:"recovery_settled_at"`
+	ChainStepID       pgtype.UUID        `json:"chain_step_id"`
 }
 
 type CommentReaction struct {
@@ -800,16 +801,19 @@ type Issue struct {
 }
 
 type IssueChainStep struct {
-	ID           pgtype.UUID        `json:"id"`
-	IssueID      pgtype.UUID        `json:"issue_id"`
-	Position     int32              `json:"position"`
-	HolderUserID pgtype.UUID        `json:"holder_user_id"`
-	AgentID      pgtype.UUID        `json:"agent_id"`
-	Title        string             `json:"title"`
-	State        string             `json:"state"`
-	StartedAt    pgtype.Timestamptz `json:"started_at"`
-	CompletedAt  pgtype.Timestamptz `json:"completed_at"`
-	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+	ID             pgtype.UUID        `json:"id"`
+	IssueID        pgtype.UUID        `json:"issue_id"`
+	Position       int32              `json:"position"`
+	HolderUserID   pgtype.UUID        `json:"holder_user_id"`
+	AgentID        pgtype.UUID        `json:"agent_id"`
+	Title          string             `json:"title"`
+	State          string             `json:"state"`
+	StartedAt      pgtype.Timestamptz `json:"started_at"`
+	CompletedAt    pgtype.Timestamptz `json:"completed_at"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	Plan           string             `json:"plan"`
+	HandoffSummary string             `json:"handoff_summary"`
+	HandoffFiles   []byte             `json:"handoff_files"`
 }
 
 type IssueDependency struct {
@@ -1363,15 +1367,19 @@ type SysCronExecution struct {
 }
 
 type TaskMessage struct {
-	ID        pgtype.UUID        `json:"id"`
-	TaskID    pgtype.UUID        `json:"task_id"`
-	Seq       int32              `json:"seq"`
-	Type      string             `json:"type"`
-	Tool      pgtype.Text        `json:"tool"`
-	Content   pgtype.Text        `json:"content"`
-	Input     []byte             `json:"input"`
-	Output    pgtype.Text        `json:"output"`
-	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	ID               pgtype.UUID        `json:"id"`
+	TaskID           pgtype.UUID        `json:"task_id"`
+	Seq              int32              `json:"seq"`
+	Type             string             `json:"type"`
+	Tool             pgtype.Text        `json:"tool"`
+	Content          pgtype.Text        `json:"content"`
+	Input            []byte             `json:"input"`
+	Output           pgtype.Text        `json:"output"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+	InputTokens      int64              `json:"input_tokens"`
+	OutputTokens     int64              `json:"output_tokens"`
+	CacheReadTokens  int64              `json:"cache_read_tokens"`
+	CacheWriteTokens int64              `json:"cache_write_tokens"`
 }
 
 type TaskToken struct {

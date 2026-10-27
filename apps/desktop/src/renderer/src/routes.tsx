@@ -8,20 +8,20 @@ import { SkillDetailPage } from "./pages/skill-detail-page";
 import { AgentDetailPage } from "./pages/agent-detail-page";
 import { AiBuilderSessionPage } from "./pages/ai-builder-session-page";
 import { MemberDetailPage } from "./pages/member-detail-page";
+import { MembersDirectoryPage } from "./pages/members-directory-page";
 import {
   RuntimeDetailPage,
   RuntimeSettingsPage,
 } from "./pages/runtime-detail-page";
 import { AttachmentPreviewRoute } from "./pages/attachment-preview-page";
-import { IssuesPage } from "@quickwork/views/issues/components";
 import { ProjectsPage } from "@quickwork/views/projects/components";
 import { DashboardPage } from "@quickwork/views/dashboard";
 import { AutopilotsPage } from "@quickwork/views/autopilots/components";
 import { MyIssuesPage } from "@quickwork/views/my-issues";
-import { ControlTowerPage } from "@quickwork/views/home";
 import { TaskListPage } from "@quickwork/views/tasks";
-import { SkillsPage } from "@quickwork/views/skills";
+import { CreateSkillPage, SkillsPage } from "@quickwork/views/skills";
 import { DesktopRuntimesPage } from "./components/desktop-runtimes-page";
+import { ModelsPage } from "@quickwork/views/models";
 import { DesktopAgentsPage } from "./components/desktop-agents-page";
 import {
   AiCreateAgentPage,
@@ -30,37 +30,30 @@ import {
 } from "@quickwork/views/agents";
 import { SquadsPage, SquadDetailPage as SquadDetailPageView } from "@quickwork/views/squads/components";
 import { InboxPage } from "@quickwork/views/inbox";
-import { SettingsPage } from "@quickwork/views/settings";
-import { useT } from "@quickwork/views/i18n";
-import { Download, Server } from "lucide-react";
+import {
+  AccountSettingsPage,
+  ConfigOverviewPage,
+  GitHubSettingsPage,
+  IntegrationsSettingsPage,
+  McpSettingsPage,
+  TokensSettingsPage,
+  WorkspaceSettingsPage,
+} from "@quickwork/views/settings";
 import { DaemonSettingsTab } from "./components/daemon-settings-tab";
 import { UpdatesSettingsTab } from "./components/updates-settings-tab";
 import { WorkspaceRouteLayout } from "./components/workspace-route-layout";
 import { DesktopRouteErrorPage } from "./components/route-error-page";
 
-/**
- * Wraps `SettingsPage` so the desktop-only extra tabs can pull their labels
- * from i18n. The route element has to be a component (not a literal JSX
- * value) for `useT` to run.
- */
-function DesktopSettingsRoute() {
-  const { t } = useT("settings");
+/** Account settings plus the desktop-only daemon/update sections. */
+function DesktopAccountSettingsRoute() {
   return (
-    <SettingsPage
-      extraAccountTabs={[
-        {
-          value: "daemon",
-          label: "Daemon",
-          icon: Server,
-          content: <DaemonSettingsTab />,
-        },
-        {
-          value: "updates",
-          label: t(($) => $.desktop.tabs.updates),
-          icon: Download,
-          content: <UpdatesSettingsTab />,
-        },
-      ]}
+    <AccountSettingsPage
+      extraSections={
+        <>
+          <DaemonSettingsTab />
+          <UpdatesSettingsTab />
+        </>
+      }
     />
   );
 }
@@ -122,7 +115,7 @@ export const appRoutes: RouteObject[] = [
         path: ":workspaceSlug",
         element: <WorkspaceRouteLayout />,
         children: [
-          // A bare `/{slug}` URL is normalized to `/{slug}/issues` by
+          // A bare `/{slug}` URL is normalized to `/{slug}/tasks` by
           // sanitizeTabPath before it ever becomes a session, so the index
           // route is unreachable in practice; null keeps it a harmless
           // safety net instead of an in-router <Navigate> (MUL-4741
@@ -130,18 +123,13 @@ export const appRoutes: RouteObject[] = [
           { index: true, element: null },
           {
             path: "dispatch",
-            element: <ControlTowerPage />,
+            element: <TaskListPage />,
             handle: { title: "Dispatch" },
           },
           {
             path: "tasks",
             element: <TaskListPage />,
             handle: { title: "Tasks" },
-          },
-          {
-            path: "issues",
-            element: <IssuesPage />,
-            handle: { title: "Issues" },
           },
           {
             path: "issues/:id",
@@ -190,6 +178,11 @@ export const appRoutes: RouteObject[] = [
           },
           { path: "skills", element: <SkillsPage />, handle: { title: "Skills" } },
           {
+            path: "skills/new",
+            element: <CreateSkillPage />,
+            handle: { title: "New skill" },
+          },
+          {
             path: "skills/:id",
             element: <SkillDetailPage />,
             handle: { title: "Skill" },
@@ -221,6 +214,11 @@ export const appRoutes: RouteObject[] = [
             handle: { title: "Agent" },
           },
           {
+            path: "members",
+            element: <MembersDirectoryPage />,
+            handle: { title: "Members" },
+          },
+          {
             path: "members/:id",
             element: <MemberDetailPage />,
             handle: { title: "Member" },
@@ -231,7 +229,7 @@ export const appRoutes: RouteObject[] = [
             element: <SquadDetailPageView />,
             handle: { title: "Squad" },
           },
-          { path: "inbox", element: <InboxPage />, handle: { title: "Inbox" } },
+          { path: "inbox", element: <InboxPage />, handle: { title: "Notifications" } },
           {
             path: "attachments/:id/preview",
             element: <AttachmentPreviewRoute />,
@@ -242,11 +240,16 @@ export const appRoutes: RouteObject[] = [
             element: <DashboardPage />,
             handle: { title: "Usage" },
           },
-          {
-            path: "settings",
-            element: <DesktopSettingsRoute />,
-            handle: { title: "Settings" },
-          },
+          { path: "config", element: <ConfigOverviewPage />, handle: { title: "Config" } },
+          { path: "mcp", element: <McpSettingsPage />, handle: { title: "MCP" } },
+          { path: "models", element: <ModelsPage />, handle: { title: "Model pool" } },
+          { path: "github", element: <GitHubSettingsPage />, handle: { title: "GitHub" } },
+          { path: "integrations", element: <IntegrationsSettingsPage />, handle: { title: "Integrations" } },
+          { path: "tokens", element: <TokensSettingsPage />, handle: { title: "API Tokens" } },
+          { path: "account", element: <DesktopAccountSettingsRoute />, handle: { title: "Account" } },
+          { path: "workspace-settings", element: <WorkspaceSettingsPage />, handle: { title: "Workspace settings" } },
+          // Alias for tabs/bookmarks from the retired monolith.
+          { path: "settings", element: <ConfigOverviewPage />, handle: { title: "Config" } },
         ],
       },
     ],

@@ -10,6 +10,8 @@
 export type IssueChainStepState =
   | "pending"
   | "doing"
+  /** The run is over and waits on its holder's own 通过 (see approve). */
+  | "reviewing"
   | "done"
   | "parked"
   | "skipped";
@@ -26,8 +28,40 @@ export interface IssueChainStep {
   agent_id?: string;
   title: string;
   state: IssueChainStepState | string;
+  /**
+   * The holder's own brief for this leg. Written by them — nobody authors a
+   * brief on another person's behalf, and the next person is handed the
+   * previous leg's output instead.
+   */
+  plan?: string;
+  /**
+   * The package this leg published on 通过, when it published one. Public:
+   * it is what the leg chose to hand over, and the boundary between the
+   * leg's private work and the shared context runs exactly here.
+   */
+  handoff?: IssueChainHandoff;
+  /**
+   * How many leg-scoped comments this leg carries. Readers who are not the
+   * holder render "N 条对话 · 对你们不可见" from this count.
+   */
+  leg_comment_count?: number;
   started_at?: string;
   completed_at?: string;
+}
+
+/** One entry of a leg's handoff package. */
+export interface IssueChainHandoffFile {
+  name: string;
+  size?: number;
+  /** Links back to an uploaded attachment when the entry is one. */
+  attachment_id?: string;
+  /** "attachment" | "branch" | unknown strings from newer servers. */
+  kind?: string;
+}
+
+export interface IssueChainHandoff {
+  summary: string;
+  files: IssueChainHandoffFile[];
 }
 
 export interface IssueChain {
@@ -38,13 +72,32 @@ export interface IssueChain {
    * disagree about what counts as stuck.
    */
   parked: boolean;
+  /**
+   * Some step's run is done and waits on its holder's own approval. The workbench
+   * keys its 审核通过 button off this.
+   */
+  reviewing: boolean;
 }
 
-export const EMPTY_ISSUE_CHAIN: IssueChain = { steps: [], parked: false };
+export const EMPTY_ISSUE_CHAIN: IssueChain = {
+  steps: [],
+  parked: false,
+  reviewing: false,
+};
 
 /** A task's chain tagged with the task it belongs to — the list-page shape. */
 export interface IssueChainForIssue extends IssueChain {
   issue_id: string;
+}
+
+/**
+ * The answer to "ask the leg's agent for the leg's output": the run that was
+ * queued to write it. The document itself arrives as the run's comment in the
+ * leg — this response only says the ask landed.
+ */
+export interface ChainLegOutputResponse {
+  task_id: string;
+  status: string;
 }
 
 /** One step of a saved chain, before it is resolved to an agent. */

@@ -4,21 +4,15 @@ import { useId, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
-  Check,
   ChevronDown,
-  ChevronRight,
   Clock,
-  FilePlus2,
-  FolderKanban,
   Maximize2,
   Minimize2,
-  Play,
   Plus,
   Rocket,
   Users,
   Webhook,
   X as XIcon,
-  Zap,
 } from "lucide-react";
 import { cn } from "@quickwork/ui/lib/utils";
 import {
@@ -47,6 +41,7 @@ import {
   useUpdateAutopilotTrigger,
 } from "@quickwork/core/autopilots/mutations";
 import { buildAutopilotWebhookUrl } from "@quickwork/core/autopilots";
+import { cronPreviewOptions } from "@quickwork/core/autopilots/queries";
 import { api } from "@quickwork/core/api";
 import type {
   AutopilotAssigneeType,
@@ -66,6 +61,8 @@ import { ScheduleEditor } from "./schedule-editor/schedule-editor";
 import { getDefaultScheduleConfig, type ScheduleConfig } from "./schedule-editor/model";
 import { browserTimezone } from "../../common/timezone-select";
 import { parseCron, toCron } from "./schedule-editor/cron-mapping";
+import { describeSchedule } from "./schedule-editor/describe";
+import { formatInTimeZone } from "../../common/format-in-time-zone";
 import { useScheduleSubmitGate } from "./schedule-editor/validate";
 import { WebhookEventFilterSection } from "./webhook-event-filter-section";
 import { WebhookUrlField } from "./webhook-url-field";
@@ -112,11 +109,6 @@ export type AutopilotDialogProps =
 
 const OUTPUT_MODE_KEYS: AutopilotExecutionMode[] = ["create_issue", "run_only"];
 
-const OUTPUT_MODE_ICONS: Record<AutopilotExecutionMode, typeof FilePlus2> = {
-  create_issue: FilePlus2,
-  run_only: Play,
-};
-
 // ---------------------------------------------------------------------------
 // Webhook event-filter dirty detection
 // ---------------------------------------------------------------------------
@@ -136,7 +128,7 @@ function serializeEventFilters(filters: WebhookEventFilter[]): string {
 // ---------------------------------------------------------------------------
 
 export function AutopilotDialog(props: AutopilotDialogProps) {
-  const { t } = useT("autopilots");
+  const { t, i18n } = useT("autopilots");
   const { open, onOpenChange } = props;
   const workspaceName = useCurrentWorkspace()?.name;
   const wsId = useWorkspaceId();
@@ -235,6 +227,67 @@ export function AutopilotDialog(props: AutopilotDialogProps) {
   // keeps that case rendering exactly the disabled editor it always has.
   const showScheduleEmptyState =
     !isCreate && existingSchedule === null && !scheduleAdded && !schedulePillDisabled;
+
+  // Compact readback of the schedule. The full editor — validation, interval
+  // windows, advanced cron — stays one click away in a popover; the dialog
+  // itself only shows the three facts a person checks before creating.
+  const [scheduleOpen, setScheduleOpen] = useState(false);
+  const scheduleSummary = useMemo(() => {
+    const advanced = schedule.raw !== null;
+    const parts = advanced ? [] : describeSchedule(t, schedule)?.split(" · ") ?? [];
+    let time = advanced ? t(($) => $.schedule_editor.cron_toggle) : "—";
+    let repeat = "—";
+    if (!advanced) {
+      if (schedule.time.kind === "at") {
+        time = parts[0] ?? schedule.time.time;
+        repeat = parts.slice(1).join(" · ") || "—";
+      } else if (schedule.time.window !== null) {
+        time = parts.slice(0, 2).join(" · ");
+        repeat = parts.slice(2).join(" · ") || "—";
+      } else {
+        time = parts[0] ?? "—";
+        repeat = parts.slice(1).join(" · ") || "—";
+      }
+    }
+    return {
+      advanced,
+      time,
+      timeMode: advanced
+        ? null
+        : schedule.time.kind === "at"
+          ? t(($) => $.schedule_editor.time_at)
+          : t(($) => $.schedule_editor.time_every),
+      repeat,
+      cron: toCron(schedule).replace(/^TZ=\S+\s+/, ""),
+    };
+  }, [schedule, t]);
+
+  const scheduleZone = useMemo(() => {
+    const city =
+      schedule.timezone.split("/").pop()?.replace(/_/g, " ") ?? schedule.timezone;
+    let offset = "";
+    try {
+      offset =
+        new Intl.DateTimeFormat("en-US", {
+          timeZone: schedule.timezone,
+          timeZoneName: "shortOffset",
+        })
+          .formatToParts(new Date())
+          .find((part) => part.type === "timeZoneName")?.value ?? "";
+    } catch {
+      // An unknown zone still renders its id; the editor surfaces the real error.
+    }
+    return { city, offset };
+  }, [schedule.timezone]);
+
+  const cronPreview = useQuery({
+    ...cronPreviewOptions(wsId, toCron(schedule), schedule.timezone),
+    enabled: triggerKind === "schedule",
+  });
+  const nextRunIso = cronPreview.data?.next_runs?.[0] ?? null;
+  const nextRunLabel = nextRunIso
+    ? formatInTimeZone(nextRunIso, schedule.timezone, i18n.language)
+    : null;
 
   const selectedAssignee = useMemo(() => {
     if (!assigneeId) return null;
@@ -455,45 +508,45 @@ export function AutopilotDialog(props: AutopilotDialogProps) {
       <DialogContent
         showCloseButton={false}
         className={cn(
-          "p-0 gap-0 flex flex-col overflow-hidden",
+          "p-0 gap-0 flex flex-col overflow-hidden bg-surface-raised",
           "!transition-all !duration-300 !ease-out !-translate-y-1/2",
-          "!w-[calc(100vw-2rem)]",
+          "!w-[calc(100vw-1.5rem)]",
           isExpanded
-            ? "!max-w-6xl !h-[calc(100vh-4rem)]"
-            : "!max-w-5xl !h-[min(720px,calc(100vh-4rem))]",
+            ? "!max-w-5xl !h-[calc(100vh-4rem)]"
+            : "!max-w-[720px] !h-auto !max-h-[calc(100vh-3rem)]",
         )}
       >
         <DialogTitle className="sr-only">
           {isCreate ? t(($) => $.dialog.sr_create) : t(($) => $.dialog.sr_edit)}
         </DialogTitle>
 
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 pt-3 pb-2 shrink-0 border-b">
-          <div className="flex items-center gap-2 text-caption">
-            <div className="flex items-center gap-1.5">
-              <span className="inline-flex size-5 items-center justify-center rounded-md bg-primary/15 text-primary">
-                <Rocket className="size-3" />
-              </span>
-              <span className="font-medium text-foreground">
-                {isCreate
-                  ? t(($) => $.dialog.header_create)
-                  : t(($) => $.dialog.header_edit)}
-              </span>
-            </div>
-            <span className="text-faint-foreground">·</span>
-            <span className="text-muted-foreground">{t(($) => $.dialog.subtitle)}</span>
+        {/* Header — console strip, same family as the new-project dialog. */}
+        <div className="flex shrink-0 items-center gap-2 border-b px-4 py-2.5">
+          <span
+            aria-hidden="true"
+            className="size-2 shrink-0 rounded-full bg-inflight"
+          />
+          <span className="truncate text-caption text-muted-foreground">
             {workspaceName && (
               <>
-                <ChevronRight className="size-3 text-faint-foreground" />
-                <span className="text-muted-foreground">{workspaceName}</span>
+                <b className="font-semibold text-foreground">{workspaceName}</b>
+                <span className="mx-1 text-faint-foreground">/</span>
               </>
             )}
-          </div>
-          <div className="flex items-center gap-1">
+            <span className="font-medium text-foreground">
+              {isCreate
+                ? t(($) => $.dialog.header_create)
+                : t(($) => $.dialog.header_edit)}
+            </span>
+          </span>
+          <span className="truncate text-caption text-faint-foreground">
+            {t(($) => $.dialog.subtitle)}
+          </span>
+          <div className="ml-auto flex items-center gap-1">
             {!isCreate && props.canManageAccess && (
               <>
                 <Popover>
-                  <PopoverTrigger className="flex items-center gap-1.5 rounded-sm px-2 py-1 text-caption text-muted-foreground transition-all hover:bg-accent/60 hover:text-foreground hover:opacity-100 cursor-pointer">
+                  <PopoverTrigger className="flex cursor-pointer items-center gap-1.5 rounded-sm px-2 py-1 text-caption text-muted-foreground transition-colors hover:bg-accent hover:text-foreground">
                     <Users className="size-3.5" />
                     <span>{t(($) => $.access.title)}</span>
                   </PopoverTrigger>
@@ -519,7 +572,7 @@ export function AutopilotDialog(props: AutopilotDialogProps) {
                   <button
                     type="button"
                     onClick={() => setIsExpanded((v) => !v)}
-                    className="rounded-sm p-1.5 opacity-70 hover:opacity-100 hover:bg-accent/60 transition-all cursor-pointer"
+                    className="cursor-pointer rounded-sm p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                   >
                     {isExpanded ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
                   </button>
@@ -535,7 +588,7 @@ export function AutopilotDialog(props: AutopilotDialogProps) {
                   <button
                     type="button"
                     onClick={() => onOpenChange(false)}
-                    className="rounded-sm p-1.5 opacity-70 hover:opacity-100 hover:bg-accent/60 transition-all cursor-pointer"
+                    className="cursor-pointer rounded-sm p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                   >
                     <XIcon className="size-4" />
                   </button>
@@ -559,62 +612,199 @@ export function AutopilotDialog(props: AutopilotDialogProps) {
         {/* Body: two columns (stacks on narrow screens via flex-wrap at container level) */}
         <div
           key={contentKey}
-          className="flex-1 min-h-0 flex flex-col lg:flex-row overflow-y-auto lg:overflow-hidden"
+          className="flex min-h-0 flex-1 flex-col overflow-y-auto lg:flex-row lg:overflow-hidden"
         >
-          {/* Left: Runbook */}
-          <div className="flex-none lg:flex-1 min-h-0 min-w-0 flex flex-col border-b lg:border-b-0 lg:border-r">
-            <div className="px-6 pt-5 pb-3 shrink-0">
-              <TitleEditor
-                ref={titleEditorRef}
-                autoFocus={isCreate}
-                defaultValue={initial.title ?? ""}
-                placeholder={t(($) => $.dialog.title_placeholder)}
-                className="text-display-sm font-semibold tracking-tight"
-                onChange={setTitle}
-                onSubmit={handleSubmit}
-              />
-              {/* role="alert": the title is a contenteditable, so there is no
-                  input to hang aria-describedby off — announcing the error is
-                  the only way a screen-reader user learns why Create did
-                  nothing. */}
-              {showErrors && title.trim().length === 0 && (
-                <p role="alert" className="mt-1.5 text-caption text-destructive">
-                  {t(($) => $.dialog.error_title_required)}
-                </p>
-              )}
-            </div>
+          {/* Left: what the run reads. The schedule lives beside the
+              instructions; the full editor opens from its readback line. */}
+          <div className="flex min-w-0 flex-1 flex-col border-b px-6 pb-5 pt-5 lg:max-h-[calc(100vh-9rem)] lg:overflow-y-auto lg:border-b-0 lg:border-r">
+            <TitleEditor
+              ref={titleEditorRef}
+              autoFocus={isCreate}
+              defaultValue={initial.title ?? ""}
+              placeholder={t(($) => $.dialog.title_placeholder)}
+              className="text-display-sm font-semibold tracking-tight"
+              onChange={setTitle}
+              onSubmit={handleSubmit}
+            />
+            {/* role="alert": the title is a contenteditable, so there is no
+                input to hang aria-describedby off — announcing the error is
+                the only way a screen-reader user learns why Create did
+                nothing. */}
+            {showErrors && title.trim().length === 0 && (
+              <p role="alert" className="mt-1.5 text-caption text-destructive">
+                {t(($) => $.dialog.error_title_required)}
+              </p>
+            )}
 
-            <div className="px-6 pb-2 shrink-0 flex items-baseline gap-2">
-              <span className="text-micro font-semibold tracking-[0.08em] text-muted-foreground uppercase">
+            <div className="mt-4 flex items-baseline gap-2">
+              <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-faint-foreground">
                 {t(($) => $.dialog.runbook_label)}
               </span>
-              <span className="text-caption text-muted-foreground">
+              <span className="truncate text-caption text-muted-foreground">
                 {t(($) => $.dialog.runbook_hint)}
               </span>
             </div>
 
-            <div className="flex-1 min-h-0 px-6 pb-6 flex flex-col lg:h-full">
-              <div className="min-h-[200px] lg:min-h-0 lg:h-full overflow-y-auto rounded-lg border border-border bg-background transition-colors focus-within:border-input px-4 py-3">
-                <ContentEditor
-                  defaultValue={initial.description ?? ""}
-                  placeholder={t(($) => $.dialog.description_placeholder)}
-                  onUpdate={setDescription}
-                  debounceMs={300}
-                  showBubbleMenu={false}
-                />
+            {/* The one dark block in the dialog: the agent's input. */}
+            <div className="qw-ink mt-2 h-[150px] overflow-y-auto rounded-[10px] bg-background px-4 py-3 transition-shadow [--muted-foreground:oklch(0.72_0.01_250)] focus-within:ring-1 focus-within:ring-primary/50">
+              <ContentEditor
+                defaultValue={initial.description ?? ""}
+                placeholder={t(($) => $.dialog.description_placeholder)}
+                onUpdate={setDescription}
+                debounceMs={300}
+                showBubbleMenu={false}
+              />
+            </div>
+
+            {isCreate && (
+              <div className="mt-5">
+                <TriggerKindSection kind={triggerKind} onChange={setTriggerKind} />
               </div>
+            )}
+
+            <div className={cn(!isCreate && "mt-5")}>
+              {triggerKind === "schedule" ? (
+                <>
+                  {!isCreate && (
+                    <SectionLabel>{t(($) => $.dialog.section_schedule)}</SectionLabel>
+                  )}
+                  {showScheduleEmptyState ? (
+                    <ScheduleEmptyState onAdd={() => setScheduleAdded(true)} />
+                  ) : (
+                    <>
+                      <div className="mt-3 grid grid-cols-[1.1fr_1fr_1.2fr] gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setScheduleOpen(true)}
+                          className="min-w-0 cursor-pointer rounded-[9px] border border-border bg-background px-3 py-2.5 text-left transition-colors hover:border-input"
+                        >
+                          <div className="text-[10.5px] leading-4 text-faint-foreground">
+                            {t(($) => $.schedule_editor.time_label)}
+                          </div>
+                          <div
+                            title={scheduleSummary.time}
+                            className="mt-0.5 truncate text-body font-medium tabular-nums"
+                          >
+                            {scheduleSummary.time}
+                            {scheduleSummary.timeMode && (
+                              <span className="ml-1 text-caption font-normal text-faint-foreground">
+                                {scheduleSummary.timeMode}
+                              </span>
+                            )}
+                          </div>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setScheduleOpen(true)}
+                          className="min-w-0 cursor-pointer rounded-[9px] border border-border bg-background px-3 py-2.5 text-left transition-colors hover:border-input"
+                        >
+                          <div className="text-[10.5px] leading-4 text-faint-foreground">
+                            {t(($) => $.schedule_editor.days_label)}
+                          </div>
+                          <div
+                            title={scheduleSummary.repeat}
+                            className="mt-0.5 truncate text-body font-medium"
+                          >
+                            {scheduleSummary.repeat}
+                          </div>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setScheduleOpen(true)}
+                          className="min-w-0 cursor-pointer rounded-[9px] border border-border bg-background px-3 py-2.5 text-left transition-colors hover:border-input"
+                        >
+                          <div className="text-[10.5px] leading-4 text-faint-foreground">
+                            {t(($) => $.schedule_editor.timezone_label)}
+                          </div>
+                          <div
+                            title={schedule.timezone}
+                            className="mt-0.5 truncate text-body font-medium"
+                          >
+                            {scheduleZone.city}
+                            {scheduleZone.offset && (
+                              <span className="ml-1 text-caption font-normal text-faint-foreground">
+                                {scheduleZone.offset}
+                              </span>
+                            )}
+                          </div>
+                        </button>
+                      </div>
+
+                      <div className="mt-2 flex min-w-0 items-center gap-2.5 pt-1">
+                        <code
+                          title={scheduleSummary.cron}
+                          className="shrink-0 rounded-[5px] bg-muted px-1.5 py-0.5 font-mono text-[11.5px] text-muted-foreground"
+                        >
+                          {scheduleSummary.cron}
+                        </code>
+                        <span className="min-w-0 truncate text-caption text-faint-foreground">
+                          {t(($) => $.dialog.next_run_label)}{" "}
+                          <b className="font-medium text-muted-foreground tabular-nums">
+                            {nextRunLabel ?? "—"}
+                          </b>
+                        </span>
+                        <Popover open={scheduleOpen} onOpenChange={setScheduleOpen}>
+                          <PopoverTrigger
+                            render={
+                              <button
+                                type="button"
+                                className="ml-auto shrink-0 cursor-pointer text-caption text-primary hover:underline"
+                              >
+                                {t(($) => $.dialog.edit_cron)}
+                              </button>
+                            }
+                          />
+                          <PopoverContent
+                            align="start"
+                            sideOffset={8}
+                            keepMounted
+                            className="max-h-[min(560px,70vh)] w-[400px] overflow-y-auto p-4"
+                          >
+                            {/* No `onValidityChange` / `clearRejection` here, unlike the
+                                detail page's add-trigger dialog: nothing in this footer is
+                                gated on the schedule's validity any more, so the gate's
+                                `scheduleValid` would have no reader. The editor still shows
+                                its own inline rejection, and `ensureAccepted` re-asks the
+                                server on submit and toasts what it says. */}
+                            <ScheduleEditor
+                              value={schedule}
+                              onChange={setSchedule}
+                              wsId={wsId}
+                              // Locked while the save is in flight: the submit path validates
+                              // over the network and then writes the schedule it read before
+                              // that round trip, so an edit made in between would be dropped
+                              // on the floor with a success toast over it.
+                              disabled={schedulePillDisabled || submitting}
+                              disabledReason={
+                                schedulePillDisabled
+                                  ? t(($) => $.dialog.schedule_disabled_reason)
+                                  : undefined
+                              }
+                            />
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+                    </>
+                  )}
+                </>
+              ) : (
+                <WebhookSection
+                  isCreate={isCreate}
+                  eventFilters={eventFilters}
+                  onEventFiltersChange={setEventFilters}
+                />
+              )}
             </div>
           </div>
 
-          {/* Right: Configuration */}
-          <aside className="w-full lg:w-[380px] shrink-0 overflow-visible lg:overflow-y-auto px-5 py-5 space-y-5 bg-muted/30">
+          {/* Right: configuration rail */}
+          <aside className="w-full shrink-0 space-y-5 border-t bg-muted/40 px-4 py-4 lg:w-[244px] lg:overflow-y-auto lg:border-t-0 lg:border-l">
             <AgentSection
               ref={assigneeTriggerRef}
               selectedType={assigneeType}
               selectedId={assigneeId}
               onChange={handleAssigneeChange}
               selectedName={selectedAssignee?.name}
-              selectedDescription={selectedAssignee?.description}
               invalid={showErrors && assigneeId.length === 0}
               errorId={assigneeErrorId}
             />
@@ -641,67 +831,34 @@ export function AutopilotDialog(props: AutopilotDialogProps) {
                 onChange={setSubscriberUserIds}
               />
             )}
-
-            {isCreate && (
-              <TriggerKindSection kind={triggerKind} onChange={setTriggerKind} />
-            )}
-
-            {triggerKind === "schedule" ? (
-              <div>
-                <SectionLabel>{t(($) => $.dialog.section_schedule)}</SectionLabel>
-                {showScheduleEmptyState ? (
-                  <ScheduleEmptyState onAdd={() => setScheduleAdded(true)} />
-                ) : (
-                  /* No `onValidityChange` / `clearRejection` here, unlike the
-                     detail page's add-trigger dialog: nothing in this footer is
-                     gated on the schedule's validity any more, so the gate's
-                     `scheduleValid` would have no reader. The editor still shows
-                     its own inline rejection, and `ensureAccepted` re-asks the
-                     server on submit and toasts what it says. */
-                  <ScheduleEditor
-                    value={schedule}
-                    onChange={setSchedule}
-                    wsId={wsId}
-                    // Locked while the save is in flight: the submit path validates
-                    // over the network and then writes the schedule it read before
-                    // that round trip, so an edit made in between would be dropped
-                    // on the floor with a success toast over it.
-                    disabled={schedulePillDisabled || submitting}
-                    disabledReason={
-                      schedulePillDisabled
-                        ? t(($) => $.dialog.schedule_disabled_reason)
-                        : undefined
-                    }
-                  />
-                )}
-              </div>
-            ) : (
-              <WebhookSection
-                isCreate={isCreate}
-                eventFilters={eventFilters}
-                onEventFiltersChange={setEventFilters}
-              />
-            )}
           </aside>
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between gap-3 px-5 py-3 border-t shrink-0 bg-background">
+        <div className="flex shrink-0 items-center gap-3 border-t bg-surface-raised px-4 py-2.5">
           {/* The hint drops out while the schedule section states the autopilot
               is manual — a footer promising automatic runs directly under that
-              is the same false promise the empty state exists to retire. The
-              slot itself stays, or `justify-between` would walk the buttons
-              over to the left edge. */}
-          <div className="flex items-center gap-1.5 text-caption text-muted-foreground min-w-0">
+              is the same false promise the empty state exists to retire. */}
+          <div className="flex min-w-0 items-center gap-1.5 text-caption text-muted-foreground">
             {!showScheduleEmptyState && (
               <>
-                <Zap className="size-3.5 text-amber-500 shrink-0" />
-                <span className="truncate">{t(($) => $.dialog.auto_run_hint)}</span>
+                <span
+                  aria-hidden="true"
+                  className="size-1.5 shrink-0 rounded-full bg-inflight"
+                />
+                <span className="truncate text-caption text-muted-foreground">
+                  {t(($) => $.dialog.auto_run_hint)}
+                </span>
               </>
             )}
           </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <Button size="sm" variant="outline" onClick={() => onOpenChange(false)}>
+          <div className="ml-auto flex shrink-0 items-center gap-2">
+            <Button
+              size="sm"
+              variant="ghost"
+              className="text-muted-foreground"
+              onClick={() => onOpenChange(false)}
+            >
               {t(($) => $.dialog.cancel)}
             </Button>
             {/* Live whenever a save isn't already in flight — an unmet
@@ -739,6 +896,7 @@ export function AutopilotDialog(props: AutopilotDialogProps) {
 function SectionLabel({
   children,
   required,
+  hint,
 }: {
   children: React.ReactNode;
   // Purely the sighted user's advance warning. `aria-required` is not supported
@@ -746,13 +904,21 @@ function SectionLabel({
   // gets instead is the blocked submit's error, wired to the trigger through
   // aria-describedby and announced by its own role="alert".
   required?: boolean;
+  hint?: string;
 }) {
   return (
-    <div className="text-micro font-semibold tracking-[0.08em] text-muted-foreground uppercase mb-2">
-      {children}
-      {required === true && (
-        <span aria-hidden className="ml-0.5 text-destructive">
-          *
+    <div className="mb-2 flex items-baseline gap-1.5">
+      <span className="shrink-0 text-caption font-semibold text-foreground/80">
+        {children}
+        {required === true && (
+          <span aria-hidden className="ml-0.5 text-destructive">
+            *
+          </span>
+        )}
+      </span>
+      {hint && (
+        <span className="min-w-0 truncate text-caption text-muted-foreground">
+          {hint}
         </span>
       )}
     </div>
@@ -765,7 +931,6 @@ function AgentSection({
   selectedId,
   onChange,
   selectedName,
-  selectedDescription,
   invalid,
   errorId,
 }: {
@@ -774,7 +939,6 @@ function AgentSection({
   selectedId: string;
   onChange: (next: AssigneeSelection) => void;
   selectedName?: string;
-  selectedDescription?: string;
   /** A submit was attempted with no assignee picked. */
   invalid: boolean;
   errorId: string;
@@ -798,8 +962,8 @@ function AgentSection({
             aria-invalid={invalid || undefined}
             aria-describedby={invalid ? errorId : undefined}
             className={cn(
-              "w-full flex items-center gap-2.5 rounded-md border bg-background px-3 py-2 text-left",
-              "hover:bg-accent/40 transition-colors cursor-pointer",
+              "flex w-full cursor-pointer items-center gap-2 rounded-md border border-border bg-background px-2.5 py-2 text-left transition-colors",
+              "hover:bg-surface-hover",
               invalid && "border-destructive",
             )}
           >
@@ -807,25 +971,18 @@ function AgentSection({
               <ActorAvatar
                 actorType={selectedType}
                 actorId={selectedId}
-                size="md"
+                size="sm"
                 showStatusDot={selectedType === "agent"}
               />
             ) : (
-              <span className="inline-flex size-7 items-center justify-center rounded-full bg-muted text-muted-foreground">
-                <Rocket className="size-3.5" />
+              <span className="inline-flex size-5 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                <Rocket className="size-3" />
               </span>
             )}
-            <span className="flex-1 min-w-0">
-              <span className="block text-body font-medium truncate">
-                {selectedName ?? t(($) => $.dialog.select_assignee)}
-              </span>
-              {selectedDescription && (
-                <span className="block text-caption text-muted-foreground truncate">
-                  {selectedDescription}
-                </span>
-              )}
+            <span className="min-w-0 flex-1 truncate text-label font-medium">
+              {selectedName ?? t(($) => $.dialog.select_assignee)}
             </span>
-            <ChevronDown className="size-3.5 text-muted-foreground shrink-0" />
+            <ChevronDown className="size-3.5 shrink-0 text-muted-foreground" />
           </button>
         }
       />
@@ -849,38 +1006,33 @@ function OutputModeSection({
   return (
     <div>
       <SectionLabel>{t(($) => $.dialog.section_output_mode)}</SectionLabel>
-      <div className="space-y-1.5">
+      <div className="flex flex-col gap-1">
         {OUTPUT_MODE_KEYS.map((key) => {
           const selected = key === mode;
-          const Icon = OUTPUT_MODE_ICONS[key];
           return (
             <button
               key={key}
               type="button"
               onClick={() => onChange(key)}
               className={cn(
-                "w-full flex items-start gap-2.5 rounded-md border px-3 py-2 text-left cursor-pointer transition-colors",
+                "flex cursor-pointer items-start gap-2.5 rounded-md border px-2.5 py-2 text-left transition-colors",
                 selected
-                  ? "border-primary bg-primary/5"
-                  : "bg-background hover:bg-accent/40",
+                  ? "border-primary/40 bg-background"
+                  : "border-transparent hover:bg-background/60",
               )}
             >
               <span
                 className={cn(
-                  "mt-0.5 inline-flex size-4 shrink-0 items-center justify-center rounded-full border",
-                  selected
-                    ? "border-primary bg-primary text-primary-foreground"
-                    : "border-muted-foreground/40 bg-background",
+                  "mt-[3px] grid size-3.5 shrink-0 place-items-center rounded-full border-[1.5px]",
+                  selected ? "border-primary" : "border-border",
                 )}
               >
-                {selected ? (
-                  <Check className="size-2.5" strokeWidth={3} />
-                ) : (
-                  <Icon className="size-2.5 opacity-0" />
+                {selected && (
+                  <span className="size-1.5 rounded-full bg-primary" />
                 )}
               </span>
-              <span className="flex-1 min-w-0">
-                <span className="block text-body font-medium">
+              <span className="min-w-0">
+                <span className="block text-label font-semibold">
                   {t(($) => $.dialog.output_modes[key].label)}
                 </span>
                 <span className="block text-caption text-muted-foreground">
@@ -907,10 +1059,9 @@ function ProjectSection({
   const { t } = useT("autopilots");
   return (
     <div>
-      <SectionLabel>{t(($) => $.dialog.section_project)}</SectionLabel>
-      <p className="mb-2 text-micro text-muted-foreground">
-        {t(($) => $.dialog.project_hint)}
-      </p>
+      <SectionLabel hint={t(($) => $.dialog.project_hint_short)}>
+        {t(($) => $.dialog.section_project)}
+      </SectionLabel>
       <ProjectPicker
         projectId={projectId}
         onUpdate={(updates) => onChange(updates.project_id ?? null)}
@@ -919,21 +1070,24 @@ function ProjectSection({
           <button
             type="button"
             className={cn(
-              "w-full flex items-center gap-2.5 rounded-md border bg-background px-3 py-2 text-left",
-              "hover:bg-accent/40 transition-colors cursor-pointer",
+              "inline-flex max-w-full cursor-pointer items-center gap-1.5 rounded-md border px-2 py-1.5 text-caption transition-colors",
+              selectedProject
+                ? "border-border bg-background text-foreground hover:bg-surface-hover"
+                : "border-dashed border-input text-muted-foreground hover:border-primary/40 hover:text-foreground",
             )}
           >
             {selectedProject ? (
-              <ProjectIcon project={selectedProject} size="md" />
+              <ProjectIcon project={selectedProject} size="sm" />
             ) : (
-              <span className="inline-flex size-5 items-center justify-center rounded-md bg-muted text-muted-foreground">
-                <FolderKanban className="size-3.5" />
-              </span>
+              <Plus className="size-3" />
             )}
-            <span className="flex-1 min-w-0 truncate text-body font-medium">
-              {selectedProject?.title ?? t(($) => $.dialog.no_project)}
+            <span className="min-w-0 truncate">
+              {selectedProject?.title ??
+                t(($) => $.dialog.pick_project)}
             </span>
-            <ChevronDown className="size-3.5 text-muted-foreground shrink-0" />
+            {selectedProject && (
+              <ChevronDown className="size-3 shrink-0 text-muted-foreground" />
+            )}
           </button>
         }
       />
@@ -951,10 +1105,9 @@ function SubscribersSection({
   const { t } = useT("autopilots");
   return (
     <div>
-      <SectionLabel>{t(($) => $.dialog.section_subscribers)}</SectionLabel>
-      <p className="mb-2 text-micro text-muted-foreground">
-        {t(($) => $.dialog.subscribers_hint)}
-      </p>
+      <SectionLabel hint={t(($) => $.dialog.subscribers_hint)}>
+        {t(($) => $.dialog.section_subscribers)}
+      </SectionLabel>
       <SubscriberMultiSelect
         selectedIds={selectedUserIds}
         onChange={onChange}
@@ -997,29 +1150,32 @@ function TriggerKindSection({
 }) {
   const { t } = useT("autopilots");
   return (
-    <div>
-      <SectionLabel>{t(($) => $.dialog.section_trigger_kind)}</SectionLabel>
-      <SegmentedToggle
-        value={kind}
-        onChange={onChange}
-        buttonClassName="px-3 py-1.5 text-body"
-        options={[
-          [
-            "schedule",
-            <span key="schedule" className="flex items-center justify-center gap-1.5">
-              <Clock className="h-3.5 w-3.5" />
-              {t(($) => $.dialog.trigger_kind_schedule)}
-            </span>,
-          ],
-          [
-            "webhook",
-            <span key="webhook" className="flex items-center justify-center gap-1.5">
-              <Webhook className="h-3.5 w-3.5" />
-              {t(($) => $.dialog.trigger_kind_webhook)}
-            </span>,
-          ],
-        ]}
-      />
+    <div className="flex items-center gap-3">
+      <span className="text-caption font-semibold text-foreground/80">
+        {t(($) => $.dialog.trigger_short)}
+      </span>
+      <div className="w-fit">
+        <SegmentedToggle
+          value={kind}
+          onChange={onChange}
+          options={[
+            [
+              "schedule",
+              <span key="schedule" className="flex items-center justify-center gap-1.5 px-1">
+                <Clock className="h-3.5 w-3.5" />
+                {t(($) => $.dialog.trigger_kind_schedule)}
+              </span>,
+            ],
+            [
+              "webhook",
+              <span key="webhook" className="flex items-center justify-center gap-1.5 px-1">
+                <Webhook className="h-3.5 w-3.5" />
+                {t(($) => $.dialog.trigger_kind_webhook)}
+              </span>,
+            ],
+          ]}
+        />
+      </div>
     </div>
   );
 }

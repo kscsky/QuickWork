@@ -15,7 +15,7 @@ import { isImeComposing } from "@quickwork/core/utils";
 import type { InboxItem } from "@quickwork/core/types";
 import type { InboxView } from "./inbox-view";
 import { InboxListItem } from "./inbox-list-item";
-import { VirtuosoSeed, VIRTUOSO_SEED_COUNT } from "../../common/virtuoso-seed";
+import { VirtuosoSeed } from "../../common/virtuoso-seed";
 import { useRestoredScrollOffset, useRestoredScrollRef } from "../../platform";
 import { useT } from "../../i18n";
 
@@ -24,6 +24,11 @@ import { useT } from "../../i18n";
 // is truthful from the first frame and a restored offset sticks. A row is
 // two text lines (body + caption) plus py-2.5.
 const INBOX_ROW_ESTIMATED_HEIGHT = 58;
+
+// A 58px row fits about twelve to a screen. Seeding one screen (plus slack)
+// keeps the first frame populated without mounting rows nobody can see —
+// every seeded row pays the full inbox-item render on the navigation click.
+const INBOX_SEED_COUNT = 14;
 
 /**
  * Scrollable, virtualized inbox notification list.
@@ -234,7 +239,7 @@ export function InboxList({
             data={items}
             computeItemKey={computeItemKey}
             initialScrollTop={restoredScrollTop}
-            initialItemCount={Math.min(items.length, VIRTUOSO_SEED_COUNT)}
+            initialItemCount={Math.min(items.length, INBOX_SEED_COUNT)}
             defaultItemHeight={INBOX_ROW_ESTIMATED_HEIGHT}
             increaseViewportBy={{ top: 400, bottom: 400 }}
             itemContent={itemContent}
@@ -246,12 +251,13 @@ export function InboxList({
               data={items}
               itemContent={itemContent}
               computeItemKey={computeItemKey}
+              count={INBOX_SEED_COUNT}
               estimatedItemHeight={INBOX_ROW_ESTIMATED_HEIGHT}
             />
             {/* The seed frame renders a bounded slice, so the entry would be
                 mid-list rather than after the last row — only show it once the
                 seed IS the whole list. */}
-            {items.length <= VIRTUOSO_SEED_COUNT && archivedEntry}
+            {items.length <= INBOX_SEED_COUNT && archivedEntry}
           </>
         )}
       </div>

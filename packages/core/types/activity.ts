@@ -30,6 +30,11 @@ export interface TimelineEntry {
   resolved_by_type?: CommentAuthorType | null;
   resolved_by_id?: string | null;
   source_task_id?: string | null;
+  /**
+   * Set when this comment belongs to a chain step's leg instead of the room
+   * (单流分界). Only the leg's holder ever receives such an entry.
+   */
+  chain_step_id?: string | null;
   /** Set by frontend coalescing when consecutive identical activities are merged. */
   coalesced_count?: number;
 }

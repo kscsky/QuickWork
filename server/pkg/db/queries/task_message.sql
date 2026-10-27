@@ -56,9 +56,14 @@ WITH incoming AS (
         unnest(sqlc.arg('tools')::text[]) AS tool,
         unnest(sqlc.arg('contents')::text[]) AS content,
         unnest(sqlc.arg('inputs')::text[]) AS input,
-        unnest(sqlc.arg('outputs')::text[]) AS output
+        unnest(sqlc.arg('outputs')::text[]) AS output,
+        -- Per-assistant-turn usage (zero = not reported; see migration 464).
+        unnest(sqlc.arg('input_tokens')::bigint[]) AS input_tokens,
+        unnest(sqlc.arg('output_tokens')::bigint[]) AS output_tokens,
+        unnest(sqlc.arg('cache_read_tokens')::bigint[]) AS cache_read_tokens,
+        unnest(sqlc.arg('cache_write_tokens')::bigint[]) AS cache_write_tokens
 ), inserted AS (
-    INSERT INTO task_message (id, task_id, seq, type, tool, content, input, output)
+    INSERT INTO task_message (id, task_id, seq, type, tool, content, input, output, input_tokens, output_tokens, cache_read_tokens, cache_write_tokens)
     SELECT
         m.id,
         sqlc.arg('task_id')::uuid,
@@ -67,7 +72,11 @@ WITH incoming AS (
         NULLIF(m.tool, ''),
         NULLIF(m.content, ''),
         NULLIF(m.input, '')::jsonb,
-        NULLIF(m.output, '')
+        NULLIF(m.output, ''),
+        m.input_tokens,
+        m.output_tokens,
+        m.cache_read_tokens,
+        m.cache_write_tokens
     FROM incoming AS m
     RETURNING *
 )

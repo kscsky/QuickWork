@@ -450,11 +450,11 @@ export interface TaskUsage {
 }
 
 /**
- * Response of the Mika bootstrap endpoint: the workspace's Mika plus the
+ * Response of the Quill bootstrap endpoint: the workspace's Quill plus the
  * caller's conversation with it, resolved together server-side so two clients
  * cannot each open their own onboarding session.
  */
-export interface MikaBootstrapResponse extends Agent {
+export interface QuillBootstrapResponse extends Agent {
   /** Absent only when the server could not resolve the session; retry the
    *  same call rather than creating one client-side. */
   onboarding_session?: ChatSession;
@@ -480,7 +480,7 @@ export interface Agent {
   instructions: string;
   /** Up to three agent-authored first-turn suggestions. Older servers omit it. */
   conversation_starters?: AgentConversationStarter[];
-  /** Set for product-defined agents (e.g. "mika"). Absent for user- and
+  /** Set for product-defined agents (e.g. "quill"). Absent for user- and
    *  template-created agents. Identity for "maintained by QuickWork" checks —
    *  never the display name, which owners may change. */
   system_key?: string;
@@ -831,7 +831,7 @@ export interface UpdateAgentEnvRequest {
  * `GET /api/agents/:id/skills`). The full SKILL.md `content` is intentionally
  * omitted — bodies routinely run 50–200KB each and shipping them in list
  * payloads tripped CLI timeouts on high-latency links (GH
- * multica-ai/multica#2174). Use `Skill` from a detail endpoint when you need
+ * upstream#2174). Use `Skill` from a detail endpoint when you need
  * the body. For skills embedded in an `Agent` payload see `AgentSkillSummary`.
  */
 export interface SkillSummary {
@@ -1075,6 +1075,112 @@ export interface DashboardFailureByAgent {
   failure_reason: string;
   task_count: number;
 }
+
+// ---------------------------------------------------------------------------
+// Usage overview + model call log
+//
+// Both endpoints read raw task_usage (daemon-run tasks only) under the same
+// window, so the overview and the log reconcile. `call_count` is the number of
+// (task, provider, model) usage rows, not distinct tasks: a run that fell back
+// to a second model contributes two calls.
+// ---------------------------------------------------------------------------
+
+export interface UsageModelSummary {
+  provider: string;
+  model: string;
+  call_count: number;
+  input_tokens: number;
+  output_tokens: number;
+  cache_read_tokens: number;
+  cache_write_tokens: number;
+  cost_usd_ticks?: number;
+  uncosted_input_tokens?: number;
+  uncosted_output_tokens?: number;
+  uncosted_cache_read_tokens?: number;
+  uncosted_cache_write_tokens?: number;
+  success_calls: number;
+  failed_calls: number;
+  cancelled_calls: number;
+  running_calls: number;
+}
+
+export interface UsageOverviewDaily extends UsageModelSummary {
+  date: string;
+}
+
+export interface UsageOverviewByAgent extends UsageModelSummary {
+  /** `__restricted_agents__` for agents this caller may not name. */
+  agent_id: string;
+}
+
+export interface UsageOverview {
+  daily: UsageOverviewDaily[];
+  by_model: UsageModelSummary[];
+  by_agent: UsageOverviewByAgent[];
+  /** Same model totals for the immediately preceding window. */
+  previous_by_model: UsageModelSummary[];
+}
+
+/** Display bucket for a task run's status. Open string on the wire. */
+export type UsageLogStatus =
+  | "success"
+  | "failed"
+  | "cancelled"
+  | "running"
+  | (string & {});
+
+/** One (task, provider, model) usage row. */
+export interface UsageLogRow {
+  id: string;
+  task_id: string;
+  status: UsageLogStatus;
+  /** Raw task status (`completed`, `failed`, `cancelled`, `running`, ...). */
+  db_status: string;
+  agent_id: string;
+  agent_name: string;
+  agent_restricted: boolean;
+  issue_id: string;
+  issue_identifier: string;
+  issue_title: string;
+  project_id: string;
+  provider: string;
+  model: string;
+  /** `comment` | `autopilot` | `direct` | `retry` | ... — open on the wire. */
+  trigger: string;
+  failure_reason: string;
+  started_at?: string;
+  completed_at?: string;
+  created_at: string;
+  input_tokens: number;
+  output_tokens: number;
+  cache_read_tokens: number;
+  cache_write_tokens: number;
+  /** Omitted when the provider reported no cost; the client estimates it. */
+  cost_usd_ticks?: number;
+}
+
+export interface UsageStatusCounts {
+  all: number;
+  success: number;
+  failed: number;
+  cancelled: number;
+  running: number;
+}
+
+export interface UsageLogSummary {
+  by_model: UsageModelSummary[];
+  status_counts: UsageStatusCounts;
+}
+
+export interface UsageLogPage {
+  rows: UsageLogRow[];
+  total: number;
+  page: number;
+  page_size: number;
+  summary: UsageLogSummary;
+}
+
+export type UsageLogSortKey = "time" | "duration" | "input" | "output" | "cache";
 
 export type RuntimeUpdateStatus =
   | "pending"

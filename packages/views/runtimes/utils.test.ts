@@ -121,6 +121,18 @@ describe("estimateCost", () => {
     expect(cost).toBeCloseTo(1.25, 5);
   });
 
+  it("prices a DeepSeek CLI's v4.1-flash id at the Flash tier", () => {
+    const cost = estimateCost({
+      ...zeroUsage,
+      model: "deepseek-v4.1-flash[1m]",
+      input_tokens: 1_000_000,
+      output_tokens: 1_000_000,
+      cache_read_tokens: 1_000_000,
+    });
+    // 1M × $0.14 + 1M × $0.28 + 1M × $0.0028 = $0.4228.
+    expect(cost).toBeCloseTo(0.4228, 5);
+  });
+
   it("prices a Copilot session reporting claude-opus-4.7 at the official Opus rate", () => {
     // Copilot's `meta.agentMeta.model` is `claude-opus-4.7` (dotted). We
     // canonicalize to the dashed catalog key so it hits the maintained $5/$25

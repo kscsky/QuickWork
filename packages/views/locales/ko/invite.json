@@ -49,5 +49,53 @@
     "row_inviter_fallback": "누군가",
     "row_invited_admin": "{{inviter}}님이 관리자로 초대했습니다",
     "row_invited_member": "{{inviter}}님이 멤버로 초대했습니다"
+  },
+  "roles": {
+    "admin": "관리자",
+    "member": "멤버"
+  },
+  "loading": {
+    "title": "초대를 여는 중",
+    "description": "초대와 스페이스를 확인하고 있습니다…"
+  },
+  "console": {
+    "wordmark": "QuickWork",
+    "top_note": "초대 / INVITATION",
+    "brand_initial": "Q",
+    "agent_initial": "AI",
+    "no_prefix": "NO.",
+    "kicker": "초대 / 응답 대기",
+    "headline_prefix": "입장해서",
+    "headline_suffix": "다음 배턴을 받으세요.",
+    "copy_as": "님이 당신을",
+    "copy_rest": "(으)로 초대했습니다. 수락하면 첫 배턴이 시작됩니다.",
+    "relay_label": "릴레이 / RELAY",
+    "relay_eng": "PASS THE BATON",
+    "leg_prev_label": "이전 배턴",
+    "leg_prev_sub": "작업은 이미 진행 중",
+    "state_done": "전달됨",
+    "leg_you_label": "당신의 배턴",
+    "leg_you_sub": "검토, 실행, 전달",
+    "state_now": "지금",
+    "you_initial": "ME",
+    "leg_next_label": "다음 배턴",
+    "leg_next_sub": "에이전트 또는 동료",
+    "state_wait": "대기",
+    "relay_note": "모든 배턴에는 받는 사람이 필요합니다. 이번에는 당신입니다.",
+    "paper_kicker": "초대 / INVITATION",
+    "workspace_path": "QuickWork 스페이스",
+    "workspace_tag": "WORKSPACE",
+    "lead_invite": "당신을",
+    "lead_end": "(으)로 {{workspace}}에 초대했습니다.",
+    "fact_inviter": "초대한 사람",
+    "fact_role": "당신의 역할",
+    "fact_valid": "유효 기간",
+    "paper_note": "작업은 배턴 단위로 흘러갑니다. 각 인계를 받는 사람이 다음 진행을 결정합니다.",
+    "reply_tag": "답장 / REPLY",
+    "reply_as": "{{role}}(으)로 참여",
+    "reply_valid": "{{date}}까지 유효",
+    "other_account_hint": "초대받은 계정이 아닌가요?",
+    "footer_left": "AGENTS AS ASSIGNEES",
+    "footer_right": "PARKED IS A FEATURE"
   }
 }

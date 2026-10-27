@@ -110,8 +110,8 @@ var pendingWorkHintMinInterval = time.Second
 // worktree's gitdir resolves into the shared cache and stays read-only even
 // when the task workdir is an explicit writable root, so `git add` /
 // `git commit` fail from inside the checkout — Linux hit this in
-// multica-ai/multica#2925, Codex's native Windows sandbox in
-// multica-ai/multica#6449.
+// upstream#2925, Codex's native Windows sandbox in
+// upstream#6449.
 //
 // Both platforms now default to danger-full-access (execenv's
 // codexSandboxPolicyFor), so in practice only a user who opted into
@@ -8465,11 +8465,43 @@ func (d *Daemon) executeAndDrain(ctx context.Context, backend agent.Backend, pro
 		var mu sync.Mutex
 		var pendingText strings.Builder
 		var pendingThinking strings.Builder
+		// Token deltas of turns whose text/thinking is still being buffered.
+		// Attached to the LAST row this flush emits, so each turn's usage is
+		// reported exactly once.
+		var pendingUsage *TaskUsageDelta
 		var batch []TaskMessageData
 		callIDToTool := map[string]string{}
 
+		// usageDeltaOf converts a per-turn agent usage into the wire delta;
+		// nil or all-zero means "not reported" and stays omitted.
+		usageDeltaOf := func(u *agent.TokenUsage) *TaskUsageDelta {
+			if u == nil || (u.InputTokens == 0 && u.OutputTokens == 0 && u.CacheReadTokens == 0 && u.CacheWriteTokens == 0) {
+				return nil
+			}
+			return &TaskUsageDelta{
+				InputTokens:      u.InputTokens,
+				OutputTokens:     u.OutputTokens,
+				CacheReadTokens:  u.CacheReadTokens,
+				CacheWriteTokens: u.CacheWriteTokens,
+			}
+		}
+		addUsage := func(acc *TaskUsageDelta, u *agent.TokenUsage) *TaskUsageDelta {
+			if u == nil {
+				return acc
+			}
+			if acc == nil {
+				acc = &TaskUsageDelta{}
+			}
+			acc.InputTokens += u.InputTokens
+			acc.OutputTokens += u.OutputTokens
+			acc.CacheReadTokens += u.CacheReadTokens
+			acc.CacheWriteTokens += u.CacheWriteTokens
+			return acc
+		}
+
 		flush := func() {
 			mu.Lock()
+			lastIdx := -1
 			if pendingThinking.Len() > 0 {
 				s := msgSeq.Add(1)
 				batch = append(batch, TaskMessageData{
@@ -8477,6 +8509,7 @@ func (d *Daemon) executeAndDrain(ctx context.Context, backend agent.Backend, pro
 					Type:    "thinking",
 					Content: pendingThinking.String(),
 				})
+				lastIdx = len(batch) - 1
 				pendingThinking.Reset()
 			}
 			if pendingText.Len() > 0 {
@@ -8486,8 +8519,13 @@ func (d *Daemon) executeAndDrain(ctx context.Context, backend agent.Backend, pro
 					Type:    "text",
 					Content: pendingText.String(),
 				})
+				lastIdx = len(batch) - 1
 				pendingText.Reset()
 			}
+			if pendingUsage != nil && lastIdx >= 0 {
+				batch[lastIdx].Usage = pendingUsage
+			}
+			pendingUsage = nil
 			toSend := batch
 			batch = nil
 			mu.Unlock()
@@ -8592,6 +8630,7 @@ func (d *Daemon) executeAndDrain(ctx context.Context, backend agent.Backend, pro
 						// values yet. Deployment order is not a control we
 						// have, so this side has to be safe on its own.
 						Input: redact.InputMap(msg.Input),
+						Usage: usageDeltaOf(msg.Usage),
 					})
 					mu.Unlock()
 				case agent.MessageToolResult:
@@ -8627,12 +8666,14 @@ func (d *Daemon) executeAndDrain(ctx context.Context, backend agent.Backend, pro
 						Type:   "tool_result",
 						Tool:   toolName,
 						Output: output,
+						Usage:  usageDeltaOf(msg.Usage),
 					})
 					mu.Unlock()
 				case agent.MessageThinking:
 					if msg.Content != "" {
 						mu.Lock()
 						pendingThinking.WriteString(msg.Content)
+						pendingUsage = addUsage(pendingUsage, msg.Usage)
 						mu.Unlock()
 					}
 				case agent.MessageText:
@@ -8640,6 +8681,7 @@ func (d *Daemon) executeAndDrain(ctx context.Context, backend agent.Backend, pro
 						taskLog.Debug("agent", "text", truncateLog(msg.Content, 200))
 						mu.Lock()
 						pendingText.WriteString(msg.Content)
+						pendingUsage = addUsage(pendingUsage, msg.Usage)
 						mu.Unlock()
 					}
 				case agent.MessageError:
@@ -8650,6 +8692,7 @@ func (d *Daemon) executeAndDrain(ctx context.Context, backend agent.Backend, pro
 						Seq:     int(s),
 						Type:    "error",
 						Content: msg.Content,
+						Usage:   usageDeltaOf(msg.Usage),
 					})
 					mu.Unlock()
 				}

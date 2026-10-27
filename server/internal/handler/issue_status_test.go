@@ -241,9 +241,10 @@ func TestIssueWriteAcceptsCustomStatusAndRejectsUnknown(t *testing.T) {
 func TestBuiltInStatusesAreImmutable(t *testing.T) {
 	ctx := context.Background()
 	seedTestCatalog(t)
+	// Any shipped built-in proves the rule; in_review is no longer seeded.
 	builtIn, err := testHandler.Queries.GetIssueStatusEntryByKey(ctx, db.GetIssueStatusEntryByKeyParams{
 		WorkspaceID: parseUUID(testWorkspaceID),
-		Key:         "in_review",
+		Key:         "in_progress",
 	})
 	if err != nil {
 		t.Fatalf("load built-in: %v", err)

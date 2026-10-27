@@ -32,6 +32,33 @@
     "type_to_search": "输入关键词搜索任务和项目"
   },
   "trigger": {
-    "label": "搜索..."
+    "label": "搜索任务、项目、智能体"
+  },
+  "caps": {
+    "pages": "PAGES",
+    "commands": "COMMANDS",
+    "members": "MEMBERS",
+    "projects": "PROJECTS",
+    "issues": "TASKS",
+    "cancelled": "CANCELLED",
+    "recent": "RECENT"
+  },
+  "palette": {
+    "placeholder": "搜索任务、项目、智能体、成员或配置…",
+    "close": "关闭搜索",
+    "scope": "空间 / {{slug}} · {{count}} 类索引",
+    "result_count_one": "{{count}} 条结果",
+    "result_count_other": "{{count}} 条结果",
+    "no_results_count": "没有结果",
+    "recent_count": "最近 {{count}} 条",
+    "no_results_title": "没有匹配「{{query}}」",
+    "no_results_hint": "换个关键词 · 任务编号、项目、智能体、成员、配置都能搜",
+    "idle_title": "搜索整个工作区",
+    "idle_hint": "输入任务编号、项目名、智能体或配置…",
+    "mark": "QUICKWORK / 搜索",
+    "hint_select": "选择",
+    "hint_open": "打开",
+    "hint_close": "关闭",
+    "esc": "esc"
   }
 }

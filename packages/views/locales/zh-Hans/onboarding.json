@@ -11,7 +11,7 @@
       "description": "起个名字，定个网址。"
     },
     "runtime": {
-      "label": "认识 Mika",
+      "label": "认识 Quill",
       "description": "你的第一个智能体队友，以及它在哪运行。"
     }
   },
@@ -30,13 +30,29 @@
       "zone_origin": "本区",
       "zone_target": "目标区",
       "agent": "Fleet",
-      "sandbox": "沙箱隔离",
+      "sandbox": "沙箱",
       "stamp": "已回执",
       "checkpoint_received": "已受理",
       "checkpoint_dispatched": "已派发",
-      "checkpoint_running": "执行中"
+      "checkpoint_running": "执行中",
+      "title": "运单 / WAYBILL",
+      "no": "QW-0001",
+      "origin_cap": "本区 / ORIGIN",
+      "target_cap": "目标区 / TARGET",
+      "me": "我",
+      "me_sub": "发起任务",
+      "agent_sub": "智能体执行",
+      "isolation": "隔离",
+      "receipt": "回执",
+      "context": "上下文",
+      "context_value": "随任务",
+      "footer": "一个任务，两个区，一条把闭环收上的回执。",
+      "sig": "QW / RELAY",
+      "step_welcome": "01 欢迎",
+      "step_workspace": "02 空间"
     },
-    "illustration_caption": "一个任务，两个区，一条把闭环收上的回执。"
+    "illustration_caption": "一个任务，两个区，一条把闭环收上的回执。",
+    "progress": "01 / 02"
   },
   "common": {
     "back": "返回",
@@ -132,7 +148,7 @@
     "skip": {
       "loading": "正在为你准备空间...",
       "title": "欢迎来到 QuickWork！",
-      "subtitle": "我们建了一个任务帮你连接运行时。准备好后，在 \"运行时\" 页面就能开始使用 Mika。",
+      "subtitle": "我们建了一个任务帮你连接运行时。准备好后，在 \"运行时\" 页面就能开始使用 Quill。",
       "got_it": "知道了",
       "status_in_progress": "进行中",
       "error_title": "没能帮你准备好",
@@ -142,7 +158,7 @@
       "cards": {
         "install_runtime": {
           "title": "连接一个运行时",
-          "subtitle": "安装 Codex 或 Kimi，然后从 \"运行时\" 页面进入 Mika 的引导对话。"
+          "subtitle": "安装 Codex 或 Kimi，然后从 \"运行时\" 页面进入 Quill 的引导对话。"
         }
       }
     }
@@ -186,13 +202,25 @@
     "creation_disabled_logout": "退出登录",
     "creation_disabled_eyebrow_resume": "你的空间",
     "creation_disabled_headline_resume": "继续使用 {{name}}。",
-    "creation_disabled_lede_resume": "该实例已禁用创建空间，继续进入你已有的空间即可。"
+    "creation_disabled_lede_resume": "该实例已禁用创建空间，继续进入你已有的空间即可。",
+    "preview": {
+      "label": "空间预览 / SPACE",
+      "tasks": "任务",
+      "members": "成员",
+      "runtime": "运行时",
+      "issue_start": "从 {{prefix}}-1 开始",
+      "only_you": "先只有你",
+      "connect_after": "创建后连接",
+      "note": "创建后可以随时改名、换前缀、邀请成员。",
+      "default_name": "你的空间"
+    },
+    "progress": "02 / 02"
   },
   "step_runtime": {
     "scanning_headline": "正在连接这台电脑...",
     "scanning_lede_prefix": "你的智能体借助本机已安装的 AI 编程工具运行，例如 ",
     "scanning_lede_suffix": " 等。我们正在检测这台电脑上装了哪些。",
-    "found_headline": "让 Mika 在哪台电脑上运行？",
+    "found_headline": "让 Quill 在哪台电脑上运行？",
     "found_lede": "以下是在这台电脑上找到的智能体运行时。之后可以随时切换，或添加更多。",
     "runtime_count_other": "{{count}} 个智能体运行时",
     "status_all_online": "全部在线",
@@ -213,15 +241,15 @@
     "refresh": "刷新",
     "refreshing": "正在刷新...",
     "hint_selected": "已选择：{{name}}",
-    "hint_pick": "在上方选择一个智能体运行时，就可以开始使用 Mika。",
+    "hint_pick": "在上方选择一个智能体运行时，就可以开始使用 Quill。",
     "hint_waiting": "等待第一个结果...",
     "hint_skip_or_refresh": "装好后点刷新，或跳过进入空间。",
-    "continue": "开始使用 Mika"
+    "continue": "开始使用 Quill"
   },
   "step_platform": {
     "eyebrow": "连接一台电脑",
     "headline": "连接一台电脑来运行你的智能体。",
-    "lede": "Mika 是这个空间的参谋长，运行在你连接到 QuickWork 的一台真实电脑上。选择一种连接方式。",
+    "lede": "Quill 是这个空间的参谋长，运行在你连接到 QuickWork 的一台真实电脑上。选择一种连接方式。",
     "hint_default": "在上方选一种方式——或先跳过，之后再连接电脑。",
     "download_title": "使用这台电脑",
     "download_subtitle": "安装我们的桌面端来连接这台电脑。会在新标签页打开，在那里选你的平台。",
@@ -250,12 +278,12 @@
   },
   "errors": {
     "skip_failed": "完成上手引导失败",
-    "mika_setup_failed": "无法启动 Mika 空间"
+    "quill_setup_failed": "无法启动 Quill 空间"
   },
-  "mika_intro": {
-    "headline": "认识一下 Mika，你的第一个智能体队友。",
-    "name": "Mika",
+  "quill_intro": {
+    "headline": "认识一下 Quill，你的第一个智能体队友。",
+    "name": "Quill",
     "role": "参谋长",
-    "blurb": "把你想做的事告诉 Mika，它会变成一个任务，并交给合适的智能体处理。"
+    "blurb": "把你想做的事告诉 Quill，它会变成一个任务，并交给合适的智能体处理。"
   }
 }

@@ -43,6 +43,12 @@ export interface Comment {
   // Per-target result of every explicit @agent / @squad mention in this comment
   // (MUL-4525 §2). Present only on create/edit responses; older servers omit it.
   trigger_outcomes?: CommentTriggerOutcome[];
+  /**
+   * Leg attribution (单流分界): set when this comment belongs to a chain
+   * step's leg instead of the room. Only the leg's holder reads it back.
+   */
+  chain_step_id?: string;
+
 }
 
 // The domain result of one explicitly-mentioned trigger target. Success-shaped

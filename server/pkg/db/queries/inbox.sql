@@ -179,6 +179,30 @@ WHERE workspace_id = $1 AND recipient_type = 'member' AND recipient_id = $2 AND 
 UPDATE inbox_item SET archived = true
 WHERE workspace_id = $1 AND recipient_type = 'member' AND recipient_id = $2 AND archived = false;
 
+-- name: DeleteAllInbox :execrows
+-- Permanent deletion, including archived rows. Unlike ArchiveAllInbox this
+-- cannot be undone; the handler backs an explicitly worded destructive action.
+DELETE FROM inbox_item
+WHERE workspace_id = $1 AND recipient_type = 'member' AND recipient_id = $2;
+
+-- name: DeleteInboxItem :execrows
+-- Permanent, recipient-scoped deletion of one notification. The console's
+-- per-item delete is explicitly confirmed, so there is no archive tombstone to
+-- restore from.
+DELETE FROM inbox_item
+WHERE id = $1 AND workspace_id = $2 AND recipient_type = 'member' AND recipient_id = $3;
+
+-- name: DeleteReadInbox :execrows
+-- "清理已读": permanently removes read notifications from the active list.
+-- Archived rows and unread rows are untouched.
+DELETE FROM inbox_item
+WHERE workspace_id = $1 AND recipient_type = 'member' AND recipient_id = $2 AND read = true AND archived = false;
+
+-- name: DeleteArchivedInbox :execrows
+-- "清空归档": permanently removes the recipient's archived notifications.
+DELETE FROM inbox_item
+WHERE workspace_id = $1 AND recipient_type = 'member' AND recipient_id = $2 AND archived = true;
+
 -- name: ArchiveAllReadInbox :execrows
 -- "Read" is the state of the one issue row the inbox renders: the newest
 -- active notification in that issue group. Archive every row in groups whose

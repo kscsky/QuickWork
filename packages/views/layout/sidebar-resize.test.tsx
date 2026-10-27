@@ -54,9 +54,9 @@ describe("left sidebar resizing", () => {
       bottom: 0,
       height: 0,
       left: 0,
-      right: 256,
+      right: 258,
       top: 0,
-      width: 256,
+      width: 258,
       x: 0,
       y: 0,
       toJSON: () => ({}),
@@ -64,7 +64,7 @@ describe("left sidebar resizing", () => {
 
     fireEvent.pointerDown(rail, {
       button: 0,
-      clientX: 256,
+      clientX: 258,
       isPrimary: true,
       pointerId: 7,
     });
@@ -79,7 +79,7 @@ describe("left sidebar resizing", () => {
 
     expect(sidebarGap.style.width).toBe("300px");
     expect(sidebarContainer.style.width).toBe("300px");
-    expect(wrapper.style.getPropertyValue("--sidebar-width")).toBe("256px");
+    expect(wrapper.style.getPropertyValue("--sidebar-width")).toBe("258px");
     expect(setItem).not.toHaveBeenCalled();
     expect(stableConsumerRender).toHaveBeenCalledTimes(1);
 
@@ -121,9 +121,9 @@ describe("left sidebar resizing", () => {
       bottom: 0,
       height: 0,
       left: 0,
-      right: 256,
+      right: 258,
       top: 0,
-      width: 256,
+      width: 258,
       x: 0,
       y: 0,
       toJSON: () => ({}),
@@ -131,7 +131,7 @@ describe("left sidebar resizing", () => {
 
     fireEvent.pointerDown(rail, {
       button: 0,
-      clientX: 256,
+      clientX: 258,
       isPrimary: true,
       pointerId: 8,
     });
@@ -140,7 +140,7 @@ describe("left sidebar resizing", () => {
 
     expect(sidebarGap.style.width).toBe("");
     expect(sidebarContainer.style.width).toBe("");
-    expect(wrapper.style.getPropertyValue("--sidebar-width")).toBe("256px");
+    expect(wrapper.style.getPropertyValue("--sidebar-width")).toBe("258px");
     expect(setItem).not.toHaveBeenCalled();
     expect(wrapper).not.toHaveAttribute("data-sidebar-resizing");
     expect(document.documentElement).not.toHaveAttribute("data-sidebar-resizing");

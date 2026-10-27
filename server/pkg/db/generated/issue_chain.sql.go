@@ -11,10 +11,44 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const countIssueChainStepComments = `-- name: CountIssueChainStepComments :many
+SELECT chain_step_id, COUNT(*)::int AS comment_count
+FROM comment
+WHERE issue_id = $1 AND chain_step_id IS NOT NULL
+GROUP BY chain_step_id
+`
+
+type CountIssueChainStepCommentsRow struct {
+	ChainStepID  pgtype.UUID `json:"chain_step_id"`
+	CommentCount int32       `json:"comment_count"`
+}
+
+// How many leg-scoped comments each step carries. Readers who are not the
+// holder render "3 条对话 · 对你们不可见" from this count instead of content.
+func (q *Queries) CountIssueChainStepComments(ctx context.Context, issueID pgtype.UUID) ([]CountIssueChainStepCommentsRow, error) {
+	rows, err := q.db.Query(ctx, countIssueChainStepComments, issueID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []CountIssueChainStepCommentsRow{}
+	for rows.Next() {
+		var i CountIssueChainStepCommentsRow
+		if err := rows.Scan(&i.ChainStepID, &i.CommentCount); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const createIssueChainStep = `-- name: CreateIssueChainStep :one
 INSERT INTO issue_chain_step (issue_id, position, holder_user_id, agent_id, title, state)
 VALUES ($1, $2, $3, $4, $5, $6)
-RETURNING id, issue_id, position, holder_user_id, agent_id, title, state, started_at, completed_at, created_at
+RETURNING id, issue_id, position, holder_user_id, agent_id, title, state, started_at, completed_at, created_at, plan, handoff_summary, handoff_files
 `
 
 type CreateIssueChainStepParams struct {
@@ -47,6 +81,9 @@ func (q *Queries) CreateIssueChainStep(ctx context.Context, arg CreateIssueChain
 		&i.StartedAt,
 		&i.CompletedAt,
 		&i.CreatedAt,
+		&i.Plan,
+		&i.HandoffSummary,
+		&i.HandoffFiles,
 	)
 	return i, err
 }
@@ -61,7 +98,7 @@ func (q *Queries) DeleteIssueChain(ctx context.Context, issueID pgtype.UUID) err
 }
 
 const getIssueChainStepAt = `-- name: GetIssueChainStepAt :one
-SELECT id, issue_id, position, holder_user_id, agent_id, title, state, started_at, completed_at, created_at FROM issue_chain_step WHERE issue_id = $1 AND position = $2
+SELECT id, issue_id, position, holder_user_id, agent_id, title, state, started_at, completed_at, created_at, plan, handoff_summary, handoff_files FROM issue_chain_step WHERE issue_id = $1 AND position = $2
 `
 
 type GetIssueChainStepAtParams struct {
@@ -83,12 +120,15 @@ func (q *Queries) GetIssueChainStepAt(ctx context.Context, arg GetIssueChainStep
 		&i.StartedAt,
 		&i.CompletedAt,
 		&i.CreatedAt,
+		&i.Plan,
+		&i.HandoffSummary,
+		&i.HandoffFiles,
 	)
 	return i, err
 }
 
 const listIssueChainSteps = `-- name: ListIssueChainSteps :many
-SELECT id, issue_id, position, holder_user_id, agent_id, title, state, started_at, completed_at, created_at FROM issue_chain_step WHERE issue_id = $1 ORDER BY position ASC
+SELECT id, issue_id, position, holder_user_id, agent_id, title, state, started_at, completed_at, created_at, plan, handoff_summary, handoff_files FROM issue_chain_step WHERE issue_id = $1 ORDER BY position ASC
 `
 
 func (q *Queries) ListIssueChainSteps(ctx context.Context, issueID pgtype.UUID) ([]IssueChainStep, error) {
@@ -111,6 +151,9 @@ func (q *Queries) ListIssueChainSteps(ctx context.Context, issueID pgtype.UUID) 
 			&i.StartedAt,
 			&i.CompletedAt,
 			&i.CreatedAt,
+			&i.Plan,
+			&i.HandoffSummary,
+			&i.HandoffFiles,
 		); err != nil {
 			return nil, err
 		}
@@ -123,7 +166,7 @@ func (q *Queries) ListIssueChainSteps(ctx context.Context, issueID pgtype.UUID) 
 }
 
 const listIssueChainStepsByIssues = `-- name: ListIssueChainStepsByIssues :many
-SELECT s.id, s.issue_id, s.position, s.holder_user_id, s.agent_id, s.title, s.state, s.started_at, s.completed_at, s.created_at FROM issue_chain_step s
+SELECT s.id, s.issue_id, s.position, s.holder_user_id, s.agent_id, s.title, s.state, s.started_at, s.completed_at, s.created_at, s.plan, s.handoff_summary, s.handoff_files FROM issue_chain_step s
 JOIN issue i ON i.id = s.issue_id
 WHERE i.workspace_id = $1
   AND s.issue_id = ANY($2::uuid[])
@@ -158,6 +201,9 @@ func (q *Queries) ListIssueChainStepsByIssues(ctx context.Context, arg ListIssue
 			&i.StartedAt,
 			&i.CompletedAt,
 			&i.CreatedAt,
+			&i.Plan,
+			&i.HandoffSummary,
+			&i.HandoffFiles,
 		); err != nil {
 			return nil, err
 		}
@@ -170,7 +216,7 @@ func (q *Queries) ListIssueChainStepsByIssues(ctx context.Context, arg ListIssue
 }
 
 const listParkedChainStepsForHolder = `-- name: ListParkedChainStepsForHolder :many
-SELECT s.id, s.issue_id, s.position, s.holder_user_id, s.agent_id, s.title, s.state, s.started_at, s.completed_at, s.created_at FROM issue_chain_step s
+SELECT s.id, s.issue_id, s.position, s.holder_user_id, s.agent_id, s.title, s.state, s.started_at, s.completed_at, s.created_at, s.plan, s.handoff_summary, s.handoff_files FROM issue_chain_step s
 JOIN issue i ON i.id = s.issue_id
 WHERE s.holder_user_id = $1
   AND s.state = 'parked'
@@ -205,6 +251,9 @@ func (q *Queries) ListParkedChainStepsForHolder(ctx context.Context, arg ListPar
 			&i.StartedAt,
 			&i.CompletedAt,
 			&i.CreatedAt,
+			&i.Plan,
+			&i.HandoffSummary,
+			&i.HandoffFiles,
 		); err != nil {
 			return nil, err
 		}
@@ -216,13 +265,89 @@ func (q *Queries) ListParkedChainStepsForHolder(ctx context.Context, arg ListPar
 	return items, nil
 }
 
+const setIssueChainStepHandoff = `-- name: SetIssueChainStepHandoff :one
+UPDATE issue_chain_step
+   SET handoff_summary = $3,
+       handoff_files = $4
+ WHERE issue_id = $1 AND position = $2
+RETURNING id, issue_id, position, holder_user_id, agent_id, title, state, started_at, completed_at, created_at, plan, handoff_summary, handoff_files
+`
+
+type SetIssueChainStepHandoffParams struct {
+	IssueID        pgtype.UUID `json:"issue_id"`
+	Position       int32       `json:"position"`
+	HandoffSummary string      `json:"handoff_summary"`
+	HandoffFiles   []byte      `json:"handoff_files"`
+}
+
+// The package the holder publishes with their 通过. Written before the state
+// moves to done so the approve response already carries it.
+func (q *Queries) SetIssueChainStepHandoff(ctx context.Context, arg SetIssueChainStepHandoffParams) (IssueChainStep, error) {
+	row := q.db.QueryRow(ctx, setIssueChainStepHandoff,
+		arg.IssueID,
+		arg.Position,
+		arg.HandoffSummary,
+		arg.HandoffFiles,
+	)
+	var i IssueChainStep
+	err := row.Scan(
+		&i.ID,
+		&i.IssueID,
+		&i.Position,
+		&i.HolderUserID,
+		&i.AgentID,
+		&i.Title,
+		&i.State,
+		&i.StartedAt,
+		&i.CompletedAt,
+		&i.CreatedAt,
+		&i.Plan,
+		&i.HandoffSummary,
+		&i.HandoffFiles,
+	)
+	return i, err
+}
+
+const setIssueChainStepPlan = `-- name: SetIssueChainStepPlan :one
+UPDATE issue_chain_step SET plan = $3 WHERE issue_id = $1 AND position = $2 RETURNING id, issue_id, position, holder_user_id, agent_id, title, state, started_at, completed_at, created_at, plan, handoff_summary, handoff_files
+`
+
+type SetIssueChainStepPlanParams struct {
+	IssueID  pgtype.UUID `json:"issue_id"`
+	Position int32       `json:"position"`
+	Plan     string      `json:"plan"`
+}
+
+// The holder writes their own leg's brief. Nothing else changes: the plan is
+// narrative for the room, not an instruction row the relay reads.
+func (q *Queries) SetIssueChainStepPlan(ctx context.Context, arg SetIssueChainStepPlanParams) (IssueChainStep, error) {
+	row := q.db.QueryRow(ctx, setIssueChainStepPlan, arg.IssueID, arg.Position, arg.Plan)
+	var i IssueChainStep
+	err := row.Scan(
+		&i.ID,
+		&i.IssueID,
+		&i.Position,
+		&i.HolderUserID,
+		&i.AgentID,
+		&i.Title,
+		&i.State,
+		&i.StartedAt,
+		&i.CompletedAt,
+		&i.CreatedAt,
+		&i.Plan,
+		&i.HandoffSummary,
+		&i.HandoffFiles,
+	)
+	return i, err
+}
+
 const setIssueChainStepState = `-- name: SetIssueChainStepState :one
 UPDATE issue_chain_step
    SET state = $3,
        started_at = CASE WHEN $3 = 'doing' THEN COALESCE(started_at, now()) ELSE started_at END,
        completed_at = CASE WHEN $3 IN ('done', 'skipped') THEN now() ELSE completed_at END
  WHERE issue_id = $1 AND position = $2
-RETURNING id, issue_id, position, holder_user_id, agent_id, title, state, started_at, completed_at, created_at
+RETURNING id, issue_id, position, holder_user_id, agent_id, title, state, started_at, completed_at, created_at, plan, handoff_summary, handoff_files
 `
 
 type SetIssueChainStepStateParams struct {
@@ -245,6 +370,9 @@ func (q *Queries) SetIssueChainStepState(ctx context.Context, arg SetIssueChainS
 		&i.StartedAt,
 		&i.CompletedAt,
 		&i.CreatedAt,
+		&i.Plan,
+		&i.HandoffSummary,
+		&i.HandoffFiles,
 	)
 	return i, err
 }
@@ -255,7 +383,7 @@ UPDATE issue_chain_step
        state = 'doing',
        started_at = COALESCE(started_at, now())
  WHERE issue_id = $1 AND position = $2
-RETURNING id, issue_id, position, holder_user_id, agent_id, title, state, started_at, completed_at, created_at
+RETURNING id, issue_id, position, holder_user_id, agent_id, title, state, started_at, completed_at, created_at, plan, handoff_summary, handoff_files
 `
 
 type StartIssueChainStepParams struct {
@@ -281,6 +409,9 @@ func (q *Queries) StartIssueChainStep(ctx context.Context, arg StartIssueChainSt
 		&i.StartedAt,
 		&i.CompletedAt,
 		&i.CreatedAt,
+		&i.Plan,
+		&i.HandoffSummary,
+		&i.HandoffFiles,
 	)
 	return i, err
 }

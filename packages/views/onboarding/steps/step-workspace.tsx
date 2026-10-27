@@ -1,10 +1,9 @@
 "use client";
 
 import { type ReactNode, useRef, useEffect, useState } from "react";
-import { ArrowLeft, Dices, Plus } from "lucide-react";
+import { ArrowLeft, ArrowRight, Dices, Loader2, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@quickwork/ui/components/ui/button";
-import { cn } from "@quickwork/ui/lib/utils";
 import { useCreateWorkspace } from "@quickwork/core/workspace/mutations";
 import type { Workspace } from "@quickwork/core/types";
 import { isImeComposing } from "@quickwork/core/utils";
@@ -74,16 +73,6 @@ function issuePrefix(slug: string): string {
 function normalizePrefix(raw: string): string {
   return raw.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 10);
 }
-
-/** The value side of a row. No box: the row's own hairline is the field's
- *  only edge, so the input contributes nothing but the text and the caret. */
-const GLASS_FIELD =
-  "h-full w-full min-w-0 bg-transparent text-body text-white outline-none " +
-  "placeholder:text-white/25";
-
-/** Small mono caps — the label is a name for the row, not a sentence about it. */
-const GLASS_LABEL =
-  "font-mono text-micro uppercase tracking-[0.22em] text-white/40";
 
 export function StepWorkspace({
   existing,
@@ -286,106 +275,65 @@ export function StepWorkspace({
     onContinue = () => {};
   }
 
-  // Hand-rolled rather than built on the shared `Field` primitives, which is
-  // the one place this step leaves the product's form language: their resting
-  // state is a filled field whose border only shows itself on error, and on
-  // this pane each row has to read as a strip of the glass panel instead. The
-  // label / hint / error wiring they standardise is reproduced by hand below.
   const createFields = (
-    <div className="onboarding-glass-card onboarding-glass-rise flex flex-col rounded-2xl px-6">
-      {/* Rows of a dispatch form, not fields of a web form: a mono label
-          holding a fixed left column, the value on the right, and one hairline
-          between rows. No box — a rounded bordered input is the generic shape
-          every tracker draws, and a boxed field would also fight the panel it
-          sits on. Focus moves the rule to the product's own `--inflight` and
-          turns the caret with it. */}
-
-      {/* Name — the only thing this step asks for. */}
-      <div
-        className="onboarding-glass-row flex items-center gap-4 border-b border-white/[0.07] py-5 transition-colors focus-within:border-inflight/50"
-        style={{ animationDelay: "80ms" }}
-      >
-        <label htmlFor="ws-name" className={cn(GLASS_LABEL, "w-[7.5rem] shrink-0")}>
-          {t(($) => $.step_workspace.name_label)}
-        </label>
-        <input
-          id="ws-name"
-          autoFocus
-          type="text"
-          value={name}
-          onChange={(e) => handleNameChange(e.target.value)}
-          placeholder={t(($) => $.step_workspace.name_placeholder)}
-          className={cn(GLASS_FIELD, "caret-inflight")}
-          onKeyDown={(e) => {
-            if (isImeComposing(e)) return;
-            if (e.key === "Enter") handleCreate();
-          }}
-        />
-        <button
-          type="button"
-          onClick={handleRandomName}
-          disabled={isCreating}
-          title={t(($) => $.step_workspace.random_name)}
-          aria-label={t(($) => $.step_workspace.random_name)}
-          className="flex size-8 shrink-0 items-center justify-center rounded-md text-white/40 transition-colors hover:bg-white/[0.06] hover:text-white disabled:opacity-40"
-        >
-          <Dices className="size-4" />
-        </button>
-      </div>
-
-      {/* Address — derived from the name, so it is shown rather than asked
-          for. The editable form appears only when the derivation produced
-          nothing (a kana, Hangul or emoji name has no ASCII slug), which is
-          also the only case where the value has to come from the member. */}
-      <div
-        className="onboarding-glass-row flex items-center gap-4 border-b border-white/[0.07] py-5 transition-colors focus-within:border-inflight/50"
-        style={{ animationDelay: "160ms" }}
-        data-invalid={slugError ? true : undefined}
-      >
-        <label htmlFor="ws-slug" className={cn(GLASS_LABEL, "w-[7.5rem] shrink-0")}>
-          {t(($) => $.step_workspace.url_label)}
-        </label>
-        {slug ? (
-          <span className="min-w-0 truncate font-mono text-body text-white/70">
-            {`${urlHost}/`}
-            <span className="text-white">{slug}</span>
-          </span>
-        ) : (
+    <div className="qw-onb-form">
+      <label className="qw-onb-field" htmlFor="ws-name">
+        <span>{t(($) => $.step_workspace.name_label)}</span>
+        <div className="qw-onb-value">
           <input
-            id="ws-slug"
+            id="ws-name"
+            aria-label={t(($) => $.step_workspace.name_label)}
+            autoFocus
             type="text"
-            value={slug}
-            onChange={(e) => handleSlugChange(e.target.value)}
-            placeholder={t(($) => $.step_workspace.slug_placeholder)}
-            className={cn(GLASS_FIELD, "caret-inflight font-mono")}
+            value={name}
+            onChange={(e) => handleNameChange(e.target.value)}
+            placeholder={t(($) => $.step_workspace.name_placeholder)}
+            className="qw-onb-input"
             onKeyDown={(e) => {
               if (isImeComposing(e)) return;
               if (e.key === "Enter") handleCreate();
             }}
           />
-        )}
-      </div>
-      {slugError ? (
-        <p className="-mt-2 pb-3 pl-[8.5rem] text-caption text-destructive">
-          {slugError}
-        </p>
-      ) : null}
-
-      {/* Issue prefix — pre-filled from the address, and what the member's
-          issues will read as from here on. */}
-      <div
-        className="onboarding-glass-row flex flex-col gap-2 py-5 transition-colors focus-within:border-inflight/50"
-        style={{ animationDelay: "240ms" }}
-      >
-        <div className="flex items-center gap-4">
-          <label
-            htmlFor="ws-issue-prefix"
-            className={cn(GLASS_LABEL, "w-[7.5rem] shrink-0")}
+          <button
+            type="button"
+            onClick={handleRandomName}
+            disabled={isCreating}
+            title={t(($) => $.step_workspace.random_name)}
+            aria-label={t(($) => $.step_workspace.random_name)}
+            className="qw-onb-dice"
           >
-            {t(($) => $.step_workspace.issue_prefix_label)}
-          </label>
+            <Dices className="size-4" />
+          </button>
+        </div>
+      </label>
+
+      <label className="qw-onb-field" htmlFor="ws-slug" data-invalid={slugError ? true : undefined}>
+        <span>{t(($) => $.step_workspace.url_label)}</span>
+        <div className="qw-onb-url">
+          <span>{`${urlHost}/`}</span>
+          <input
+            id="ws-slug"
+            aria-label={t(($) => $.step_workspace.url_label)}
+            type="text"
+            value={slug}
+            onChange={(e) => handleSlugChange(e.target.value)}
+            placeholder={t(($) => $.step_workspace.slug_placeholder)}
+            className="qw-onb-input mono"
+            onKeyDown={(e) => {
+              if (isImeComposing(e)) return;
+              if (e.key === "Enter") handleCreate();
+            }}
+          />
+        </div>
+      </label>
+      {slugError ? <p className="qw-onb-field-error">{slugError}</p> : null}
+
+      <label className="qw-onb-field prefix" htmlFor="ws-issue-prefix">
+        <span>{t(($) => $.step_workspace.issue_prefix_label)}</span>
+        <div className="qw-onb-value">
           <input
             id="ws-issue-prefix"
+            aria-label={t(($) => $.step_workspace.issue_prefix_label)}
             type="text"
             value={prefix}
             onChange={(e) => handlePrefixChange(e.target.value)}
@@ -394,126 +342,167 @@ export function StepWorkspace({
             autoCapitalize="characters"
             spellCheck={false}
             maxLength={10}
-            className={cn(GLASS_FIELD, "caret-inflight w-24 font-mono uppercase tracking-[0.14em]")}
+            className="qw-onb-input mono prefix"
             onKeyDown={(e) => {
               if (isImeComposing(e)) return;
               if (e.key === "Enter") handleCreate();
             }}
           />
         </div>
-        <p className="pl-[8.5rem] text-caption text-white/40">
-          {effectivePrefix ? (
-            <>
-              {t(($) => $.step_workspace.issue_prefix_prefix)}
-              <span className="font-mono text-white">{effectivePrefix}-123</span>
-              {t(($) => $.step_workspace.issue_prefix_suffix)}
-            </>
-          ) : (
-            t(($) => $.step_workspace.issue_prefix_pending)
-          )}
-        </p>
-      </div>
+      </label>
+      <p className="qw-onb-issue-preview">
+        {effectivePrefix ? (
+          <>
+            {t(($) => $.step_workspace.issue_prefix_prefix)}
+            <b>{effectivePrefix}-123</b>
+            {t(($) => $.step_workspace.issue_prefix_suffix)}
+          </>
+        ) : (
+          t(($) => $.step_workspace.issue_prefix_pending)
+        )}
+      </p>
     </div>
   );
 
-  return (
-    <div className="dark onboarding-glass-pane flex h-full min-h-0 flex-col overflow-y-auto bg-background text-foreground">
-      <DragStrip />
+  const previewReusing = Boolean(reusing) && mode !== "create";
+  const previewName = previewReusing
+    ? (reusing?.name ?? "")
+    : name.trim() || t(($) => $.step_workspace.preview.default_name);
+  const previewSlug = previewReusing
+    ? (reusing?.slug ?? "")
+    : slug.trim();
+  const previewPrefix = previewReusing
+    ? (reusing?.issue_prefix ?? "")
+    : effectivePrefix;
 
-      {/* No rail on this step, so Back has to carry itself. */}
-      <div className="flex shrink-0 items-center px-6 pt-5 sm:px-10">
+  const heading = reusing
+    ? workspaceCreationAllowed
+      ? t(($) => $.step_workspace.headline_resume, { name: reusing.name })
+      : t(($) => $.step_workspace.creation_disabled_headline_resume, { name: reusing.name })
+    : workspaceCreationAllowed
+      ? t(($) => $.step_workspace.headline_first)
+      : t(($) => $.step_workspace.creation_disabled_headline);
+  const lede = reusing
+    ? workspaceCreationAllowed
+      ? t(($) => $.step_workspace.lede_resume)
+      : t(($) => $.step_workspace.creation_disabled_lede_resume)
+    : workspaceCreationAllowed
+      ? t(($) => $.step_workspace.lede_first)
+      : t(($) => $.step_workspace.creation_disabled_lede);
+
+  return (
+    <div className="qw-onb-workspace">
+      <DragStrip />
+      <div className="qw-onb-ws-top">
+        <span className="qw-onb-mark">Q</span>
+        <span className="qw-onb-word">{t(($) => $.step_nav.wordmark)}</span>
+        <span className="qw-onb-progress">{t(($) => $.step_workspace.progress)}</span>
         {onBack && (
           <button
             type="button"
             onClick={onBack}
             disabled={backDisabled}
-            className="flex items-center gap-1.5 rounded-md text-caption text-muted-foreground transition-colors hover:text-foreground disabled:opacity-40"
+            className="qw-onb-back"
           >
-            <ArrowLeft className="size-3.5" />
+            <ArrowLeft className="size-3.5" aria-hidden="true" />
             {t(($) => $.common.back)}
           </button>
         )}
       </div>
 
-      <div className="flex flex-1 items-center justify-center px-6 py-10 sm:px-10">
-        <div className="animate-onboarding-enter flex w-full max-w-[540px] flex-col gap-9">
-        {/* The eyebrow is gone with the rest of them, but its disabled-state
-            wording is not: "Workspace creation is disabled" was the only
-            thing on this screen that said so before the notice below, so
-            that variant is folded into the heading's own copy. */}
-        {/* Display scale, not a form label: this is the first decision the
-            product asks a member to make, and `StepHeading`'s title-lg reads
-            as one field of a longer form. */}
-        <header className="flex flex-col gap-4">
-          <span className="font-mono text-micro uppercase tracking-[0.3em] text-white/35">
-            {t(($) => $.step_nav.wordmark)}
-          </span>
-          <h1 className="text-balance text-3xl font-semibold leading-[1.06] tracking-[-0.035em] text-white sm:text-4xl">
-            {reusing
-              ? workspaceCreationAllowed
-                ? t(($) => $.step_workspace.headline_resume, { name: reusing.name })
-                : t(($) => $.step_workspace.creation_disabled_headline_resume, { name: reusing.name })
-              : workspaceCreationAllowed
-                ? t(($) => $.step_workspace.headline_first)
-                : t(($) => $.step_workspace.creation_disabled_headline)}
-          </h1>
-          <p className="max-w-[46ch] text-pretty text-body leading-relaxed text-white/55">
-            {reusing
-              ? workspaceCreationAllowed
-                ? t(($) => $.step_workspace.lede_resume)
-                : t(($) => $.step_workspace.creation_disabled_lede_resume)
-              : workspaceCreationAllowed
-                ? t(($) => $.step_workspace.lede_first)
-                : t(($) => $.step_workspace.creation_disabled_lede)}
-          </p>
-        </header>
+      <div className="qw-onb-ws-body">
+        <div className="qw-onb-ws-copy">
+          <h1>{heading}</h1>
+          <p>{lede}</p>
 
-        <div>
-          {reusing ? (
-            <div className="flex flex-col gap-3">
-              <ExistingWorkspaceCard
-                workspace={reusing}
-                selected={mode === "existing"}
-                onSelect={pickExisting}
-              />
-              {/* Hide the create-new card entirely when the self-host
-                  gate (DISABLE_WORKSPACE_CREATION) is on (#3433) — the
-                  backend would 403 the POST and the user would be stuck
-                  with a useless form. */}
-              {!workspaceCreationDisabled && (
-                <CreateNewWorkspaceCard
-                  selected={mode === "create"}
-                  onSelect={pickCreate}
-                >
-                  {createFields}
-                </CreateNewWorkspaceCard>
-              )}
-            </div>
-          ) : workspaceCreationDisabled ? (
-            <CreationDisabledNotice onLogout={logout} />
-          ) : (
-            createFields
-          )}
+          <div className="qw-onb-ws-form">
+            {reusing ? (
+              <div className="qw-onb-choice-list">
+                <ExistingWorkspaceCard
+                  workspace={reusing}
+                  selected={mode === "existing"}
+                  onSelect={pickExisting}
+                />
+                {!workspaceCreationDisabled && (
+                  <CreateNewWorkspaceCard
+                    selected={mode === "create"}
+                    onSelect={pickCreate}
+                  >
+                    {createFields}
+                  </CreateNewWorkspaceCard>
+                )}
+              </div>
+            ) : workspaceCreationDisabled ? (
+              <CreationDisabledNotice onLogout={logout} />
+            ) : (
+              createFields
+            )}
+          </div>
         </div>
 
         {!(workspaceCreationDisabled && !reusing) && (
-          <div className="flex flex-col gap-3">
-            <Button
-              className="onboarding-glass-cta h-12 rounded-xl text-body font-semibold"
-              disabled={continueDisabled}
-              onClick={onContinue}
-            >
-              {continueLabel}
-            </Button>
-            {hint ? (
-              <p className="text-center text-caption text-muted-foreground">
-                {hint}
-              </p>
-            ) : null}
-          </div>
+          <aside className="qw-onb-ws-preview">
+            <div className="qw-onb-ws-label">
+              {t(($) => $.step_workspace.preview.label)}
+            </div>
+            <div className="qw-onb-ws-card">
+              <span className="qw-onb-ws-avatar" aria-hidden="true">
+                {previewName.trim().charAt(0).toUpperCase() || "Q"}
+              </span>
+              <div className="min-w-0">
+                <b>{previewName}</b>
+                <span>
+                  {`${urlHost}/`}
+                  {previewSlug || "…"}
+                </span>
+              </div>
+            </div>
+            <div className="qw-onb-ws-facts">
+              <div>
+                <span>{t(($) => $.step_workspace.preview.tasks)}</span>
+                <b>
+                  {previewPrefix
+                    ? t(($) => $.step_workspace.preview.issue_start, {
+                        prefix: previewPrefix,
+                      })
+                    : "—"}
+                </b>
+              </div>
+              <div>
+                <span>{t(($) => $.step_workspace.preview.members)}</span>
+                <b>{t(($) => $.step_workspace.preview.only_you)}</b>
+              </div>
+              <div>
+                <span>{t(($) => $.step_workspace.preview.runtime)}</span>
+                <b>{t(($) => $.step_workspace.preview.connect_after)}</b>
+              </div>
+            </div>
+            <p className="qw-onb-ws-note">
+              {t(($) => $.step_workspace.preview.note)}
+            </p>
+          </aside>
         )}
-        </div>
       </div>
+
+      {!(workspaceCreationDisabled && !reusing) && (
+        <div className="qw-onb-ws-foot">
+          <span className="qw-onb-hint">{hint}</span>
+          <button
+            type="button"
+            className="qw-onb-primary"
+            disabled={continueDisabled}
+            onClick={onContinue}
+          >
+            {isCreating ? (
+              <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+            ) : null}
+            {continueLabel}
+            {!isCreating ? (
+              <ArrowRight className="size-3.5" aria-hidden="true" />
+            ) : null}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -552,19 +541,12 @@ function ExistingWorkspaceCard({
       role="radio"
       aria-checked={selected}
       onClick={onSelect}
-      className={cn(
-        "onboarding-glass-card flex w-full items-center gap-4 rounded-lg border px-5 py-4 text-left transition-all",
-        // Hover moves the border, not the fill: the fill is translucent glass
-        // shared with the pane behind it, so tinting it reads as smudge rather
-        // than as response.
-        selected
-          ? "border-foreground shadow-[inset_0_0_0_1px_var(--color-foreground)]"
-          : "hover:border-foreground/40",
-      )}
+      className="qw-onb-choice"
+      data-selected={selected ? "" : undefined}
     >
       <WorkspaceAvatar name={workspace.name} avatarUrl={workspace.avatar_url} size="lg" />
       <div className="flex min-w-0 flex-1 flex-col">
-        <div className="truncate text-body font-medium text-foreground">
+        <div className="qw-onb-choice-title">
           {workspace.name}
         </div>
         <div className="truncate font-mono text-caption text-muted-foreground">
@@ -595,12 +577,8 @@ function CreateNewWorkspaceCard({
   const { t } = useT("onboarding");
   return (
     <div
-      className={cn(
-        "onboarding-glass-card overflow-hidden rounded-lg border transition-all",
-        selected
-          ? "border-foreground shadow-[inset_0_0_0_1px_var(--color-foreground)]"
-          : "hover:border-foreground/40",
-      )}
+      className="qw-onb-choice"
+      data-selected={selected ? "" : undefined}
     >
       <button
         type="button"
@@ -608,25 +586,25 @@ function CreateNewWorkspaceCard({
         aria-checked={selected}
         aria-expanded={selected}
         onClick={onSelect}
-        className="flex w-full items-center gap-4 px-5 py-4 text-left"
+        className="qw-onb-choice-head"
       >
         <div
           aria-hidden
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground"
+          className="qw-onb-choice-plus"
         >
           <Plus className="h-4 w-4" />
         </div>
         <div className="flex min-w-0 flex-1 flex-col">
-          <div className="truncate text-body font-medium text-foreground">
+          <div className="qw-onb-choice-title">
             {t(($) => $.step_workspace.create_new_title)}
           </div>
-          <div className="truncate text-caption text-muted-foreground">
+          <div className="qw-onb-choice-sub">
             {t(($) => $.step_workspace.create_new_subtitle)}
           </div>
         </div>
         <RadioMark selected={selected} />
       </button>
-      {selected && <div className="border-t px-5 py-5">{children}</div>}
+      {selected && <div className="qw-onb-choice-body">{children}</div>}
     </div>
   );
 }

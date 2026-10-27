@@ -1,0 +1,3 @@
+-- No-op: the reverse would re-seed rows into every workspace, including ones
+-- that never had this migration's rows removed. New workspaces get their
+-- catalog from SeedIssueStatusEntries.

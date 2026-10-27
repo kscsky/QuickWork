@@ -41,6 +41,11 @@
     --color-inflight: var(--inflight);
     --color-inflight-foreground: var(--inflight-foreground);
     --color-inflight-surface: var(--inflight-surface);
+    --color-review: var(--review);
+    --color-review-soft: var(--review-soft);
+    --color-parked: var(--parked);
+    --color-done: var(--done);
+    --color-live: var(--live);
     --color-zone-1: var(--zone-1);
     --color-zone-2: var(--zone-2);
     --color-zone-3: var(--zone-3);
@@ -99,11 +104,11 @@
  * a separate ramp and stays out of this scale on purpose. */
 @theme {
     /* counters, badges, timestamps, overline labels */
-    --text-micro: 11px;
-    --text-micro--line-height: 15px;
+    --text-micro: 12px;
+    --text-micro--line-height: 17px;
     /* secondary and helper text — was text-xs */
-    --text-caption: 12px;
-    --text-caption--line-height: 16px;
+    --text-caption: 13px;
+    --text-caption--line-height: 18px;
     /* dense labels: table headers, metadata rows */
     --text-label: 13px;
     --text-label--line-height: 18px;
@@ -128,6 +133,9 @@
     /* hero numbers and empty-state headlines — was text-3xl (30px) */
     --text-display: 36px;
     --text-display--line-height: 40px;
+    /* page mastheads — the serif title + count block at the top of a collection page */
+    --text-masthead: 40px;
+    --text-masthead--line-height: 44px;
 }
 
 :root {
@@ -135,17 +143,17 @@
     /* Surface system: the app shell is the quiet outer frame; the page canvas
        is where lists, boards, and conversations live; surfaces are reserved
        for bounded content groups; raised surfaces are ephemeral overlays. */
-    --app-shell: oklch(0.97 0 0);
-    --page-canvas: oklch(1 0 0);
-    --surface: oklch(1 0 0);
-    --surface-foreground: oklch(0.25 0.032 252);
-    --surface-raised: oklch(1 0 0);
-    --surface-hover: oklch(0.972 0 0);
-    --surface-selected: oklch(0.945 0 0);
-    --surface-selected-foreground: oklch(0.25 0.032 252);
-    --surface-border: oklch(0.83 0.022 246);
-    --surface-shadow: 2px 2px 0 oklch(0.9 0.014 244);
-    --floating-shadow: 4px 4px 0 oklch(0.88 0.018 244);
+    --app-shell: #f1f3f6;
+    --page-canvas: #f1f3f6;
+    --surface: #fdfefe;
+    --surface-foreground: #14181f;
+    --surface-raised: #fdfefe;
+    --surface-hover: #f7f9fb;
+    --surface-selected: #e4e9fb;
+    --surface-selected-foreground: #1b3396;
+    --surface-border: #dce1e7;
+    --surface-shadow: 0 0 0 0 transparent;
+    --floating-shadow: 0 18px 50px -24px rgba(9, 15, 14, .45), 0 2px 8px rgba(9, 15, 14, .08);
 
     /* The chat launcher is an overlay pinned to the dashboard's bottom-right
        corner on every workspace page, so that corner is not available to page
@@ -161,18 +169,18 @@
     /* Menus (dropdown/context/select/popover) hover just above their trigger,
        so they carry a lighter shadow than window-level overlays (dialogs,
        sheets), which keep --floating-shadow. */
-    --menu-shadow: 3px 3px 0 oklch(0.89 0.016 244);
+    --menu-shadow: 0 18px 50px -24px rgba(9, 15, 14, .45), 0 2px 8px rgba(9, 15, 14, .08);
     --background: var(--page-canvas);
-    --foreground: oklch(0.25 0.032 252);
-    --card: var(--surface);
-    --card-foreground: oklch(0.25 0.032 252);
-    --popover: var(--surface-raised);
-    --popover-foreground: oklch(0.25 0.032 252);
-    --primary: oklch(0.32 0.05 252);
-    --primary-foreground: oklch(0.98 0.004 240);
-    --secondary: oklch(0.955 0 0);
-    --secondary-foreground: oklch(0.28 0.032 252);
-    --muted: oklch(0.955 0 0);
+    --foreground: #14181f;
+    --card: #fdfefe;
+    --card-foreground: #14181f;
+    --popover: #fdfefe;
+    --popover-foreground: #14181f;
+    --primary: #14181f;
+    --primary-foreground: #f1f3f6;
+    --secondary: #f7f9fb;
+    --secondary-foreground: #3b4350;
+    --muted: #f7f9fb;
     /* Lightness is pinned by WCAG AA, not by taste: muted text sits on every
        light surface we have, and the darkest of them — --sidebar-accent, the
        nav hover state — is the binding constraint. At the old 0.552 that pair
@@ -180,7 +188,7 @@
        sidebar / sidebar-accent / muted / surface-selected / surface, with the
        worst case at 4.88:1. Raise it and the nav labels fail again. Hue and
        chroma are unchanged so the neutral ramp keeps its cast. */
-    --muted-foreground: oklch(0.505 0.032 250);
+    --muted-foreground: #68717e;
     /* The quiet step below muted, for marks that are not text: disclosure
        chevrons, separator glyphs, the em dash standing in for an empty cell,
        the large icon in an empty state. It exists because the alternative
@@ -192,50 +200,50 @@
        for text: text has one floor, --muted-foreground, and there is no room
        for a third readable step (AA caps a lighter text tone at L 0.523 here,
        0.018 away from muted — a difference no one can see). */
-    --faint-foreground: oklch(0.6 0.03 248);
-    --accent: oklch(0.955 0 0);
-    --accent-foreground: oklch(0.28 0.032 252);
-    --destructive: oklch(0.577 0.245 27.325);
-    --border: oklch(0.87 0.018 246);
-    --input: oklch(0.84 0.022 246);
-    --ring: oklch(0.6 0.06 252);
+    --faint-foreground: #919aa6;
+    --accent: #e9edf2;
+    --accent-foreground: #14181f;
+    --destructive: #b23a2a;
+    --border: #dce1e7;
+    --input: #c7ced7;
+    --ring: #2547c9;
     /* Brand-derived blue gradient (h=255 = brand hue). chart-1 equals brand
        so the most important series visually anchors to the product colour;
        chart-2..5 step lighter + less saturated so a stacked bar reads
        "primary → secondary → tertiary" at a glance instead of fighting
        for attention as five equally-weighted greys. */
-    --chart-1: oklch(0.55 0.16 258);
-    --chart-2: oklch(0.66 0.13 258);
-    --chart-3: oklch(0.76 0.10 258);
-    --chart-4: oklch(0.85 0.06 258);
-    --chart-5: oklch(0.92 0.03 258);
+    --chart-1: #2547c9;
+    --chart-2: #6a4a9e;
+    --chart-3: #3f6b58;
+    --chart-4: #c2562f;
+    --chart-5: #8a5a2a;
     /* Blueprint skin: near-square corners (radius ≈ 3.2px, radius-sm ≈ 1.9px)
        — pages draw with a ruler, not with consumer-card roundness. Paired
        with the hard offset shadows above: crisp edges, no soft blur. */
-    --radius: 0.2rem;
-    --sidebar: oklch(0.97 0 0);
-    --sidebar-foreground: oklch(0.28 0.032 252);
-    --sidebar-primary: oklch(0.32 0.05 252);
-    --sidebar-primary-foreground: oklch(0.98 0.004 240);
-    --sidebar-accent: oklch(0.94 0 0);
-    --sidebar-accent-foreground: oklch(0.28 0.032 252);
-    --sidebar-border: oklch(0.88 0.018 244);
-    --sidebar-ring: oklch(0.6 0.06 252);
-    --brand: oklch(0.5 0.14 254);
-    --brand-foreground: oklch(0.985 0 0);
+    --radius: 0.25rem;
+    --sidebar: #f7f9fb;
+    --sidebar-foreground: #14181f;
+    --sidebar-primary: #14181f;
+    --sidebar-primary-foreground: #f1f3f6;
+    --sidebar-accent: #fdfefe;
+    --sidebar-accent-foreground: #14181f;
+    --sidebar-border: #dce1e7;
+    --sidebar-ring: #2547c9;
+    --brand: #2547c9;
+    --brand-foreground: #fdfefe;
     /* A brand-coloured surface you put body text on — a chat bubble, not a
        button. --brand alone cannot serve both themes: at L 0.52 white text
        clears AA, but the dark ramp lifts brand to L 0.70 where the same white
        sits at roughly 2.5:1. This pair holds the fill at the lightness that
        keeps its text legible and lets only the hue carry the identity, which
        is the same construction as --inflight. */
-    --brand-surface: oklch(0.5 0.14 254);
-    --brand-surface-foreground: oklch(0.985 0 0);
-    --success: oklch(0.55 0.16 145);
-    --warning: oklch(0.75 0.16 85);
-    --info: oklch(0.55 0.18 250);
-    --scrollbar-thumb: oklch(0 0 0 / 10%);
-    --scrollbar-thumb-hover: oklch(0 0 0 / 18%);
+    --brand-surface: #2547c9;
+    --brand-surface-foreground: #f1f3f6;
+    --success: #3f6b58;
+    --warning: #8a5a2a;
+    --info: #6a4a9e;
+    --scrollbar-thumb: #c7ced7;
+    --scrollbar-thumb-hover: #919aa6;
     --scrollbar-track: transparent;
     /* In-page find (Cmd/Ctrl+F) match tints, painted via the CSS Custom
        Highlight API. Bright fill + dark text so matches stay legible in
@@ -252,9 +260,9 @@
        wash it sits on, kept light enough that body text still clears AA.
        Hue 65 is deliberately far from the brand's 258 so the two can never be
        mistaken for one another. */
-    --inflight: oklch(0.62 0.17 65);
-    --inflight-foreground: oklch(0.985 0 0);
-    --inflight-surface: oklch(0.975 0.025 75);
+    --inflight: #c2562f;
+    --inflight-foreground: #fdfefe;
+    --inflight-surface: #f8e7e0;
 
     /* Zone palette: one hue per workspace, so where a task came from is
        readable without reading it. Every value sits on the same
@@ -270,6 +278,14 @@
     --zone-6: oklch(0.55 0.15 28);
     --zone-7: oklch(0.55 0.15 340);
     --zone-8: oklch(0.55 0.15 300);
+    /* Refresh world state palette (docs/mockups/refresh · graphite). */
+    --review: #6a4a9e;
+    --review-soft: #efe8f8;
+    --parked: #8a5a2a;
+    --done: #3f6b58;
+    --live: #c2562f;
+    --live-ink: #8f3c1e;
+    --live-soft: #f8e7e0;
 }
 
 .dark {

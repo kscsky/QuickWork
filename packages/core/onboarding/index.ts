@@ -18,19 +18,19 @@ export {
 } from "./needs-backfill";
 export { agentCompletedIssueCountOptions } from "./queries";
 export {
-  bootstrapMika,
-  useBootstrapMika,
-  type BootstrapMikaInput,
-  type BootstrapMikaResult,
-  type MikaOnboardingLanguage,
-} from "./use-bootstrap-mika";
+  bootstrapQuill,
+  useBootstrapQuill,
+  type BootstrapQuillInput,
+  type BootstrapQuillResult,
+  type QuillOnboardingLanguage,
+} from "./use-bootstrap-quill";
 export {
   useWelcomeStore,
   type WelcomeSignal,
 } from "./welcome-store";
 export {
-  MIKA_SYSTEM_KEY,
-  isMikaAgent,
-  memberNeedsMikaSetup,
-  workspaceNeedsMika,
-} from "./mika";
+  QUILL_SYSTEM_KEY,
+  isQuillAgent,
+  memberNeedsQuillSetup,
+  workspaceNeedsQuill,
+} from "./quill";

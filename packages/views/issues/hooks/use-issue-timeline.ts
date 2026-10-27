@@ -64,6 +64,7 @@ function commentToTimelineEntry(c: Comment): TimelineEntry {
     resolved_by_type: c.resolved_by_type,
     resolved_by_id: c.resolved_by_id,
     source_task_id: c.source_task_id,
+    chain_step_id: c.chain_step_id,
   };
 }
 
@@ -139,6 +140,16 @@ export function useIssueTimeline(issueId: string, userId?: string) {
       (payload: unknown) => {
         const { comment } = payload as CommentCreatedPayload;
         if (comment.issue_id !== issueId) return;
+        // Leg-scoped comments arrive as a POINTER (id + issue, no body): the
+        // shared channel must not carry leg interiors. The id is enough — the
+        // global invalidate above refetches, and the server hands the content
+        // back only to the leg's holder. Appending here would interpolate a
+        // bodyless entry into the stream. A pointer omits the field entirely;
+        // an empty STRING is a real comment (attachments only) and appends.
+        if (comment.content == null) {
+          qc.invalidateQueries({ queryKey: issueKeys.timeline(issueId) });
+          return;
+        }
         qc.setQueryData<TLCache>(issueKeys.timeline(issueId), (old) => {
           const entry = commentToTimelineEntry(comment);
           if (!old) return [entry];
@@ -359,10 +370,10 @@ export function useIssueTimeline(issueId: string, userId?: string) {
   // on success — so a slow send no longer leaves the box full next to an
   // already-posted comment, and a failed send keeps the draft.
   const submitComment = useCallback(
-    async (content: string, attachmentIds?: string[], suppressAgentIds?: string[]): Promise<string | false> => {
+    async (content: string, attachmentIds?: string[], suppressAgentIds?: string[], chainStepId?: string): Promise<string | false> => {
       if (!content.trim() || !userId) return false;
       try {
-        const comment = await createComment({ content, attachmentIds, suppressAgentIds });
+        const comment = await createComment({ content, attachmentIds, suppressAgentIds, chainStepId });
         warnUnhandledTriggers(comment?.trigger_outcomes, comment?.content);
         return comment.id;
       } catch (err) {

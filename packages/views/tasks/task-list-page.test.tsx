@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AgentTask, Issue, IssueChainForIssue } from "@quickwork/core/types";
@@ -8,9 +8,10 @@ import type { AgentTask, Issue, IssueChainForIssue } from "@quickwork/core/types
 const h = vi.hoisted(() => ({
   issues: { current: [] as unknown[] },
   chains: { current: [] as unknown[] },
-  chainsPending: { current: false },
   tasks: { current: [] as unknown[] },
   push: vi.fn(),
+  openModal: vi.fn(),
+  batchDelete: vi.fn(async () => {}),
 }));
 
 vi.mock("@quickwork/core/hooks", () => ({
@@ -29,6 +30,15 @@ vi.mock("@quickwork/core/auth", () => ({
 }));
 
 vi.mock("@quickwork/core/modals", () => ({
+  useModalStore: { getState: () => ({ open: h.openModal }) },
+}));
+
+vi.mock("@quickwork/core/issues/mutations", () => ({
+  useBatchDeleteIssues: () => ({ mutateAsync: h.batchDelete, isPending: false }),
+}));
+
+vi.mock("sonner", () => ({
+  toast: { success: vi.fn(), error: vi.fn() },
 }));
 
 vi.mock("@quickwork/core/workspace/hooks", () => ({
@@ -42,6 +52,13 @@ vi.mock("@quickwork/core/workspace/hooks", () => ({
 vi.mock("@quickwork/core/issues/queries", () => ({
   issueListOptions: () => ({ queryKey: ["issues"] }),
   issueChainsOptions: () => ({ queryKey: ["chains"] }),
+}));
+
+// The status label comes from the issue-status catalog in the app; here a
+// tiny map keeps the row assertions about the ROW, not the catalog.
+vi.mock("../issues/utils/status-label", () => ({
+  useStatusLabel: () => (key: string) =>
+    ({ todo: "Todo", in_progress: "In Progress", done: "Done" })[key] ?? key,
 }));
 
 vi.mock("../navigation", () => ({
@@ -94,7 +111,7 @@ vi.mock("@tanstack/react-query", async (importOriginal) => {
         case "issues":
           return { data: h.issues.current };
         case "chains":
-          return { data: h.chains.current, isPending: h.chainsPending.current };
+          return { data: h.chains.current };
         // agentTaskSnapshotOptions — the relay's run states.
         case "workspaces":
           return { data: h.tasks.current };
@@ -134,7 +151,7 @@ function issue(over: Partial<Issue> & { id: string; title: string }): Issue {
 }
 
 function chain(over: Partial<IssueChainForIssue> & { issue_id: string }): IssueChainForIssue {
-  return { steps: [], parked: false, ...over };
+  return { steps: [], parked: false, reviewing: false, ...over };
 }
 
 function step(over: Partial<IssueChainForIssue["steps"][number]> & { id: string; position: number; holder_user_id: string; title: string; state: string }) {
@@ -159,50 +176,91 @@ function task(over: Partial<AgentTask> & { issue_id: string; agent_id: string; s
 beforeEach(() => {
   h.issues.current = [];
   h.chains.current = [];
-  h.chainsPending.current = false;
   h.tasks.current = [];
   h.push.mockClear();
+  h.openModal.mockClear();
+  h.batchDelete.mockClear();
 });
 
 describe("TaskListPage", () => {
-  it("tells each row's relay story and counts the filters", () => {
+  // The mix is the page: a squad task draws its relay legs inline, a solo
+  // task draws who has it and where it stands.
+  it("draws relay legs for squad rows and assignee + status for solo rows", () => {
     h.issues.current = [
-      issue({ id: "issue-1", title: "Payment retry rework" }),
-      issue({ id: "issue-2", title: "Release checklist" }),
+      issue({ id: "issue-1", title: "Payment retry rework", assignee_type: "squad", assignee_id: "sq-1" }),
+      issue({ id: "issue-2", title: "Copy pass", assignee_type: "agent", assignee_id: "ag-1", status: "in_progress" }),
     ];
     h.chains.current = [
       chain({
         issue_id: "issue-1",
-        parked: true,
         steps: [
           step({ id: "s0", position: 0, holder_user_id: "u-a", title: "Break down", state: "done" }),
-          step({ id: "s1", position: 1, holder_user_id: "u-chen", title: "reviewer", state: "parked" }),
+          step({ id: "s1", position: 1, holder_user_id: "u-b", title: "Build", state: "doing", agent_id: "ag-1" }),
         ],
       }),
     ];
 
     render(<TaskListPage />);
 
-    // The parked row says who it is waiting on and where — the one line that
-    // makes the page worth opening.
-    // A stuck task is visible without opening anything: the dot is the one
-    // piece of state the folded row still shows.
-    expect(screen.getByTitle("Stuck")).toBeTruthy();
-    // Chain-less rows fall back to their assignee's absence, not to a blank.
-    expect(screen.getAllByText("Unassigned").length).toBeGreaterThan(0);
-    // Filter counts see the same data: one parked, none mine, two total.
-    expect(screen.getByRole("button", { name: "Stuck 1" })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "All 2" })).toBeTruthy();
-    // The row says who it is for, not whose turn it is — the timeline holds
-    // that, and the two run-state tests below cover it.
-    expect(screen.getByRole("button", { name: /Payment retry rework/ })).toBeTruthy();
+    // The squad row's legs, with the holder's names in the strip.
+    expect(screen.getByText("u-a")).toBeTruthy();
+    expect(screen.getByText("u-b")).toBeTruthy();
+    expect(screen.getByText("In progress")).toBeTruthy();
+    expect(screen.getAllByText("Squad").length).toBeGreaterThan(0);
+    // The solo row: who has it, and its status.
+    expect(screen.getByText("agent:ag-1")).toBeTruthy();
+    expect(screen.getByText("In Progress")).toBeTruthy();
+    expect(screen.getAllByText("Solo").length).toBeGreaterThan(0);
   });
 
-  it("filters down to the stuck tasks", async () => {
-    const user = userEvent.setup();
+  // A doing step nobody has claimed is waiting on the holder, not running —
+  // the same distinction the room makes, kept here so the two cannot disagree.
+  it("says an unclaimed step is awaiting pickup, a claimed one in progress", () => {
     h.issues.current = [
-      issue({ id: "issue-1", title: "Payment retry rework" }),
-      issue({ id: "issue-2", title: "Release checklist" }),
+      issue({ id: "issue-1", title: "Payment retry rework", assignee_type: "squad", assignee_id: "sq-1" }),
+    ];
+    h.chains.current = [
+      chain({
+        issue_id: "issue-1",
+        steps: [
+          step({ id: "s0", position: 0, holder_user_id: "u-wang", title: "Break down", state: "doing", agent_id: "agent-1" }),
+        ],
+      }),
+    ];
+    h.tasks.current = [task({ issue_id: "issue-1", agent_id: "agent-1", status: "queued" })];
+    const { unmount } = render(<TaskListPage />);
+    expect(screen.getByText("Awaiting pickup")).toBeTruthy();
+    unmount();
+
+    h.tasks.current = [task({ issue_id: "issue-1", agent_id: "agent-1", status: "running" })];
+    render(<TaskListPage />);
+    expect(screen.getByText("In progress")).toBeTruthy();
+  });
+
+  // A relay's active leg can be assigned to the person holding it while the
+  // issue itself still carries a chain. The chain is the stronger signal.
+  it("reads a chain as a squad task even when the active assignee is a member", () => {
+    h.issues.current = [
+      issue({ id: "issue-1", title: "Payment retry rework", assignee_type: "member", assignee_id: "me-1" }),
+    ];
+    h.chains.current = [
+      chain({
+        issue_id: "issue-1",
+        steps: [step({ id: "s1", position: 0, holder_user_id: "me-1", title: "Build", state: "doing", agent_id: "agent-1" })],
+      }),
+    ];
+    h.tasks.current = [task({ issue_id: "issue-1", agent_id: "agent-1", status: "running" })];
+
+    render(<TaskListPage />);
+
+    expect(screen.getAllByText("Squad").length).toBeGreaterThan(0);
+    expect(screen.getByText("In progress")).toBeTruthy();
+  });
+
+  it("counts the filters by kind, by turn and by stuck", () => {
+    h.issues.current = [
+      issue({ id: "issue-1", title: "Payment retry rework", assignee_type: "squad", assignee_id: "sq-1" }),
+      issue({ id: "issue-2", title: "Copy pass", assignee_type: "member", assignee_id: "me-1" }),
     ];
     h.chains.current = [
       chain({
@@ -213,98 +271,205 @@ describe("TaskListPage", () => {
     ];
 
     render(<TaskListPage />);
-    await user.click(screen.getByRole("button", { name: "Stuck 1" }));
 
-    expect(screen.getByText("Payment retry rework")).toBeTruthy();
-    expect(screen.queryByText("Release checklist")).toBeNull();
+    expect(screen.getByRole("button", { name: "All 2" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Solo 1" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Squad 1" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Mine 1" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Stuck 1" })).toBeTruthy();
+    // Stuck is the one state that has to be visible without opening anything.
+    expect(screen.getByTitle("Stuck")).toBeTruthy();
   });
 
-  it("counts a task as mine when the relay is on my step", async () => {
+  it("filters by kind and by stuck", async () => {
     const user = userEvent.setup();
-    h.issues.current = [issue({ id: "issue-1", title: "Payment retry rework" })];
+    h.issues.current = [
+      issue({ id: "issue-1", title: "Payment retry rework", assignee_type: "squad", assignee_id: "sq-1" }),
+      issue({ id: "issue-2", title: "Copy pass", assignee_type: "member", assignee_id: "me-1" }),
+    ];
     h.chains.current = [
       chain({
         issue_id: "issue-1",
-        steps: [step({ id: "s0", position: 0, holder_user_id: "me-1", title: "Break down", state: "doing" })],
+        parked: true,
+        steps: [step({ id: "s1", position: 0, holder_user_id: "u-chen", title: "reviewer", state: "parked" })],
       }),
     ];
 
     render(<TaskListPage />);
-    expect(screen.getByRole("button", { name: "My turn 1" })).toBeTruthy();
 
-    await user.click(screen.getByRole("button", { name: "My turn 1" }));
+    await user.click(screen.getByRole("button", { name: "Solo 1" }));
+    expect(screen.getByText("Copy pass")).toBeTruthy();
+    expect(screen.queryByText("Payment retry rework")).toBeNull();
+
+    await user.click(screen.getByRole("button", { name: "Stuck 1" }));
     expect(screen.getByText("Payment retry rework")).toBeTruthy();
-
-    // The filter is the subject here; what the open timeline says about the run
-    // is covered by the two tests below.
-    await user.click(screen.getByRole("button", { name: /Payment retry rework/ }));
-    expect(screen.getByText("Break down")).toBeTruthy();
+    expect(screen.queryByText("Copy pass")).toBeNull();
   });
 
-  it("says a dispatched step is waiting for the holder's machine, not running", async () => {
-    h.issues.current = [issue({ id: "issue-1", title: "Payment retry rework" })];
-    h.chains.current = [
-      chain({
-        issue_id: "issue-1",
-        steps: [
-          step({ id: "s0", position: 0, holder_user_id: "u-wang", title: "Break down", state: "doing", agent_id: "agent-1" }),
-        ],
-      }),
-    ];
-    h.tasks.current = [task({ issue_id: "issue-1", agent_id: "agent-1", status: "queued" })];
+  // The row is a doorway now: one click opens the task, where the full
+  // timeline lives.
+  it("opens the task when its row is clicked", async () => {
+    const user = userEvent.setup();
+    h.issues.current = [issue({ id: "issue-9", title: "Payment retry rework" })];
 
     render(<TaskListPage />);
-    await userEvent.click(
-      screen.getByRole("button", { name: /Payment retry rework/ }),
-    );
+    await user.click(screen.getByRole("button", { name: /Payment retry rework/ }));
 
-    // The run exists but nobody has claimed it — the honest story is "their
-    // machine hasn't picked it up", not "in progress".
-    expect(
-      screen.getByText("u-wang hasn't picked it up"),
-    ).toBeTruthy();
+    expect(h.push).toHaveBeenCalledWith("/acme/issues/issue-9");
   });
 
-  it("says a claimed step is running on the holder's machine", async () => {
-    h.issues.current = [issue({ id: "issue-1", title: "Payment retry rework" })];
+  // The create entry sits next to the title (where reading starts), and it
+  // opens the merged dialog — the type is picked inside, not by entry point.
+  it("opens the merged create dialog from the header", async () => {
+    const user = userEvent.setup();
+    h.issues.current = [issue({ id: "issue-1", title: "Copy pass" })];
+
+    render(<TaskListPage />);
+    await user.click(screen.getByRole("button", { name: "New task" }));
+
+    expect(h.openModal).toHaveBeenCalledWith("quick-create-issue");
+  });
+
+  it("shows the empty state when nothing is filed", () => {
+    render(<TaskListPage />);
+    expect(screen.getByText("No tasks yet")).toBeTruthy();
+  });
+
+  // A squad task the viewer holds a leg in speaks as THEIR subtask: the row
+  // is the work actually on them (编号 -N + 这一棒的名字), the parent is context.
+  it("speaks as the viewer's own subtask when they hold a leg", () => {
+    h.issues.current = [
+      issue({ id: "issue-1", title: "Payment retry rework", assignee_type: "squad", assignee_id: "sq-1" }),
+    ];
     h.chains.current = [
       chain({
         issue_id: "issue-1",
         steps: [
-          step({ id: "s0", position: 0, holder_user_id: "u-wang", title: "Break down", state: "doing", agent_id: "agent-1" }),
+          step({ id: "s0", position: 0, holder_user_id: "u-a", title: "Break down", state: "done" }),
+          step({ id: "s1", position: 1, holder_user_id: "me-1", title: "对账口径与自测", state: "doing", agent_id: "agent-1" }),
+          step({ id: "s2", position: 2, holder_user_id: "u-chen", title: "Verify", state: "pending" }),
         ],
       }),
     ];
     h.tasks.current = [task({ issue_id: "issue-1", agent_id: "agent-1", status: "running" })];
 
     render(<TaskListPage />);
-    await userEvent.click(
-      screen.getByRole("button", { name: /Payment retry rework/ }),
+
+    // The row is the leg: identifier -seq, the leg's own title, the parent as
+    // context, and the leg's state.
+    expect(screen.getByText("KSCS-1-2")).toBeTruthy();
+    expect(screen.getByText("对账口径与自测")).toBeTruthy();
+    expect(screen.getByText("Payment retry rework")).toBeTruthy(); // parent context
+    expect(screen.getByText("Leg 2/3")).toBeTruthy();
+    expect(screen.getByText("In progress")).toBeTruthy();
+    // The others' legs are not surfaced as their own rows.
+    expect(screen.queryByText("Break down")).toBeNull();
+    expect(screen.queryByText("Verify")).toBeNull();
+  });
+
+  // Ten at a time, with the count line always telling you where you are. The
+  // pager lives outside the scroll area, so it reads the same on every page.
+  it("pages the feed ten at a time and says where you are", async () => {
+    const user = userEvent.setup();
+    // Descending activity so the page split is deterministic.
+    h.issues.current = Array.from({ length: 12 }, (_, i) =>
+      issue({
+        id: `issue-${i + 1}`,
+        title: `Task ${i + 1}`,
+        updated_at: `2026-10-08T${String(12 - i).padStart(2, "0")}:00:00Z`,
+      }),
     );
 
-    expect(screen.getByText("u-wang is running")).toBeTruthy();
+    render(<TaskListPage />);
+
+    expect(screen.getByText(/12 total · 10 per page · page 1 \/ 2/)).toBeTruthy();
+    expect(screen.getByText("Task 1")).toBeTruthy();
+    expect(screen.getByText("Task 10")).toBeTruthy();
+    expect(screen.queryByText("Task 11")).toBeNull();
+
+    await user.click(screen.getByRole("button", { name: "2" }));
+
+    expect(screen.getByText(/page 2 \/ 2/)).toBeTruthy();
+    expect(screen.getByText("Task 11")).toBeTruthy();
+    expect(screen.getByText("Task 12")).toBeTruthy();
+    expect(screen.queryByText("Task 1")).toBeNull();
   });
 
-  it("folds a task open on its row, and opens it from inside", async () => {
+  it("returns to the first page when the filter changes", async () => {
     const user = userEvent.setup();
-    h.issues.current = [issue({ id: "issue-9", title: "Payment retry rework" })];
+    h.issues.current = Array.from({ length: 12 }, (_, i) =>
+      issue({
+        id: `issue-${i + 1}`,
+        title: `Task ${i + 1}`,
+        assignee_type: "member",
+        assignee_id: "me-1",
+        updated_at: `2026-10-08T${String(12 - i).padStart(2, "0")}:00:00Z`,
+      }),
+    );
 
     render(<TaskListPage />);
-    const row = () => screen.getByRole("button", { name: /Payment retry rework/ });
+    await user.click(screen.getByRole("button", { name: "2" }));
+    expect(screen.queryByText("Task 1")).toBeNull();
 
-    expect(row()).toHaveAttribute("aria-expanded", "false");
-    await user.click(row());
-
-    // The row click is not navigation any more: it is the ask for detail.
-    expect(row()).toHaveAttribute("aria-expanded", "true");
-    expect(h.push).not.toHaveBeenCalled();
-
-    await user.click(screen.getByRole("button", { name: "Open task" }));
-    expect(h.push).toHaveBeenCalledWith("/acme/issues/issue-9");
+    // A narrower question starts from its own first page, not the old offset.
+    await user.click(screen.getByRole("button", { name: "Mine 12" }));
+    expect(screen.getByText("Task 1")).toBeTruthy();
+    expect(screen.getByText(/page 1 \/ 2/)).toBeTruthy();
   });
 
-  it("shows the empty state when nothing is filed", () => {
+  // Deleting one task lives on the row itself — no detour through the detail
+  // page, no multi-select.
+  it("opens the delete confirmation from the row", async () => {
+    const user = userEvent.setup();
+    h.issues.current = [
+      issue({ id: "issue-9", identifier: "KSCS-9", title: "Payment retry rework" }),
+    ];
+
     render(<TaskListPage />);
-    expect(screen.getByText("No tasks yet")).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: "Delete task KSCS-9" }));
+
+    expect(h.openModal).toHaveBeenCalledWith("issue-delete-confirm", {
+      issueId: "issue-9",
+      identifier: "KSCS-9",
+    });
+  });
+
+  it("selects rows and deletes them in bulk", async () => {
+    const user = userEvent.setup();
+    h.issues.current = [
+      issue({ id: "issue-1", identifier: "KSCS-1", title: "Payment retry rework" }),
+      issue({ id: "issue-2", identifier: "KSCS-2", title: "Copy pass" }),
+    ];
+
+    render(<TaskListPage />);
+    await user.click(screen.getByRole("checkbox", { name: "Select KSCS-1" }));
+    await user.click(screen.getByRole("checkbox", { name: "Select KSCS-2" }));
+
+    expect(screen.getByText("2 selected")).toBeTruthy();
+
+    await user.click(screen.getByRole("button", { name: "Delete" }));
+    const dialog = screen.getByRole("alertdialog");
+    expect(within(dialog).getByText("Delete 2 tasks?")).toBeTruthy();
+
+    await user.click(within(dialog).getByRole("button", { name: "Delete" }));
+    expect(h.batchDelete).toHaveBeenCalledWith(["issue-1", "issue-2"]);
+  });
+
+  it("selects the whole page from the batch bar", async () => {
+    const user = userEvent.setup();
+    h.issues.current = Array.from({ length: 12 }, (_, i) =>
+      issue({
+        id: `issue-${i + 1}`,
+        identifier: `KSCS-${i + 1}`,
+        title: `Task ${i + 1}`,
+        updated_at: `2026-10-08T${String(12 - i).padStart(2, "0")}:00:00Z`,
+      }),
+    );
+
+    render(<TaskListPage />);
+    await user.click(screen.getByRole("checkbox", { name: "Select KSCS-1" }));
+    await user.click(screen.getByRole("button", { name: "Select page" }));
+
+    expect(screen.getByText("10 selected")).toBeTruthy();
   });
 });

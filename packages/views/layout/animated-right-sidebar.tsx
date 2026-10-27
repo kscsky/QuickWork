@@ -120,11 +120,13 @@ export function useRightSidebarShortcut(
 }
 
 export function AnimatedRightSidebar({
+  id,
   open,
   motionEnabled,
   children,
   className,
 }: {
+  id?: string;
   open: boolean;
   motionEnabled?: boolean;
   children: ReactNode;
@@ -132,6 +134,7 @@ export function AnimatedRightSidebar({
 }) {
   return (
     <motion.div
+      id={id}
       animate={{ opacity: open ? 1 : 0, x: open ? 0 : 12 }}
       className={cn(
         "h-full overflow-x-hidden overflow-y-auto border-l",

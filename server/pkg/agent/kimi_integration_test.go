@@ -132,7 +132,7 @@ func TestKimiRealMcpConfigReachesSessionSmoke(t *testing.T) {
 	}
 
 	// Exactly the shape the daemon forwards from agent.mcp_config.
-	mcpConfig := fmt.Sprintf(`{"mcpServers":{"multicaprobe":{"command":%q,"args":[],"env":{}}}}`, serverPath)
+	mcpConfig := fmt.Sprintf(`{"mcpServers":{"quickworkprobe":{"command":%q,"args":[],"env":{}}}}`, serverPath)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 240*time.Second)
 	defer cancel()

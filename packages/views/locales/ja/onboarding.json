@@ -11,7 +11,7 @@
       "description": "名前と URL を決める。"
     },
     "runtime": {
-      "label": "Mika を知る",
+      "label": "Quill を知る",
       "description": "最初のエージェント仲間と、その実行環境。"
     }
   },
@@ -34,9 +34,25 @@
       "stamp": "受領済み",
       "checkpoint_received": "受付済み",
       "checkpoint_dispatched": "派発済み",
-      "checkpoint_running": "実行中"
+      "checkpoint_running": "実行中",
+      "title": "送り状 / WAYBILL",
+      "no": "QW-0001",
+      "origin_cap": "起点 / ORIGIN",
+      "target_cap": "宛先 / TARGET",
+      "me": "自分",
+      "me_sub": "タスクを開始",
+      "agent_sub": "エージェントが実行",
+      "isolation": "分離",
+      "receipt": "受領",
+      "context": "コンテキスト",
+      "context_value": "タスクと一緒に",
+      "footer": "1つのタスク、2つのゾーン、ループを閉じる1枚の受領。",
+      "sig": "QW / RELAY",
+      "step_welcome": "01 ようこそ",
+      "step_workspace": "02 スペース"
     },
-    "illustration_caption": "1 つのタスク、2 つのゾーン、そして輪を閉じる受領。"
+    "illustration_caption": "1 つのタスク、2 つのゾーン、そして輪を閉じる受領。",
+    "progress": "01 / 02"
   },
   "common": {
     "back": "戻る",
@@ -132,7 +148,7 @@
     "skip": {
       "loading": "スペースを準備中…",
       "title": "QuickWork へようこそ!",
-      "subtitle": "ランタイム接続を案内するタスクを 1 つ追加しました。準備できたら Runtimes から Mika と始められます。",
+      "subtitle": "ランタイム接続を案内するタスクを 1 つ追加しました。準備できたら Runtimes から Quill と始められます。",
       "got_it": "了解",
       "status_in_progress": "進行中",
       "error_title": "準備できませんでした",
@@ -142,7 +158,7 @@
       "cards": {
         "install_runtime": {
           "title": "ランタイムを接続",
-          "subtitle": "Codex または Kimi をインストールし、Runtimes から Mika の案内チャットを始めてください。"
+          "subtitle": "Codex または Kimi をインストールし、Runtimes から Quill の案内チャットを始めてください。"
         }
       }
     }
@@ -186,13 +202,25 @@
     "creation_disabled_logout": "ログアウト",
     "creation_disabled_eyebrow_resume": "あなたのスペース",
     "creation_disabled_headline_resume": "{{name}} で続けましょう。",
-    "creation_disabled_lede_resume": "このインスタンスではスペースの作成が無効になっているため、既存のスペースへ続けて移動します。"
+    "creation_disabled_lede_resume": "このインスタンスではスペースの作成が無効になっているため、既存のスペースへ続けて移動します。",
+    "preview": {
+      "label": "スペースプレビュー / SPACE",
+      "tasks": "タスク",
+      "members": "メンバー",
+      "runtime": "ランタイム",
+      "issue_start": "{{prefix}}-1 から",
+      "only_you": "まずはあなただけ",
+      "connect_after": "作成後に接続",
+      "note": "作成後は名前・プレフィックス・メンバーをいつでも変更できます。",
+      "default_name": "あなたのスペース"
+    },
+    "progress": "02 / 02"
   },
   "step_runtime": {
     "scanning_headline": "このコンピュータを接続中…",
     "scanning_lede_prefix": "エージェントは、あなたがすでに持っている AI コーディングツールを通じて作業します — たとえば ",
     "scanning_lede_suffix": " など。このコンピュータにインストール済みのものを確認しています。",
-    "found_headline": "Mika はどこで動かしますか？",
+    "found_headline": "Quill はどこで動かしますか？",
     "found_lede": "このコンピュータで見つかったエージェントランタイムです。あとで切り替えたり追加したりできます。",
     "runtime_count_other": "エージェントランタイム {{count}} 個",
     "status_all_online": "すべてオンライン",
@@ -213,15 +241,15 @@
     "refresh": "更新",
     "refreshing": "更新中…",
     "hint_selected": "選択中: {{name}}",
-    "hint_pick": "Mika と始めるには、上でエージェントランタイムを選んでください。",
+    "hint_pick": "Quill と始めるには、上でエージェントランタイムを選んでください。",
     "hint_waiting": "最初の結果を待っています…",
     "hint_skip_or_refresh": "インストール後に更新するか、スキップしてスペースに入ってください。",
-    "continue": "Mika と始める"
+    "continue": "Quill と始める"
   },
   "step_platform": {
     "eyebrow": "コンピュータを接続",
     "headline": "エージェントを実行するコンピュータを接続しましょう。",
-    "lede": "このスペースの参謀長である Mika は、QuickWork に接続した実際のコンピュータで動きます。どう接続するかを選んでください。",
+    "lede": "このスペースの参謀長である Quill は、QuickWork に接続した実際のコンピュータで動きます。どう接続するかを選んでください。",
     "hint_default": "接続方法を選んでください。スキップしてあとでコンピュータを接続することもできます。",
     "download_title": "このコンピュータを使う",
     "download_subtitle": "デスクトップアプリをインストールして、このコンピュータを接続します。新しいタブで開くので、そこでプラットフォームを選んでください。",
@@ -250,12 +278,12 @@
   },
   "errors": {
     "skip_failed": "オンボーディングを完了できませんでした",
-    "mika_setup_failed": "Mika スペースを開始できませんでした"
+    "quill_setup_failed": "Quill スペースを開始できませんでした"
   },
-  "mika_intro": {
-    "headline": "最初のエージェント仲間、Mika を紹介します。",
-    "name": "Mika",
+  "quill_intro": {
+    "headline": "最初のエージェント仲間、Quill を紹介します。",
+    "name": "Quill",
     "role": "参謀長",
-    "blurb": "やりたいことを Mika に伝えると、タスクになり、適したエージェントが担当します。"
+    "blurb": "やりたいことを Quill に伝えると、タスクになり、適したエージェントが担当します。"
   }
 }

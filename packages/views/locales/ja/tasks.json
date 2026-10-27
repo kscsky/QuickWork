@@ -1,48 +1,88 @@
 {
   "title": "タスク",
-  "subtitle": "各タスクはリレーです。チェーンを順に受け渡し、エージェントをまだ紐づけていない人の番で停まります——どこで停まったかは見えます。",
-  "new_task": "タスクを作成",
+  "create": "新しいタスク",
+  "tagline": "単独タスクは人かエージェントへ、スクワッドタスクはリレーで実行 —— 各番の承認で次の人へ。",
   "filter": {
     "all": "すべて {{count}}",
-    "mine": "自分の番 {{count}}",
-    "parked": "停止中 {{count}}"
+    "single": "単独 {{count}}",
+    "squad": "スクワッド {{count}}",
+    "mine": "自分 {{count}}",
+    "parked": "停止 {{count}}"
   },
-  "state": {
-    "pending": "未開始",
-    "doing": "進行中",
-    "done": "完了",
-    "parked": "停止·待機",
-    "skipped": "スキップ",
-    "unknown": "不明"
+  "pager": {
+    "sum": "全 {{count}} 件 · 1ページ {{size}} 件 · {{page}} / {{pages}} ページ",
+    "prev": "前へ",
+    "next": "次へ"
   },
   "row": {
-    "parked_at": "{{name}} で停まっています · {{step}}",
-    "doing_at": "{{name}} が作業中 · {{step}}",
-    "waiting_at": "{{name}} のマシンの引き取り待ち · {{step}}",
-    "running_at": "{{name}} のマシンで実行中 · {{step}}",
-    "interrupted_at": "{{name}} 側で止まりました · {{step}}",
-    "finished": "すべて完了",
-    "head_pending": "開始待ち · {{step}}",
-    "no_chain": "リレーなし",
+    "leg_parent": "親タスク",
+    "leg_seq": "第{{seq}}/{{total}}棒",
+    "type_single": "単独",
+    "type_squad": "スクワッド",
     "unassigned": "未割り当て",
-    "assignee": "担当 {{name}}"
+    "select_task": "{{identifier}} を選択",
+    "delete_task": "タスクを削除"
+  },
+  "bulk": {
+    "selected": "{{count}} 件選択中",
+    "clear": "選択をクリア",
+    "select_page": "このページをすべて選択",
+    "delete": "削除",
+    "delete_title": "タスク {{count}} 件を削除しますか？",
+    "delete_desc": "この操作は元に戻せません。選択したタスクとすべてのコメントが完全に削除されます。",
+    "delete_warning": "スペースのメンバーは誰でもタスクを削除できます。",
+    "cancel": "キャンセル",
+    "delete_success": "タスク {{count}} 件を削除しました",
+    "delete_failed": "タスクを削除できませんでした"
   },
   "empty": {
-    "title": "タスクはまだありません",
-    "body": "ディスパッチタワーで作成したタスクが、リレーとともにここに並びます。",
-    "filtered_title": "このフィルターに一致するタスクはありません",
-    "filtered_body": "別のフィルターを試してください。"
+    "title": "まだタスクがありません",
+    "body": "「新しいタスク」から作成してください —— 単独タスクは人かエージェントへ、スクワッドタスクはリレーで実行されます。",
+    "filtered_title": "このフィルターに合うタスクはありません",
+    "filtered_body": "別のフィルターをお試しください。"
   },
-  "load_error": "タスクを読み込めませんでした",
   "chain": {
     "parked_dot": "停止中",
-    "none": "リレー未設定。チームに割り当てると、ここに各工程の引き継ぎが出ます。",
-    "parked_at": "{{name}} で停止（エージェント未設定）",
-    "delivered": "{{name}} が納品",
-    "skipped_at": "{{name}} をスキップ",
-    "running": "{{name}} が実行中",
-    "awaiting_pickup": "{{name}} が未着手",
-    "waiting": "{{name}} 待機中",
-    "open_task": "タスクを開く"
-  }
+    "none": "リレー未設定",
+    "chip_done": "受け渡し済み",
+    "chip_doing": "進行中",
+    "chip_queued": "引き取り待ち",
+    "chip_review": "確認待ち",
+    "chip_parked": "停止·待機",
+    "chip_skipped": "スキップ",
+    "chip_waiting": "待機中"
+  },
+  "mast": {
+    "running": "件実行中",
+    "review": "件確認待ち",
+    "quiet": "件静か",
+    "sync_hint": "最終同期 · たった今",
+    "info": "単独タスクは人かエージェントへ、スクワッドタスクはリレーで実行します。停止した番は誰かが補うまで待ちます。",
+    "sort_recent": "最近の活動",
+    "sort_oldest": "古い活動",
+    "sort_label": "並び替え"
+  },
+  "filter_name": {
+    "all": "すべて",
+    "single": "単独",
+    "squad": "スクワッド",
+    "mine": "自分",
+    "parked": "停止"
+  },
+  "board": {
+    "task": "タスク",
+    "state": "状態",
+    "actions": "操作"
+  },
+  "state": {
+    "open": "開く",
+    "view": "表示",
+    "review": "確認",
+    "fill": "補う",
+    "needs_fill": "補任が必要",
+    "delivered": "受け渡し済み"
+  },
+  "quick_create_failed_banner": "{{count}} 件のクイックタスク作成に失敗しました",
+  "quick_create_failed_view": "通知を開く",
+  "quick_create_failed_fallback": "通知でエラー詳細を確認してください。"
 }

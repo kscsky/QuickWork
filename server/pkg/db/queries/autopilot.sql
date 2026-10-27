@@ -27,7 +27,35 @@ SELECT
     WHERE r.autopilot_id = a.id
     ORDER BY r.triggered_at DESC
     LIMIT 1
-  ), '')::text AS last_run_status
+  ), '')::text AS last_run_status,
+  -- Recent run outcomes for the list's strip of dots, newest first. The
+  -- subquery is capped so a long-lived automation pays a fixed cost per row.
+  COALESCE((
+    SELECT array_agg(recent.status ORDER BY recent.triggered_at DESC, recent.id DESC)
+    FROM (
+      SELECT r.status, r.triggered_at, r.id
+      FROM autopilot_run r
+      WHERE r.autopilot_id = a.id
+      ORDER BY r.triggered_at DESC, r.id DESC
+      LIMIT 7
+    ) recent
+  ), ARRAY[]::text[])::text[] AS recent_run_statuses,
+  -- The schedule trigger the list's "next run" cell describes. Its cadence
+  -- and zone are otherwise only available from the detail endpoint.
+  COALESCE((
+    SELECT t.cron_expression
+    FROM autopilot_trigger t
+    WHERE t.autopilot_id = a.id AND t.enabled AND t.kind = 'schedule'
+    ORDER BY t.next_run_at ASC NULLS LAST, t.created_at ASC
+    LIMIT 1
+  ), '')::text AS schedule_cron,
+  COALESCE((
+    SELECT t.timezone
+    FROM autopilot_trigger t
+    WHERE t.autopilot_id = a.id AND t.enabled AND t.kind = 'schedule'
+    ORDER BY t.next_run_at ASC NULLS LAST, t.created_at ASC
+    LIMIT 1
+  ), '')::text AS schedule_timezone
 FROM autopilot a
 WHERE a.workspace_id = $1
   AND (

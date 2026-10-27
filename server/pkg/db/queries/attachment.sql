@@ -266,3 +266,24 @@ ORDER BY id;
 DELETE FROM attachment
 WHERE workspace_id = sqlc.arg(workspace_id)
   AND source_context_id IS NOT NULL;
+
+-- name: UpdateAttachmentContent :one
+-- Swaps the object a text attachment points at after an in-place edit. The
+-- URL changes (fresh storage key — CDN caches keyed by path can never serve
+-- the previous revision) while the id stays stable, which is what handoff
+-- packages and comments reference. Mirrors CreateAttachment's issue-revision
+-- bump so clients holding a revision marker refetch the attachment list.
+WITH updated AS (
+  UPDATE attachment AS a
+  SET url = sqlc.arg(new_url), size_bytes = sqlc.arg(new_size)
+  WHERE a.id = sqlc.arg(attachment_id) AND a.workspace_id = sqlc.arg(ws_id)
+  RETURNING a.*
+), bumped_issue AS (
+  UPDATE issue
+  SET revision = revision + 1
+  WHERE issue.id IN (SELECT issue_id FROM updated WHERE issue_id IS NOT NULL)
+  RETURNING revision
+)
+SELECT updated.*,
+       COALESCE((SELECT revision FROM bumped_issue), 0)::bigint AS issue_revision
+FROM updated;

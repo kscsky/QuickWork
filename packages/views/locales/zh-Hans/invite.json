@@ -49,5 +49,53 @@
     "row_inviter_fallback": "某人",
     "row_invited_admin": "{{inviter}} 邀请你以管理员身份加入",
     "row_invited_member": "{{inviter}} 邀请你以成员身份加入"
+  },
+  "roles": {
+    "admin": "管理员",
+    "member": "成员"
+  },
+  "loading": {
+    "title": "正在打开邀请",
+    "description": "正在核对这条邀请和它所在的空间…"
+  },
+  "console": {
+    "wordmark": "QuickWork",
+    "top_note": "邀请 / INVITATION",
+    "brand_initial": "Q",
+    "agent_initial": "AI",
+    "no_prefix": "NO.",
+    "kicker": "邀请 / 待你回复",
+    "headline_prefix": "进入",
+    "headline_suffix": "接下一条接力",
+    "copy_as": "邀请你以",
+    "copy_rest": "的身份加入。接受后，第一棒就轮到你了。",
+    "relay_label": "接力 / RELAY",
+    "relay_eng": "PASS THE BATON",
+    "leg_prev_label": "上一棒",
+    "leg_prev_sub": "工作已经在路上",
+    "state_done": "已交棒",
+    "leg_you_label": "你这一棒",
+    "leg_you_sub": "验收、执行、再交棒",
+    "state_now": "现在",
+    "you_initial": "你",
+    "leg_next_label": "下一棒",
+    "leg_next_sub": "智能体或队友",
+    "state_wait": "等待",
+    "relay_note": "每一棒都需要有人接住；这一次是你。",
+    "paper_kicker": "邀请 / INVITATION",
+    "workspace_path": "QuickWork 空间",
+    "workspace_tag": "空间 / WORKSPACE",
+    "lead_invite": "邀请你以",
+    "lead_end": "的身份加入 {{workspace}}。",
+    "fact_inviter": "邀请人",
+    "fact_role": "你的角色",
+    "fact_valid": "有效期",
+    "paper_note": "任务会按棒次传到你手上；你验收的这一棒通过，才轮到下一位。",
+    "reply_tag": "回复 / REPLY",
+    "reply_as": "以「{{role}}」身份加入",
+    "reply_valid": "{{date}} 前有效",
+    "other_account_hint": "受邀账号不是你？",
+    "footer_left": "AGENTS AS ASSIGNEES",
+    "footer_right": "PARKED IS A FEATURE"
   }
 }

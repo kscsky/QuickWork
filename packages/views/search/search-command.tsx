@@ -4,7 +4,6 @@ import { issueStatusCategory } from "@quickwork/core/issues";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Check,
-  Clock,
   Copy,
   FileText,
   Link2,
@@ -38,10 +37,13 @@ import {
 } from "@quickwork/core/issues/stores";
 import { issueDetailOptions, issueTimelineOptions } from "@quickwork/core/issues/queries";
 import { useWorkspaceId } from "@quickwork/core";
-import { useWorkspacePaths, WORKSPACE_PAGES } from "@quickwork/core/paths";
+import {
+  useCurrentWorkspace,
+  useWorkspacePaths,
+  WORKSPACE_PAGES,
+} from "@quickwork/core/paths";
 import type { WorkspacePageKey, WorkspacePaths } from "@quickwork/core/paths";
 import { useModalStore } from "@quickwork/core/modals";
-import { createShortcutChord } from "@quickwork/core/shortcuts";
 import { memberListOptions } from "@quickwork/core/workspace/queries";
 import { resolvePublicFileUrl } from "@quickwork/core/workspace/avatar-url";
 import { StatusIcon } from "../issues/components";
@@ -52,7 +54,6 @@ import { routeIconForPath } from "../layout/route-icon-components";
 import { PROJECT_STATUS_CONFIG } from "@quickwork/core/projects/config";
 import type { ProjectStatus } from "@quickwork/core/types";
 import { ActorAvatar } from "../common/actor-avatar";
-import { ShortcutKeycaps } from "../common/shortcut-keycaps";
 import { ActorAvatar as ActorAvatarBase } from "@quickwork/ui/components/common/actor-avatar";
 import {
   Dialog,
@@ -93,7 +94,6 @@ const PAGE_KEYWORDS: Record<WorkspacePageKey, string[]> = {
   dispatch: ["dispatch", "tower", "orchestrate", "queue", "调度", "编排", "派发"],
   tasks: ["tasks", "relay", "chain", "handoff", "任务", "链路", "交接"],
   myIssues: ["my", "issues", "assigned", "mine", "我的", "任务"],
-  issues: ["issues", "tasks", "bugs", "任务"],
   projects: ["projects", "kanban", "项目"],
   autopilots: ["autopilot", "autopilots", "automation", "schedule", "cron", "webhook", "自动化", "定时"],
   agents: ["agents", "bots", "ai", "智能体"],
@@ -101,7 +101,14 @@ const PAGE_KEYWORDS: Record<WorkspacePageKey, string[]> = {
   usage: ["usage", "analytics", "stats", "metrics", "统计", "分析", "用量"],
   runtimes: ["runtimes", "environments", "machines", "运行时"],
   skills: ["skills", "library", "技能"],
-  settings: ["settings", "config", "preferences", "设置", "配置"],
+  config: ["config", "settings", "configuration", "配置", "设置"],
+  models: ["models", "model pool", "free models", "模型", "模型池", "免费模型"],
+  mcp: ["mcp", "servers", "tools", "服务", "工具"],
+  github: ["github", "git", "pull request", "pr", "仓库"],
+  integrations: ["integrations", "slack", "lark", "telegram", "集成", "飞书"],
+  tokens: ["tokens", "api tokens", "pat", "令牌"],
+  account: ["account", "profile", "账号", "个人资料"],
+  workspaceSettings: ["workspace", "settings", "空间", "设置"],
 };
 
 const NAV_PAGE_KEYS = Object.keys(WORKSPACE_PAGES) as WorkspacePageKey[];
@@ -195,26 +202,31 @@ function ProjectResultRow({
       value={`project:${project.id}`}
       disabled={disabled}
       onSelect={onSelect}
-      className="flex cursor-default select-none flex-col gap-1 rounded-lg px-3 py-2.5 text-body outline-none data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50 data-selected:bg-accent"
+      className="qw-cmd-row"
     >
-      <div className="flex items-center gap-2.5">
+      <span className="qw-cmd-row-ico">
         <ProjectIcon project={project} size="md" />
-        <span className="truncate">
+      </span>
+      <div className="qw-cmd-row-main">
+        <span className="qw-cmd-row-title">
           <HighlightText text={project.title} query={query} />
         </span>
+        {project.match_source === "description" && project.matched_snippet ? (
+          <span className="qw-cmd-row-sub">
+            <HighlightText text={project.matched_snippet} query={query} />
+          </span>
+        ) : null}
+      </div>
+      <span className="qw-cmd-row-tail">
         <span
-          className={`ml-auto text-caption shrink-0 ${PROJECT_STATUS_CONFIG[status]?.color ?? "text-muted-foreground"}`}
+          className={PROJECT_STATUS_CONFIG[status]?.color ?? "text-muted-foreground"}
         >
           {projectStatusLabels[status] ?? project.status}
         </span>
-      </div>
-      {project.match_source === "description" && project.matched_snippet && (
-        <div className="flex items-start gap-2 pl-[26px]">
-          <span className="text-caption text-muted-foreground truncate">
-            <HighlightText text={project.matched_snippet} query={query} />
-          </span>
-        </div>
-      )}
+        <span className="qw-cmd-enter" aria-hidden="true">
+          ↵
+        </span>
+      </span>
     </CommandPrimitive.Item>
   );
 }
@@ -236,44 +248,52 @@ function IssueResultRow({
       value={issue.id}
       disabled={disabled}
       onSelect={onSelect}
-      className="flex cursor-default select-none flex-col gap-1 rounded-lg px-3 py-2.5 text-body outline-none data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50 data-selected:bg-accent"
+      className="qw-cmd-row"
     >
-      <div className="flex items-center gap-2.5">
+      <span className="qw-cmd-row-ico">
         <StatusIcon
           status={issue.status}
           category={issueStatusCategory(issue) ?? undefined}
-          className="size-4 shrink-0"
+          className="size-3.5 shrink-0"
         />
-        <span className="text-caption text-muted-foreground shrink-0">
-          {issue.identifier}
-        </span>
-        <span className="min-w-0 flex-1 truncate">
+      </span>
+      <div className="qw-cmd-row-main">
+        <span className="qw-cmd-row-title">
           <HighlightText text={issue.title} query={query} />
         </span>
+        <span className="qw-cmd-row-sub">
+          {issue.identifier}
+          {issue.matched_description_snippet ? (
+            <>
+              {" · "}
+              <FileText className="qw-cmd-inline-ico" aria-hidden="true" />
+              <HighlightText
+                text={issue.matched_description_snippet}
+                query={query}
+              />
+            </>
+          ) : null}
+          {issue.matched_comment_snippet ? (
+            <>
+              {" · "}
+              <MessageSquare className="qw-cmd-inline-ico" aria-hidden="true" />
+              <HighlightText
+                text={issue.matched_comment_snippet}
+                query={query}
+              />
+            </>
+          ) : null}
+        </span>
+      </div>
+      <span className="qw-cmd-row-tail">
         <IssueAssigneeAvatar
           assigneeType={issue.assignee_type}
           assigneeId={issue.assignee_id}
         />
-      </div>
-      {issue.matched_description_snippet && (
-        <div className="flex items-start gap-2 pl-[26px]">
-          <FileText className="size-3 shrink-0 text-muted-foreground mt-0.5" />
-          <span className="text-caption text-muted-foreground truncate">
-            <HighlightText
-              text={issue.matched_description_snippet}
-              query={query}
-            />
-          </span>
-        </div>
-      )}
-      {issue.matched_comment_snippet && (
-        <div className="flex items-start gap-2 pl-[26px]">
-          <MessageSquare className="size-3 shrink-0 text-muted-foreground mt-0.5" />
-          <span className="text-caption text-muted-foreground truncate">
-            <HighlightText text={issue.matched_comment_snippet} query={query} />
-          </span>
-        </div>
-      )}
+        <span className="qw-cmd-enter" aria-hidden="true">
+          ↵
+        </span>
+      </span>
     </CommandPrimitive.Item>
   );
 }
@@ -305,8 +325,29 @@ const NO_RESULTS: SearchResults = { query: "", issues: [], projects: [] };
 // prop rather than a hand-rolled div: cmdk renders it into a
 // [cmdk-group-heading] node and points the group's aria-labelledby at it, so a
 // screen reader announces which group a row belongs to.
-const GROUP_CLASS =
-  "p-2 [&_[cmdk-group-heading]]:px-3 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:text-caption [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-muted-foreground";
+const GROUP_CLASS = "qw-cmd-group";
+
+function GroupHeading({
+  label,
+  cap,
+  count,
+}: {
+  label: string;
+  cap: string;
+  count: number;
+}) {
+  return (
+    <>
+      <span className="qw-cmd-group-label">{label}</span>
+      {label.toLowerCase() === cap.toLowerCase() ? null : (
+        <span className="qw-cmd-group-cap">/ {cap}</span>
+      )}
+      <span className="qw-cmd-group-count">
+        {String(count).padStart(2, "0")}
+      </span>
+    </>
+  );
+}
 
 export function SearchCommand() {
   const { t } = useT("search");
@@ -347,6 +388,7 @@ export function SearchCommand() {
   const wsId = useWorkspaceId();
   const recentItems = useRecentIssuesStore(selectRecentIssues(wsId));
   const p: WorkspacePaths = useWorkspacePaths();
+  const workspace = useCurrentWorkspace();
   const { theme, setTheme } = useTheme();
   const { data: members = [] } = useQuery(memberListOptions(wsId));
 
@@ -584,6 +626,15 @@ export function SearchCommand() {
     [results],
   );
 
+  const shownResultCount =
+    filteredPages.length +
+    filteredCommands.length +
+    filteredMembers.length +
+    partitionedResults.liveProjects.length +
+    partitionedResults.liveIssues.length +
+    partitionedResults.cancelledProjects.length +
+    partitionedResults.cancelledIssues.length;
+
   // Close on single ESC — capture phase fires before base-ui Dialog's handlers
   useEffect(() => {
     if (!open) return;
@@ -704,14 +755,13 @@ export function SearchCommand() {
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent
         finalFocus={false}
-        className="top-[20%] translate-y-0 overflow-hidden rounded-xl! p-0 sm:max-w-xl!"
+        overlayClassName="qw-cmd-overlay-bg"
+        className="qw-cmd-content"
         showCloseButton={false}
       >
         <DialogHeader className="sr-only">
           <DialogTitle>{t(($) => $.title)}</DialogTitle>
-          <DialogDescription>
-            {t(($) => $.description)}
-          </DialogDescription>
+          <DialogDescription>{t(($) => $.description)}</DialogDescription>
         </DialogHeader>
         <CommandPrimitive
           shouldFilter={false}
@@ -727,61 +777,102 @@ export function SearchCommand() {
               });
             }
           }}
-          className="flex size-full flex-col overflow-hidden rounded-xl bg-popover text-popover-foreground"
+          className="qw-cmd-root"
         >
-          {/* Search input */}
-          <div className="flex items-center gap-3 border-b px-4 py-3">
-            <SearchIcon className="size-5 shrink-0 text-muted-foreground" />
-            <CommandPrimitive.Input
-              placeholder={t(($) => $.placeholder)}
-              value={query}
-              onValueChange={handleValueChange}
-              onKeyDown={(e) => {
-                // cmdk's root handler intercepts Home/End for list navigation;
-                // stop propagation so the browser moves the text caret instead.
-                if (e.key === "Home" || e.key === "End") {
-                  e.stopPropagation();
-                }
-              }}
-              className="flex-1 bg-transparent text-body outline-none placeholder:text-muted-foreground"
-            />
-            <ShortcutKeycaps
-              shortcut={createShortcutChord("Escape")}
-              className="hidden shrink-0 sm:inline-flex"
-            />
-          </div>
+          <header className="qw-cmd-head">
+            <div className="qw-cmd-search">
+              <SearchIcon className="qw-cmd-search-ico" aria-hidden="true" />
+              <CommandPrimitive.Input
+                placeholder={t(($) => $.palette.placeholder)}
+                value={query}
+                onValueChange={handleValueChange}
+                onKeyDown={(e) => {
+                  if (e.key === "Home" || e.key === "End") {
+                    e.stopPropagation();
+                  }
+                }}
+                aria-label={t(($) => $.palette.placeholder)}
+                className="qw-cmd-input"
+              />
+              <button
+                type="button"
+                className="qw-cmd-close"
+                onClick={() => setOpen(false)}
+                aria-label={t(($) => $.palette.close)}
+              >
+                <span className="qw-cmd-key">{t(($) => $.palette.esc)}</span>
+              </button>
+            </div>
+            <div className="qw-cmd-strip">
+              <span className="qw-cmd-scope">
+                {t(($) => $.palette.scope, {
+                  slug: workspace?.slug ?? "—",
+                  count: 6,
+                })}
+              </span>
+              <span className="qw-cmd-count">
+                {query.trim()
+                  ? shownResultCount
+                    ? t(($) => $.palette.result_count, {
+                        count: shownResultCount,
+                      })
+                    : t(($) => $.palette.no_results_count)
+                  : t(($) => $.palette.recent_count, {
+                      count: recentIssues.length,
+                    })}
+              </span>
+            </div>
+          </header>
 
-          {/* Results list */}
-          <CommandPrimitive.List className="max-h-[min(400px,50vh)] overflow-y-auto overflow-x-hidden">
-            {/* Pages section — only shown when query matches */}
+          <CommandPrimitive.List className="qw-cmd-results" role="listbox">
             {filteredPages.length > 0 && (
               <CommandPrimitive.Group
-                heading={t(($) => $.groups.pages)}
+                heading={
+                  <GroupHeading
+                    label={t(($) => $.groups.pages)}
+                    cap={t(($) => $.caps.pages)}
+                    count={filteredPages.length}
+                  />
+                }
                 className={GROUP_CLASS}
               >
                 {filteredPages.map((page) => {
                   const PageIcon = routeIconForPath(p[page.key]());
                   return (
-                  <CommandPrimitive.Item
-                    key={page.key}
-                    value={`page:${page.key}`}
-                    onSelect={() => handlePageSelect(page.key)}
-                    className="flex cursor-default select-none items-center gap-2.5 rounded-lg px-3 py-2.5 text-body outline-none data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50 data-selected:bg-accent"
-                  >
-                    <PageIcon className="size-4 shrink-0 text-muted-foreground" />
-                    <span className="truncate">
-                      <HighlightText text={page.label} query={query} />
-                    </span>
-                  </CommandPrimitive.Item>
+                    <CommandPrimitive.Item
+                      key={page.key}
+                      value={`page:${page.key}`}
+                      onSelect={() => handlePageSelect(page.key)}
+                      className="qw-cmd-row"
+                    >
+                      <span className="qw-cmd-row-ico">
+                        <PageIcon className="size-3.5" aria-hidden="true" />
+                      </span>
+                      <div className="qw-cmd-row-main">
+                        <span className="qw-cmd-row-title">
+                          <HighlightText text={page.label} query={query} />
+                        </span>
+                      </div>
+                      <span className="qw-cmd-row-tail">
+                        <span className="qw-cmd-enter" aria-hidden="true">
+                          ↵
+                        </span>
+                      </span>
+                    </CommandPrimitive.Item>
                   );
                 })}
               </CommandPrimitive.Group>
             )}
 
-            {/* Commands section — New Issue / New Project / Copy link / Theme, only shown when query matches */}
             {filteredCommands.length > 0 && (
               <CommandPrimitive.Group
-                heading={t(($) => $.groups.commands)}
+                heading={
+                  <GroupHeading
+                    label={t(($) => $.groups.commands)}
+                    cap={t(($) => $.caps.commands)}
+                    count={filteredCommands.length}
+                  />
+                }
                 className={GROUP_CLASS}
               >
                 {filteredCommands.map((cmd) => (
@@ -789,13 +880,22 @@ export function SearchCommand() {
                     key={cmd.key}
                     value={`command:${cmd.key}`}
                     onSelect={cmd.onSelect}
-                    className="flex cursor-default select-none items-center gap-2.5 rounded-lg px-3 py-2.5 text-body outline-none data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50 data-selected:bg-accent"
+                    className="qw-cmd-row"
                   >
-                    <cmd.icon className="size-4 shrink-0 text-muted-foreground" />
-                    <span className="truncate">
-                      <HighlightText text={cmd.label} query={query} />
+                    <span className="qw-cmd-row-ico">
+                      <cmd.icon className="size-3.5" aria-hidden="true" />
                     </span>
-                    {cmd.trailing}
+                    <div className="qw-cmd-row-main">
+                      <span className="qw-cmd-row-title">
+                        <HighlightText text={cmd.label} query={query} />
+                      </span>
+                    </div>
+                    <span className="qw-cmd-row-tail">
+                      {cmd.trailing}
+                      <span className="qw-cmd-enter" aria-hidden="true">
+                        ↵
+                      </span>
+                    </span>
                   </CommandPrimitive.Item>
                 ))}
               </CommandPrimitive.Group>
@@ -803,7 +903,13 @@ export function SearchCommand() {
 
             {filteredMembers.length > 0 && (
               <CommandPrimitive.Group
-                heading={t(($) => $.groups.members)}
+                heading={
+                  <GroupHeading
+                    label={t(($) => $.groups.members)}
+                    cap={t(($) => $.caps.members)}
+                    count={filteredMembers.length}
+                  />
+                }
                 className={GROUP_CLASS}
               >
                 {filteredMembers.map((member) => (
@@ -811,38 +917,37 @@ export function SearchCommand() {
                     key={member.user_id}
                     value={`member:${member.user_id}`}
                     onSelect={() => handleMemberSelect(member.user_id)}
-                    className="flex cursor-default select-none items-center gap-2.5 rounded-lg px-3 py-2.5 text-body outline-none data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50 data-selected:bg-accent"
+                    className="qw-cmd-row"
                   >
-                    <ActorAvatarBase
-                      name={member.name}
-                      initials={memberInitials(member.name)}
-                      avatarUrl={resolvePublicFileUrl(member.avatar_url)}
-                      size="md"
-                    />
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate">
+                    <span className="qw-cmd-row-ico qw-cmd-row-ava">
+                      <ActorAvatarBase
+                        name={member.name}
+                        initials={memberInitials(member.name)}
+                        avatarUrl={resolvePublicFileUrl(member.avatar_url)}
+                        size="md"
+                      />
+                    </span>
+                    <div className="qw-cmd-row-main">
+                      <div className="qw-cmd-row-title">
                         <HighlightText text={member.name} query={query} />
                       </div>
-                      <div className="truncate text-caption text-muted-foreground">
+                      <div className="qw-cmd-row-sub">
                         <HighlightText text={member.email} query={query} />
                       </div>
                     </div>
+                    <span className="qw-cmd-row-tail">
+                      <span className="qw-cmd-enter" aria-hidden="true">
+                        ↵
+                      </span>
+                    </span>
                   </CommandPrimitive.Item>
                 ))}
               </CommandPrimitive.Group>
             )}
 
-            {/*
-              Spinner only while there is nothing to look at. isLoading flips
-              on the keystroke, before the 300ms debounce even fires, so
-              swapping the whole result list for a spinner on every character
-              made the list strobe while typing. Keeping the previous query's
-              rows until the next response lands is the standard trade: they
-              are one keystroke stale for a moment, instead of gone.
-            */}
             {isLoading && !hasResults && (
-              <div className="flex items-center justify-center py-10">
-                <Loader2 className="size-5 animate-spin text-muted-foreground" />
+              <div className="qw-cmd-loading">
+                <Loader2 className="size-4 animate-spin" aria-hidden="true" />
               </div>
             )}
 
@@ -851,26 +956,25 @@ export function SearchCommand() {
               !hasResults &&
               filteredPages.length === 0 &&
               filteredCommands.length === 0 && (
-                <CommandPrimitive.Empty className="py-10 text-center text-body text-muted-foreground">
-                  {t(($) => $.empty.no_results)}
+                <CommandPrimitive.Empty className="qw-cmd-empty">
+                  <b>
+                    {t(($) => $.palette.no_results_title, {
+                      query: query.trim(),
+                    })}
+                  </b>
+                  <span>{t(($) => $.palette.no_results_hint)}</span>
                 </CommandPrimitive.Empty>
               )}
 
-            {/*
-              Render order is the cross-type cancelled partition (MUL-5824):
-              live projects → live issues → one trailing Cancelled section
-              holding cancelled projects then cancelled issues. Projects and
-              issues arrive as two independently ranked responses, so per-type
-              ordering is not enough — the whole Projects group used to render
-              above the whole Issues group, letting one cancelled project be the
-              first row of the list. Keeping cancelled rows in a single trailing
-              section is the only arrangement where no cancelled row of either
-              type can precede a live row of the other. Direct hits stay in
-              their live section (see partitionAggregatedSearchResults).
-            */}
             {partitionedResults.liveProjects.length > 0 && (
               <CommandPrimitive.Group
-                heading={t(($) => $.groups.projects)}
+                heading={
+                  <GroupHeading
+                    label={t(($) => $.groups.projects)}
+                    cap={t(($) => $.caps.projects)}
+                    count={partitionedResults.liveProjects.length}
+                  />
+                }
                 className={GROUP_CLASS}
               >
                 {partitionedResults.liveProjects.map((project) => (
@@ -887,7 +991,13 @@ export function SearchCommand() {
 
             {partitionedResults.liveIssues.length > 0 && (
               <CommandPrimitive.Group
-                heading={t(($) => $.groups.issues)}
+                heading={
+                  <GroupHeading
+                    label={t(($) => $.groups.issues)}
+                    cap={t(($) => $.caps.issues)}
+                    count={partitionedResults.liveIssues.length}
+                  />
+                }
                 className={GROUP_CLASS}
               >
                 {partitionedResults.liveIssues.map((issue) => (
@@ -904,7 +1014,16 @@ export function SearchCommand() {
 
             {partitionedResults.hasCancelled && (
               <CommandPrimitive.Group
-                heading={t(($) => $.groups.cancelled)}
+                heading={
+                  <GroupHeading
+                    label={t(($) => $.groups.cancelled)}
+                    cap={t(($) => $.caps.cancelled)}
+                    count={
+                      partitionedResults.cancelledProjects.length +
+                      partitionedResults.cancelledIssues.length
+                    }
+                  />
+                }
                 className={GROUP_CLASS}
               >
                 {partitionedResults.cancelledProjects.map((project) => (
@@ -931,44 +1050,72 @@ export function SearchCommand() {
             {!query.trim() && recentIssues.length > 0 && (
               <CommandPrimitive.Group
                 heading={
-                  <>
-                    <Clock className="size-3" />
-                    <span>{t(($) => $.groups.recent)}</span>
-                  </>
+                  <GroupHeading
+                    label={t(($) => $.groups.recent)}
+                    cap={t(($) => $.caps.recent)}
+                    count={recentIssues.length}
+                  />
                 }
-                className={`${GROUP_CLASS} [&_[cmdk-group-heading]]:flex [&_[cmdk-group-heading]]:items-center [&_[cmdk-group-heading]]:gap-2`}
+                className={GROUP_CLASS}
               >
                 {recentIssues.map((item) => (
                   <CommandPrimitive.Item
                     key={item.id}
                     value={item.id}
                     onSelect={handleSelect}
-                    className="flex cursor-default select-none items-center gap-2.5 rounded-lg px-3 py-2.5 text-body outline-none data-[disabled=true]:pointer-events-none data-[disabled=true]:opacity-50 data-selected:bg-accent"
+                    className="qw-cmd-row"
                   >
-                    <StatusIcon
-                      status={item.status}
-                      category={issueStatusCategory(item) ?? undefined}
-                      className="size-4 shrink-0"
-                    />
-                    <span className="text-caption text-muted-foreground shrink-0">
-                      {item.identifier}
+                    <span className="qw-cmd-row-ico">
+                      <StatusIcon
+                        status={item.status}
+                        category={issueStatusCategory(item) ?? undefined}
+                        className="size-3.5 shrink-0"
+                      />
                     </span>
-                    <span className="min-w-0 flex-1 truncate">{item.title}</span>
-                    <IssueAssigneeAvatar
-                      assigneeType={item.assignee_type}
-                      assigneeId={item.assignee_id}
-                    />
+                    <div className="qw-cmd-row-main">
+                      <span className="qw-cmd-row-title">{item.title}</span>
+                      <span className="qw-cmd-row-sub">{item.identifier}</span>
+                    </div>
+                    <span className="qw-cmd-row-tail">
+                      <IssueAssigneeAvatar
+                        assigneeType={item.assignee_type}
+                        assigneeId={item.assignee_id}
+                      />
+                      <span className="qw-cmd-enter" aria-hidden="true">
+                        ↵
+                      </span>
+                    </span>
                   </CommandPrimitive.Item>
                 ))}
               </CommandPrimitive.Group>
             )}
 
             {!isLoading && !query.trim() && recentIssues.length === 0 && (
-              <div className="px-5 py-4 text-center text-caption text-muted-foreground">
-                {t(($) => $.empty.type_to_search)}
+              <div className="qw-cmd-empty" role="status">
+                <b>{t(($) => $.palette.idle_title)}</b>
+                <span>{t(($) => $.palette.idle_hint)}</span>
               </div>
             )}
           </CommandPrimitive.List>
+
+          <footer className="qw-cmd-foot">
+            <span className="qw-cmd-mark">{t(($) => $.palette.mark)}</span>
+            <span className="qw-cmd-hints">
+              <span className="qw-cmd-hint">
+                <kbd className="qw-cmd-key">↑</kbd>
+                <kbd className="qw-cmd-key">↓</kbd>
+                {t(($) => $.palette.hint_select)}
+              </span>
+              <span className="qw-cmd-hint">
+                <kbd className="qw-cmd-key">↵</kbd>
+                {t(($) => $.palette.hint_open)}
+              </span>
+              <span className="qw-cmd-hint">
+                <kbd className="qw-cmd-key">{t(($) => $.palette.esc)}</kbd>
+                {t(($) => $.palette.hint_close)}
+              </span>
+            </span>
+          </footer>
         </CommandPrimitive>
       </DialogContent>
     </Dialog>

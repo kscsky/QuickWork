@@ -101,23 +101,22 @@ describe("CreateIssueDialog sizing", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
-  // MUL-6236: every width the shell sets is `!important` so it can beat
-  // DialogContent's own sizing — which also beat DialogContent's
-  // `max-w-[calc(100%-2rem)]` gutter, so the card ran the full width of a
-  // phone screen with no margin on either side.
-  it("caps the agent dialog inside the viewport on phones", () => {
+  // The refresh dispatch note owns its size in CSS: 960×620 with viewport
+  // caps, centered. Keeping it out of Tailwind's sizing groups is what lets
+  // that one rule hold on every platform.
+  it("uses the refresh dispatch-note frame for the agent dialog", () => {
     render(<CreateIssueDialog onClose={vi.fn()} initialMode="agent" />);
 
-    expect(contentClass()).toContain("!max-w-[calc(100vw-1.5rem)]");
-    // Wider since the docket restructure: the seat card + labeled field rows
-    // need the room (was max-w-xl).
-    expect(contentClass()).toContain("sm:!max-w-2xl");
+    expect(contentClass()).toContain("qk-create-dialog");
+    expect(contentClass()).toContain("!-translate-x-1/2");
+    expect(contentClass()).toContain("!-translate-y-1/2");
+    expect(contentClass()).not.toContain("!max-w-[calc(100vw-1.5rem)]");
   });
 
-  it("keeps the ordinary agent dialog content-driven", () => {
+  it("keeps the ordinary agent dialog out of the manual sizing", () => {
     render(<CreateIssueDialog onClose={vi.fn()} initialMode="agent" />);
 
-    expect(contentClass()).toContain("!max-h-[80dvh]");
+    expect(contentClass()).not.toContain("manual-dialog-class");
     expect(contentClass()).not.toContain("!h-96");
   });
 
@@ -151,12 +150,10 @@ describe("CreateIssueDialog sizing", () => {
 
     expect(mockBeginIsolatedDraft).toHaveBeenCalledTimes(1);
     expect(screen.getByText(/agent panel · comment-source/)).toBeInTheDocument();
-    expect(contentClass()).toContain("!h-96");
-    expect(contentClass()).toContain("sm:!max-w-xl");
+    expect(contentClass()).toContain("qk-create-dialog");
     fireEvent.click(screen.getByRole("button", { name: "toggle source context" }));
     expect(screen.getByText(/agent panel · comment-source · expanded/)).toBeInTheDocument();
-    expect(contentClass()).toContain("!h-5/6");
-    expect(contentClass()).toContain("sm:!max-w-2xl");
+    expect(contentClass()).toContain("qk-create-dialog");
     expect(contentClass()).not.toContain("!h-96");
 
     view.unmount();

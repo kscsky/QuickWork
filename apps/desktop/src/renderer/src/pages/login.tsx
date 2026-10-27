@@ -1,6 +1,6 @@
 import { LoginPage } from "@quickwork/views/auth";
 import { DragStrip } from "@quickwork/views/platform";
-import { QuickWorkIcon } from "@quickwork/ui/components/common/quickwork-icon";
+import { QuickWorkMark } from "@quickwork/ui/components/common/quickwork-mark";
 
 function requireRuntimeAppUrl(): string {
   const runtimeConfig = window.desktopAPI.runtimeConfig;
@@ -26,7 +26,7 @@ export function DesktopLoginPage() {
     <div className="flex h-screen flex-col">
       <DragStrip />
       <LoginPage
-        logo={<QuickWorkIcon bordered size="lg" />}
+        logo={<QuickWorkMark className="size-10" />}
         onSuccess={() => {
           // Auth store update triggers AppContent re-render → shows DesktopShell.
           // Initial workspace navigation happens in routes.tsx via IndexRedirect.

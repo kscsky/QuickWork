@@ -1,1 +1,1 @@
-export { HomePage as default } from "@quickwork/views/home";
+export { TaskListPage as default } from "@quickwork/views/tasks";

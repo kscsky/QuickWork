@@ -20,3 +20,23 @@ func (r CreateAttachmentRow) Attachment() Attachment {
 		TaskID:        r.TaskID,
 	}
 }
+
+// Attachment converts the CTE-backed content-update row the same way.
+func (r UpdateAttachmentContentRow) Attachment() Attachment {
+	return Attachment{
+		ID:            r.ID,
+		WorkspaceID:   r.WorkspaceID,
+		IssueID:       r.IssueID,
+		CommentID:     r.CommentID,
+		UploaderType:  r.UploaderType,
+		UploaderID:    r.UploaderID,
+		Filename:      r.Filename,
+		Url:           r.Url,
+		ContentType:   r.ContentType,
+		SizeBytes:     r.SizeBytes,
+		CreatedAt:     r.CreatedAt,
+		ChatSessionID: r.ChatSessionID,
+		ChatMessageID: r.ChatMessageID,
+		TaskID:        r.TaskID,
+	}
+}

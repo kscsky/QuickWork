@@ -417,6 +417,32 @@ describe("AttachmentPreviewModal — server-relative download_url resolution (MU
       "https://cdn.example.test/att-1.png?Signature=s",
     );
   });
+
+  it("prefers the public local-upload URL over the auth-gated download endpoint", () => {
+    // Regression: local storage exposes /uploads/... publicly, while the API
+    // download endpoint needs the Bearer token a native <img> cannot send.
+    // The desktop renderer used to pick download_url first and 401 every
+    // gallery thumbnail in the preview modal.
+    getBaseUrlMock.mockReturnValue("http://localhost:8090");
+    const att = makeAttachment({
+      filename: "cover.jpg",
+      content_type: "image/webp",
+      url: "/uploads/workspaces/ws/shot.jpg",
+      download_url: "/api/attachments/att-1/download",
+      markdown_url: "http://localhost:8090/api/attachments/att-1/download",
+    });
+    render(
+      <AttachmentPreviewModal
+        source={{ kind: "full", attachment: att }}
+        open
+        onClose={() => {}}
+      />,
+    );
+    const img = document.querySelector("img");
+    expect(img?.getAttribute("src")).toBe(
+      "http://localhost:8090/uploads/workspaces/ws/shot.jpg",
+    );
+  });
 });
 
 describe("AttachmentPreviewModal — error states", () => {

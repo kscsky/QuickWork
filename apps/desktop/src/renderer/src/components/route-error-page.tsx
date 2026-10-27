@@ -28,7 +28,7 @@ export function createRouteErrorFeedbackContext({
  * rather than the failed URL. This is load-bearing, not stylistic: the routes
  * that land here most often are the ones whose first segment is not a workspace
  * at all. Deriving a slug from `/Users/me/shot.png` yields "Users" and a
- * "recovery" button pointing at `/Users/issues`, i.e. a second 404 (MUL-4899).
+ * "recovery" button pointing at `/Users/tasks`, i.e. a second 404 (MUL-4899).
  * A pathname we already failed to route cannot be a source of truth about where
  * the user belongs.
  *
@@ -37,7 +37,7 @@ export function createRouteErrorFeedbackContext({
  */
 function useRecoveryRoute(): string | null {
   const activeWorkspaceSlug = useTabStore((state) => state.activeWorkspaceSlug);
-  return activeWorkspaceSlug ? `/${activeWorkspaceSlug}/issues` : null;
+  return activeWorkspaceSlug ? `/${activeWorkspaceSlug}/tasks` : null;
 }
 
 export function DesktopRouteErrorPage() {
@@ -91,7 +91,7 @@ function DesktopNotFoundPage() {
                 .navigateActiveSession(recoveryRoute, { replace: true })
             }
           >
-            Go to issues
+            Go to tasks
           </Button>
         ) : null}
         <Button
@@ -155,7 +155,7 @@ function DesktopUnexpectedErrorPage({ error }: { error: unknown }) {
                 .navigateActiveSession(recoveryRoute, { replace: true })
             }
           >
-            Go to issues
+            Go to tasks
           </Button>
         ) : null}
         <Button

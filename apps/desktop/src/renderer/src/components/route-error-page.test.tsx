@@ -183,11 +183,11 @@ describe("DesktopRouteErrorPage", () => {
 
     it("takes the recovery entry from the active workspace, NEVER from the bad pathname", async () => {
       // The whole point: deriving a slug from this pathname yields "Users" and a
-      // "recovery" button pointing at /Users/issues — a second 404.
+      // "recovery" button pointing at /Users/tasks — a second 404.
       renderUnmatchedRoute("/Users/whoever/Desktop/shot.png");
 
-      fireEvent.click(await screen.findByRole("button", { name: /go to issues/i }));
-      expect(navigateActiveSession).toHaveBeenCalledWith("/acme/issues", {
+      fireEvent.click(await screen.findByRole("button", { name: /go to tasks/i }));
+      expect(navigateActiveSession).toHaveBeenCalledWith("/acme/tasks", {
         replace: true,
       });
       expect(navigateActiveSession).not.toHaveBeenCalledWith(
@@ -203,7 +203,7 @@ describe("DesktopRouteErrorPage", () => {
 
       await screen.findByRole("alert");
       expect(
-        screen.queryByRole("button", { name: /go to issues/i }),
+        screen.queryByRole("button", { name: /go to tasks/i }),
       ).not.toBeInTheDocument();
       expect(
         screen.getByRole("button", { name: /close tab/i }),

@@ -11,7 +11,7 @@
       "description": "Name it and pick its URL."
     },
     "runtime": {
-      "label": "Meet Mika",
+      "label": "Meet Quill",
       "description": "Your first agent teammate, and where it runs."
     }
   },
@@ -30,13 +30,29 @@
       "zone_origin": "Origin zone",
       "zone_target": "Target zone",
       "agent": "Fleet",
-      "sandbox": "sandboxed",
+      "sandbox": "Sandbox",
       "stamp": "Receipt returned",
       "checkpoint_received": "Accepted",
       "checkpoint_dispatched": "Dispatched",
-      "checkpoint_running": "Running"
+      "checkpoint_running": "Running",
+      "title": "WAYBILL",
+      "no": "QW-0001",
+      "origin_cap": "ORIGIN",
+      "target_cap": "TARGET",
+      "me": "Me",
+      "me_sub": "Starts the task",
+      "agent_sub": "Agent executes",
+      "isolation": "Isolation",
+      "receipt": "Receipt",
+      "context": "Context",
+      "context_value": "Travels with the task",
+      "footer": "One task, two zones, one receipt that closes the loop.",
+      "sig": "QW / RELAY",
+      "step_welcome": "01 Welcome",
+      "step_workspace": "02 Space"
     },
-    "illustration_caption": "One task, two zones, and the receipt that closes the loop."
+    "illustration_caption": "One task, two zones, and the receipt that closes the loop.",
+    "progress": "01 / 02"
   },
   "common": {
     "back": "Back",
@@ -132,7 +148,7 @@
     "skip": {
       "loading": "Setting up your space…",
       "title": "Welcome to QuickWork!",
-      "subtitle": "We've added one issue to help you connect a runtime. When it's ready, start with Mika from Runtimes.",
+      "subtitle": "We've added one issue to help you connect a runtime. When it's ready, start with Quill from Runtimes.",
       "got_it": "Got it",
       "status_in_progress": "In progress",
       "error_title": "We couldn't set that up",
@@ -142,7 +158,7 @@
       "cards": {
         "install_runtime": {
           "title": "Connect a runtime",
-          "subtitle": "Install Codex or Kimi, then start the guided Mika chat from Runtimes."
+          "subtitle": "Install Codex or Kimi, then start the guided Quill chat from Runtimes."
         }
       }
     }
@@ -186,13 +202,25 @@
     "creation_disabled_logout": "Log out",
     "creation_disabled_eyebrow_resume": "Your space",
     "creation_disabled_headline_resume": "Continue with {{name}}.",
-    "creation_disabled_lede_resume": "Space creation is disabled on this instance, so you'll continue into your existing space."
+    "creation_disabled_lede_resume": "Space creation is disabled on this instance, so you'll continue into your existing space.",
+    "preview": {
+      "label": "SPACE PREVIEW",
+      "tasks": "Tasks",
+      "members": "Members",
+      "runtime": "Runtime",
+      "issue_start": "Starts at {{prefix}}-1",
+      "only_you": "Just you for now",
+      "connect_after": "Connect after creation",
+      "note": "You can rename it, change the prefix or invite people any time.",
+      "default_name": "Your space"
+    },
+    "progress": "02 / 02"
   },
   "step_runtime": {
     "scanning_headline": "Connecting this computer…",
     "scanning_lede_prefix": "Your agent works through an AI coding tool you already have — like ",
     "scanning_lede_suffix": ", and others. We're checking this computer for ones you've installed.",
-    "found_headline": "Where should Mika run?",
+    "found_headline": "Where should Quill run?",
     "found_lede": "These are the agent runtimes we found on this computer. You can switch it or add more later.",
     "runtime_count_one": "{{count}} agent runtime",
     "runtime_count_other": "{{count}} agent runtimes",
@@ -214,15 +242,15 @@
     "refresh": "Refresh",
     "refreshing": "Refreshing…",
     "hint_selected": "Selected: {{name}}",
-    "hint_pick": "Pick an agent runtime above to start with Mika.",
+    "hint_pick": "Pick an agent runtime above to start with Quill.",
     "hint_waiting": "Waiting for the first result…",
     "hint_skip_or_refresh": "Refresh after installing one, or skip to enter your space.",
-    "continue": "Start with Mika"
+    "continue": "Start with Quill"
   },
   "step_platform": {
     "eyebrow": "Connect a computer",
     "headline": "Connect a computer to run your agent.",
-    "lede": "Mika, your space's Chief of Staff, runs on a real computer that you connect to QuickWork. Pick how you want to connect one.",
+    "lede": "Quill, your space's Chief of Staff, runs on a real computer that you connect to QuickWork. Pick how you want to connect one.",
     "hint_default": "Pick a way to connect — or skip and connect a computer later.",
     "download_title": "Use this computer",
     "download_subtitle": "Install our desktop app to connect this computer. Opens in a new tab — pick your platform there.",
@@ -252,12 +280,12 @@
   },
   "errors": {
     "skip_failed": "Failed to finish onboarding",
-    "mika_setup_failed": "Couldn't start your Mika space"
+    "quill_setup_failed": "Couldn't start your Quill space"
   },
-  "mika_intro": {
-    "headline": "Meet Mika, your first agent teammate.",
-    "name": "Mika",
+  "quill_intro": {
+    "headline": "Meet Quill, your first agent teammate.",
+    "name": "Quill",
     "role": "Chief of Staff",
-    "blurb": "Tell Mika what you want done. It becomes an issue, with the right agent on it."
+    "blurb": "Tell Quill what you want done. It becomes an issue, with the right agent on it."
   }
 }

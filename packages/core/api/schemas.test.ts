@@ -26,6 +26,8 @@ import {
   DashboardFailureDailyListSchema,
   DashboardUsageByAgentListSchema,
   DashboardUsageDailyListSchema,
+  UsageOverviewSchema,
+  UsageLogPageSchema,
   ChatDraftRestoresResponseSchema,
   ChatPendingTaskSchema,
   ChatSessionListSchema,
@@ -75,6 +77,9 @@ import {
   IssueStatusEntrySchema,
   EMPTY_LIST_ISSUE_STATUSES_RESPONSE,
   EMPTY_ISSUE_STATUS_ENTRY,
+  IssueChainSchema,
+  ChainLegOutputResponseSchema,
+  EMPTY_CHAIN_LEG_OUTPUT,
 } from "./schemas";
 import { parseWithFallback } from "./schema";
 
@@ -2000,10 +2005,10 @@ describe("Plugin schemas", () => {
     // state where a component could render it.
     const parsed = PluginInstallationSchema.parse({
       id: "installation-1",
-      config: { repo: "multica-ai/multica" },
+      config: { repo: "kscsky/QuickWork" },
       configured_secrets: ["token"],
     });
-    expect(parsed.config).toEqual({ repo: "multica-ai/multica" });
+    expect(parsed.config).toEqual({ repo: "kscsky/QuickWork" });
     expect(parsed.configured_secrets).toEqual(["token"]);
     expect(Object.keys(parsed)).not.toContain("secrets");
   });
@@ -2178,5 +2183,200 @@ describe("issue status catalog schemas", () => {
       { endpoint: "POST /api/issue-statuses" },
     );
     expect(parsed).toEqual(EMPTY_ISSUE_STATUS_ENTRY);
+  });
+});
+
+describe("IssueChainSchema (the relay's review gate)", () => {
+  it("parses a step waiting on its holder's own review, plan and all", () => {
+    const parsed = IssueChainSchema.parse({
+      steps: [
+        {
+          id: "s1",
+          position: 0,
+          holder_user_id: "u1",
+          agent_id: "a1",
+          title: "拆解与定方案",
+          state: "reviewing",
+          plan: "按上一棒清单实现 1/2/4 退避",
+        },
+      ],
+      parked: false,
+      reviewing: true,
+    });
+    expect(parsed.steps[0]?.state).toBe("reviewing");
+    expect(parsed.steps[0]?.plan).toBe("按上一棒清单实现 1/2/4 退避");
+    expect(parsed.reviewing).toBe(true);
+  });
+
+  it("defaults reviewing/plan on older backends that predate the gate", () => {
+    const parsed = IssueChainSchema.parse({
+      steps: [
+        { id: "s1", position: 0, holder_user_id: "u1", title: "t", state: "doing" },
+      ],
+      parked: false,
+    });
+    expect(parsed.reviewing).toBe(false);
+    expect(parsed.steps[0]?.plan).toBeUndefined();
+  });
+
+  it("keeps an unknown state rather than blanking the chain", () => {
+    const parsed = IssueChainSchema.parse({
+      steps: [
+        { id: "s1", position: 0, holder_user_id: "u1", state: "fast_forwarding" },
+      ],
+    });
+    expect(parsed.steps).toHaveLength(1);
+    expect(parsed.steps[0]?.state).toBe("fast_forwarding");
+  });
+
+  it("parses a published handoff package, unknown file kinds and all", () => {
+    const parsed = IssueChainSchema.parse({
+      steps: [
+        {
+          id: "s1",
+          position: 0,
+          holder_user_id: "u1",
+          state: "done",
+          handoff: {
+            summary: "退避改 1/2/4，超 3 次进 audit_queue。",
+            files: [
+              { name: "实施清单.md", size: 4096, attachment_id: "att-1", kind: "attachment" },
+              { name: "feat/retry-backoff", kind: "branch" },
+              { name: "未来的新鲜玩意", kind: "hologram" },
+            ],
+          },
+        },
+      ],
+    });
+    expect(parsed.steps[0]?.handoff?.summary).toContain("1/2/4");
+    expect(parsed.steps[0]?.handoff?.files).toHaveLength(3);
+    expect(parsed.steps[0]?.handoff?.files[2]?.kind).toBe("hologram");
+  });
+
+  it("keeps the chain when a leg reports no handoff at all", () => {
+    const parsed = IssueChainSchema.parse({
+      steps: [{ id: "s1", position: 0, holder_user_id: "u1", state: "done" }],
+    });
+    expect(parsed.steps[0]?.handoff).toBeUndefined();
+  });
+
+  it("drops a malformed handoff without dropping the chain", () => {
+    // A package this build cannot read must not take the relay's controls
+    // (approve, skip, the strip) down with it — degrade to "no package".
+    const parsed = IssueChainSchema.parse({
+      steps: [
+        {
+          id: "s1",
+          position: 0,
+          holder_user_id: "u1",
+          state: "done",
+          handoff: "not-a-package",
+        },
+      ],
+      reviewing: true,
+    });
+    expect(parsed.steps).toHaveLength(1);
+    expect(parsed.steps[0]?.handoff).toBeUndefined();
+    expect(parsed.reviewing).toBe(true);
+  });
+});
+
+describe("ChainLegOutputResponseSchema (the leg-output ask)", () => {
+  it("parses the queued run's pointer", () => {
+    const parsed = ChainLegOutputResponseSchema.parse({
+      task_id: "t-1",
+      status: "queued",
+    });
+    expect(parsed.task_id).toBe("t-1");
+    expect(parsed.status).toBe("queued");
+  });
+
+  it("degrades a malformed response to the empty ask", () => {
+    // The ask itself is fire-and-observe — the document arrives as the run's
+    // comment, so an unreadable response must never fail the flow hard.
+    const parsed = parseWithFallback("not-an-object", ChainLegOutputResponseSchema, EMPTY_CHAIN_LEG_OUTPUT, {
+      endpoint: "POST /api/issues/:id/chain/output",
+    });
+    expect(parsed.task_id).toBe("");
+    expect(parsed.status).toBe("");
+  });
+});
+
+describe("usage overview + model call log schemas", () => {
+  it("keeps the valid sections of a partially malformed overview", () => {
+    const parsed = UsageOverviewSchema.parse({
+      daily: [
+        {
+          date: "2026-10-20",
+          provider: "claude",
+          model: "deepseek-v4.1-flash",
+          call_count: 2,
+          input_tokens: 10,
+        },
+        { date: 42, provider: "claude" },
+      ],
+      by_model: { not: "an array" },
+      by_agent: [
+        { agent_id: "agent-1", provider: "claude", model: "deepseek-v4.1-flash" },
+        { agent_id: 7 },
+      ],
+    });
+    expect(parsed.daily).toHaveLength(1);
+    expect(parsed.daily[0]?.call_count).toBe(2);
+    expect(parsed.by_model).toEqual([]);
+    expect(parsed.by_agent).toHaveLength(1);
+    expect(parsed.by_agent[0]?.agent_id).toBe("agent-1");
+  });
+
+  it("drops one malformed log row without hiding the rest", () => {
+    const parsed = UsageLogPageSchema.parse({
+      rows: [
+        {
+          id: "usage-1",
+          task_id: "task-1",
+          status: "success",
+          provider: "claude",
+          model: "deepseek-v4.1-flash",
+          input_tokens: 10,
+          output_tokens: 2,
+          created_at: "2026-10-20T00:00:00Z",
+        },
+        { id: "usage-2", input_tokens: "not-a-number" },
+      ],
+      total: 1,
+      page: 1,
+      page_size: 25,
+      summary: {
+        by_model: [
+          { provider: "claude", model: "deepseek-v4.1-flash", call_count: 1 },
+        ],
+        status_counts: { all: 1, success: 1 },
+      },
+    });
+    expect(parsed.rows.map((row) => row.id)).toEqual(["usage-1"]);
+    expect(parsed.summary.by_model[0]?.call_count).toBe(1);
+    expect(parsed.summary.status_counts.success).toBe(1);
+    expect(parsed.summary.status_counts.failed).toBe(0);
+  });
+
+  it("defaults an unreadable log page instead of throwing", () => {
+    const parsed = parseWithFallback(
+      { rows: "oops", total: "oops", summary: null },
+      UsageLogPageSchema,
+      {
+        rows: [],
+        total: 0,
+        page: 1,
+        page_size: 25,
+        summary: {
+          by_model: [],
+          status_counts: { all: 0, success: 0, failed: 0, cancelled: 0, running: 0 },
+        },
+      },
+      { endpoint: "GET /api/dashboard/usage/logs" },
+    );
+    expect(parsed.rows).toEqual([]);
+    expect(parsed.total).toBe(0);
+    expect(parsed.summary.status_counts.running).toBe(0);
   });
 });
