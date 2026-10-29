@@ -657,7 +657,7 @@ describe("LarkInstallDialog (polling terminal errors)", () => {
     await waitFor(() => {
       expect(
         screen.getByText(
-          /You no longer have permission to install Lark Bots in this workspace/i,
+          /You no longer have permission to install Lark Bots in this space/i,
         ),
       ).toBeTruthy();
     });

@@ -337,7 +337,6 @@
       "check_desc": "已填写说明",
       "check_content": "SKILL.md 有内容",
       "editor_foot": "Markdown · 标题、触发条件与交付步骤",
-      "line_count_one": "{{count}} 行",
       "line_count_other": "{{count}} 行",
       "consequence": "保存后会出现在 Skills 库，空间内任何智能体都可以被分配使用。",
       "add_agents_failed": "Skill 已创建，但部分智能体绑定失败。"

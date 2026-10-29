@@ -77,8 +77,8 @@ func TestEnsureIsIdempotent(t *testing.T) {
 			systemByKey[e.Key] = e
 		}
 	}
-	if len(systemByKey) != 7 {
-		t.Fatalf("expected exactly 7 built-in rows after double seeding, got %d", len(systemByKey))
+	if len(systemByKey) != 4 {
+		t.Fatalf("expected exactly 4 built-in rows after double seeding, got %d", len(systemByKey))
 	}
 	// Every built-in must be its own category's canonical — the invariant that
 	// makes Effective an identity function on built-in keys.
@@ -89,10 +89,11 @@ func TestEnsureIsIdempotent(t *testing.T) {
 	}
 }
 
-// TestCatalogOrderMatchesHistoricalStatusOrder pins the default board order.
-// A workspace with no custom statuses must list exactly as it did before this
-// feature, or every existing user's board silently rearranges.
-func TestCatalogOrderMatchesHistoricalStatusOrder(t *testing.T) {
+// TestCatalogOrderMatchesShippedStatusOrder pins the default catalog order.
+// The product ships four first-class statuses; backlog, in_review and blocked
+// remain valid categories for old/custom rows but are not seeded in a fresh
+// workspace.
+func TestCatalogOrderMatchesShippedStatusOrder(t *testing.T) {
 	seedTestCatalog(t)
 	entries, err := testHandler.Queries.ListIssueStatusEntries(context.Background(), db.ListIssueStatusEntriesParams{
 		WorkspaceID: parseUUID(testWorkspaceID),
@@ -107,7 +108,7 @@ func TestCatalogOrderMatchesHistoricalStatusOrder(t *testing.T) {
 			gotSystem = append(gotSystem, e.Key)
 		}
 	}
-	want := []string{"backlog", "todo", "in_progress", "in_review", "done", "blocked", "cancelled"}
+	want := []string{"todo", "in_progress", "done", "cancelled"}
 	for i := range want {
 		if i >= len(gotSystem) || gotSystem[i] != want[i] {
 			t.Fatalf("built-in order = %v, want %v (frontend STATUS_ORDER)", gotSystem, want)

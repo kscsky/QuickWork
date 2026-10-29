@@ -324,6 +324,15 @@
     "note_squad": "시작 후 첫 구간은 {{name}} 님이 바로 이어받고, 각 구간 승인 후 다음으로 넘깁니다.",
     "note_squad_unassigned": "아직 리더가 없어 첫 구간이 배정되지 않았습니다.",
     "parked_notice_short": "{{name}} 님이 에이전트를 바인딩하지 않아 이 구간에서 대기합니다.",
-    "title_required_solo": "이 배정 메모에 할 일을 적어 주세요"
+    "blocked_notice_short": "{{name}} 님의 에이전트가 이 구간을 맡을 수 없습니다: {{reason}}. 여기서 대기합니다.",
+    "blocked_reason_offline": "머신이 오프라인",
+    "blocked_reason_private": "머신이 다른 구성원의 개인 머신",
+    "blocked_reason_unavailable": "에이전트를 사용할 수 없음",
+    "blocked_reason_unbound": "머신이 연결되지 않음",
+    "blocked_reason_unusable": "머신에서 CLI를 실행할 수 없음",
+    "blocked_reason_fallback": "현재 실행할 수 없음",
+    "title_required_solo": "이 배정 메모에 할 일을 적어 주세요",
+    "active_duplicate": "같은 제목의 진행 중 작업 {{identifier}} '{{title}}'이(가) 있습니다. 중복 생성 대신 기존 작업을 여세요.",
+    "open_existing": "기존 작업 열기"
   }
 }

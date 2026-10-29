@@ -137,6 +137,19 @@ RETURNING *;
 UPDATE inbox_item SET archived = false
 WHERE workspace_id = $1 AND recipient_type = $2 AND recipient_id = $3 AND issue_id = $4 AND archived = true;
 
+-- name: ResolveRelayTurnInbox :execrows
+-- A relay turn notification is only valid while its leg is waiting. When the
+-- leg is approved, returned, skipped, reassigned or resumed, the pending
+-- "your turn" item is resolved (read + archived) instead of lingering until
+-- someone opens the inbox. Scoped by issue AND position so a newly created
+-- turn for the next holder is never swept away.
+UPDATE inbox_item
+SET read = true, archived = true
+WHERE issue_id = $1
+  AND type = 'relay_turn'
+  AND archived = false
+  AND details->>'position' = $2::text;
+
 -- name: ArchiveInboxByIssueAndType :many
 UPDATE inbox_item SET archived = true
 WHERE workspace_id = $1 AND issue_id = $2 AND type = $3 AND archived = false

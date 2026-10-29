@@ -501,7 +501,6 @@
     "offline": "未上线",
     "working": "正在执行",
     "idle": "空闲",
-    "subscribers_count_one": "{{count}} 人",
     "subscribers_count_other": "{{count}} 人",
     "runs": "最近运行 / RUNS",
     "empty": "这个筛选下没有自动化",

@@ -13,6 +13,11 @@ import { renderWithI18n } from "../../test/i18n";
 const mockInitiateListModels = vi.hoisted(() => vi.fn());
 const mockGetListModelsResult = vi.hoisted(() => vi.fn());
 
+vi.mock("@quickwork/core/hooks", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@quickwork/core/hooks")>()),
+  useWorkspaceId: () => "workspace-1",
+}));
+
 vi.mock("@quickwork/core/api", () => ({
   api: {
     initiateListModels: (...args: unknown[]) =>

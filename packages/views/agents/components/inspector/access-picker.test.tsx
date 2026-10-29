@@ -67,7 +67,7 @@ describe("AccessPicker owner-only editing (MUL-3963)", () => {
     expect(screen.queryByRole("button")).toBeNull();
     // The current access is still shown…
     expect(screen.getByTestId("access-readonly")).toBeInTheDocument();
-    expect(screen.getByText("Workspace")).toBeInTheDocument();
+    expect(screen.getByText("Space")).toBeInTheDocument();
     // …with the owner-only explanation surfaced as the accessible label.
     expect(
       screen.getByLabelText(
@@ -82,7 +82,7 @@ describe("AccessPicker owner-only editing (MUL-3963)", () => {
       screen.getByRole("radio", { name: /^Only me/i }),
     ).toBeChecked();
     expect(
-      screen.getByRole("radio", { name: /^Entire workspace/i }),
+      screen.getByRole("radio", { name: /^Entire space/i }),
     ).not.toBeChecked();
     expect(
       screen.getByRole("radio", { name: /^Specific people/i }),
@@ -92,7 +92,7 @@ describe("AccessPicker owner-only editing (MUL-3963)", () => {
   it("lets the owner grant the entire workspace access", () => {
     const { onChange } = renderPicker({ canEdit: true });
     fireEvent.click(
-      screen.getByRole("radio", { name: /^Entire workspace/i }),
+      screen.getByRole("radio", { name: /^Entire space/i }),
     );
     expect(onChange).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
@@ -107,7 +107,7 @@ describe("AccessPicker owner-only editing (MUL-3963)", () => {
     renderPicker({ canEdit: true, onDirtyChange });
 
     fireEvent.click(
-      screen.getByRole("radio", { name: /^Entire workspace/i }),
+      screen.getByRole("radio", { name: /^Entire space/i }),
     );
     expect(onDirtyChange).toHaveBeenLastCalledWith(true);
 
@@ -137,7 +137,7 @@ describe("AccessPicker owner-only editing (MUL-3963)", () => {
       invocationTargets: [{ target_type: "member", target_id: "u1" }],
       visibility: "private",
     });
-    fireEvent.click(screen.getByRole("radio", { name: /^Entire workspace/i }));
+    fireEvent.click(screen.getByRole("radio", { name: /^Entire space/i }));
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
     expect(onChange).toHaveBeenCalledWith({
       permission_mode: "public_to",

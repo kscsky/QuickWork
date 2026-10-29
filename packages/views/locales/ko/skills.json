@@ -337,7 +337,6 @@
       "check_desc": "설명 입력됨",
       "check_content": "SKILL.md 내용 있음",
       "editor_foot": "Markdown · 제목, 트리거, 전달 단계",
-      "line_count_one": "{{count}}줄",
       "line_count_other": "{{count}}줄",
       "consequence": "저장하면 Skills 라이브러리에 나타나며 스페이스의 모든 에이전트에 할당할 수 있습니다.",
       "add_agents_failed": "Skill은 생성되었지만 일부 에이전트에 할당하지 못했습니다."

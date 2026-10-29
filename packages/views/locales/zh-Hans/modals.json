@@ -324,6 +324,15 @@
     "note_squad": "开局后第一棒由 {{name}} 接手；每一棒验收后交棒。",
     "note_squad_unassigned": "小队还没有队长，第一棒尚未分配。",
     "parked_notice_short": "{{name}} 未绑定智能体，这一棒会停下等待。",
-    "title_required_solo": "给这张派工单一个动作"
+    "blocked_notice_short": "{{name}} 的智能体无法接手：{{reason}}，这一棒会先停下。",
+    "blocked_reason_offline": "机器离线",
+    "blocked_reason_private": "机器是他人私有的",
+    "blocked_reason_unavailable": "智能体已不可用",
+    "blocked_reason_unbound": "还没有绑定机器",
+    "blocked_reason_unusable": "机器上的 CLI 无法执行",
+    "blocked_reason_fallback": "暂时不可用",
+    "title_required_solo": "给这张派工单一个动作",
+    "active_duplicate": "已有同名进行中任务 {{identifier}}「{{title}}」，请打开已有任务，避免重复创建。",
+    "open_existing": "打开已有任务"
   }
 }

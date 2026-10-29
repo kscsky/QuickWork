@@ -5,10 +5,13 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowUpRight, BookmarkPlus, ChevronDown, GripVertical, Plus, Trash2 } from "lucide-react";
 import { useWorkspaceId } from "@quickwork/core/hooks";
 import { useModalStore } from "@quickwork/core/modals";
-import { api } from "@quickwork/core/api";
+import { api, ApiError } from "@quickwork/core/api";
+import { useCreateIssue } from "@quickwork/core/issues/mutations";
+import { issueKeys } from "@quickwork/core/issues/queries";
 import { useShortcut } from "@quickwork/core/shortcuts";
 import { useActorName } from "@quickwork/core/workspace/hooks";
 import {
+  agentListOptions,
   squadListOptions,
   squadMemberListOptions,
   squadPlaybooksOptions,
@@ -32,8 +35,8 @@ import { CreateTaskChrome, DispatchPriority } from "./create-task-chrome";
 import { useIssueDraftStore } from "@quickwork/core/issues/stores/draft-store";
 import { ProjectPicker } from "../projects/components/project-picker";
 import { DueDatePicker } from "../issues/components";
-import { useCurrentWorkspace } from "@quickwork/core/paths";
-import { useOrchestrate, type OrchestrateRoute } from "../home/use-orchestrate";
+import { useCurrentWorkspace, useWorkspacePaths } from "@quickwork/core/paths";
+import { useNavigation } from "../navigation";
 
 /** The "no saved route" option in the source picker. */
 const BLANK_ROUTE = "__blank__";
@@ -58,11 +61,12 @@ interface Person {
  * persisted when the user asks: dragging a person in is a decision about THIS
  * task, not a new saved route.
  *
- * A submitted dispatch must keep its host mounted: the issue link arrives
- * asynchronously (the relay's leader agent creates it), the navigation happens
- * from the hook, and unmounting early would strand the chain unwritten. The
- * body reports that window through `onBusyChange` so the shell can refuse to
- * close.
+ * Creation is the normal path: the server creates the issue, the body writes
+ * the route immediately after, and the squad leader's run starts from the
+ * assignment. The body holds the dialog only while those two writes are in
+ * flight — there is no agent-created issue and no polling window to outlast.
+ * It reports that short window through `onBusyChange` so the shell does not
+ * close mid-write.
  */
 export function SquadTaskBody({
   onClose,
@@ -109,6 +113,14 @@ export function SquadTaskBody({
   const { data: playbooks = [] } = useQuery(
     squadPlaybooksOptions(wsId, activeSquadId),
   );
+  // Readiness per agent, evaluated by the server with the same predicate the
+  // claimer enforces. Route planning uses it to warn before a leg is written:
+  // a step whose agent cannot claim would otherwise be dispatched and park.
+  const { data: agents = [] } = useQuery(agentListOptions(wsId));
+  const agentById = useMemo(
+    () => new Map(agents.map((agent) => [agent.id, agent])),
+    [agents],
+  );
 
   const people = useMemo<Person[]>(
     () =>
@@ -150,6 +162,11 @@ export function SquadTaskBody({
   const [savingName, setSavingName] = useState("");
   const [naming, setNaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [duplicateIssue, setDuplicateIssue] = useState<{
+    id?: string;
+    identifier?: string;
+    title?: string;
+  } | null>(null);
   const [stamped, setStamped] = useState(false);
   const titleRef = useRef<HTMLInputElement>(null);
   const dispatchRef = useRef(false);
@@ -205,30 +222,46 @@ export function SquadTaskBody({
     setRoute(sourceSteps);
   }, [seedKey, sourceSteps]);
 
-  const editedCount = useMemo(() => {
-    if (route.length !== sourceSteps.length) {
-      return Math.max(route.length, sourceSteps.length);
-    }
-    let changed = 0;
-    for (let i = 0; i < route.length; i++) {
-      const step = route[i]!;
-      const source = sourceSteps[i]!;
-      if (
-        step.holder_user_id !== source.holder_user_id ||
-        (step.title ?? "") !== (source.title ?? "")
-      ) {
-        changed++;
-      }
-    }
-    return changed;
-  }, [route, sourceSteps]);
-
   const parkedSteps = route.filter(
     (s) => !peopleById.get(s.holder_user_id)?.agentId,
   );
 
-  const { orchestrate, isSubmitting, isBusy, isWaitingOnIssue } =
-    useOrchestrate(wsId);
+  // A step whose agent exists but cannot claim: the machine is offline, it is
+  // private to another member, no machine is bound, or the agent is archived.
+  // The server parks such a leg at dispatch; saying so here is the difference
+  // between a planned wait and a surprise.
+  const blockedStep = route.find((s) => {
+    const agentId = peopleById.get(s.holder_user_id)?.agentId;
+    if (!agentId) return false;
+    const agent = agentById.get(agentId);
+    return agent?.runnability !== undefined && agent.runnability.ready === false;
+  });
+  const blockedReason = (() => {
+    if (!blockedStep) return "";
+    const agent = agentById.get(
+      peopleById.get(blockedStep.holder_user_id)?.agentId ?? "",
+    );
+    switch (agent?.runnability?.reason) {
+      case "runtime_offline":
+        return tModals(($) => $.create_issue.blocked_reason_offline);
+      case "runtime_private_foreign":
+        return tModals(($) => $.create_issue.blocked_reason_private);
+      case "runtime_unusable":
+        return tModals(($) => $.create_issue.blocked_reason_unusable);
+      case "agent_runtime_required":
+        return tModals(($) => $.create_issue.blocked_reason_unbound);
+      case "target_unavailable":
+        return tModals(($) => $.create_issue.blocked_reason_unavailable);
+      default:
+        return tModals(($) => $.create_issue.blocked_reason_fallback);
+    }
+  })();
+
+  const navigation = useNavigation();
+  const wsPaths = useWorkspacePaths();
+  const createIssue = useCreateIssue();
+  const [creating, setCreating] = useState(false);
+  const isBusy = creating || createIssue.isPending;
 
   const savePlaybook = useMutation({
     mutationFn: (name: string) =>
@@ -251,24 +284,6 @@ export function SquadTaskBody({
     onError: () => toast.error(t(($) => $.compose.playbook_save_failed)),
   });
 
-  const composePrompt = () => {
-    const headline = title.trim();
-    const body = prompt.trim();
-    if (!headline) return body;
-    if (!body) return headline;
-    return `${headline}
-
-${body}`;
-  };
-
-  const dispatchRoute = (): OrchestrateRoute =>
-    // Name the playbook only while the canvas still agrees with it: the server
-    // makes a named playbook win, so sending one after an edit would quietly
-    // discard the edit.
-    sourceId !== BLANK_ROUTE && editedCount === 0
-      ? { playbookId: sourceId }
-      : { steps: route };
-
   useEffect(() => {
     if (!isBusy) dispatchRef.current = false;
   }, [isBusy]);
@@ -282,16 +297,64 @@ ${body}`;
     }
     if (!activeSquadId) return;
     dispatchRef.current = true;
+    setCreating(true);
     setError(null);
+    setDuplicateIssue(null);
     setStamped(true);
     if (stampTimer.current) clearTimeout(stampTimer.current);
     stampTimer.current = setTimeout(() => setStamped(false), 1800);
-    const text = composePrompt();
-    const fields = projectId || priority !== "none" || dueDate
-      ? { projectId, priority, dueDate }
-      : undefined;
-    if (fields) orchestrate(activeSquadId, text, dispatchRoute(), fields);
-    else orchestrate(activeSquadId, text, dispatchRoute());
+    void (async () => {
+      try {
+        // The route travels WITH the create. The server writes the chain and
+        // dispatches the leader in one transaction, so the first run never
+        // starts without its leg frame and a blocked leader starts parked.
+        const issue = await createIssue.mutateAsync({
+          title: title.trim(),
+          description: prompt.trim() || undefined,
+          assignee_type: "squad",
+          assignee_id: activeSquadId,
+          chain_steps: route.map((step) => ({
+            holder_user_id: step.holder_user_id,
+            title: step.title ?? "",
+          })),
+          ...(projectId ? { project_id: projectId } : {}),
+          ...(priority !== "none" ? { priority } : {}),
+          ...(dueDate ? { due_date: dueDate } : {}),
+        });
+        // Seed the detail page with the chain the server just wrote.
+        if (issue.chain) {
+          queryClient.setQueryData(issueKeys.chain(issue.id), issue.chain);
+        }
+        onClose();
+        navigation.push(wsPaths.issueDetail(issue.id));
+      } catch (err) {
+        dispatchRef.current = false;
+        if (err instanceof ApiError && err.status === 409) {
+          const body = err.body as {
+            code?: string;
+            issue?: { id?: string; identifier?: string; title?: string };
+          };
+          if (body?.code === "active_duplicate_issue" && body.issue) {
+            setDuplicateIssue(body.issue);
+            setError(
+              tModals(($) => $.create_issue.active_duplicate, {
+                identifier: body.issue.identifier ?? "",
+                title: body.issue.title ?? "",
+              }),
+            );
+            return;
+          }
+        }
+        setDuplicateIssue(null);
+        setError(
+          err instanceof Error && err.message
+            ? err.message
+            : tModals(($) => $.create_issue.toast_failed),
+        );
+      } finally {
+        setCreating(false);
+      }
+    })();
   };
   const sendRef = useRef(send);
   sendRef.current = send;
@@ -368,6 +431,7 @@ ${body}`;
             onChange={(e) => {
               setTitle(e.target.value);
               setError(null);
+              setDuplicateIssue(null);
             }}
             onKeyDown={(e) => {
               if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
@@ -381,7 +445,23 @@ ${body}`;
           />
         </label>
 
-        <div className="qk-form-error" role="status">{error ?? ""}</div>
+        <div className="qk-form-error" role="status">
+          {error ?? ""}
+          {duplicateIssue?.identifier || duplicateIssue?.id ? (
+            <button
+              type="button"
+              className="qk-form-error-link"
+              onClick={() => {
+                const target = duplicateIssue.identifier ?? duplicateIssue.id;
+                if (!target) return;
+                onClose();
+                navigation.push(wsPaths.issueDetail(target));
+              }}
+            >
+              {tModals(($) => $.create_issue.open_existing)}
+            </button>
+          ) : null}
+        </div>
 
         <label className="qk-brief-field" htmlFor="qk-squad-brief">
           <span className="qk-field-label">
@@ -393,6 +473,7 @@ ${body}`;
             onChange={(e) => {
               setPrompt(e.target.value);
               setError(null);
+              setDuplicateIssue(null);
             }}
             onKeyDown={(e) => {
               if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
@@ -581,6 +662,16 @@ ${body}`;
               </p>
             ) : null}
 
+            {blockedStep ? (
+              <p className="qk-parked-notice">
+                {tModals(($) => $.create_issue.blocked_notice_short, {
+                  name:
+                    peopleById.get(blockedStep.holder_user_id)?.name ?? "",
+                  reason: blockedReason,
+                })}
+              </p>
+            ) : null}
+
             <div className="qk-route-source">
               <DropdownMenu>
                 <DropdownMenuTrigger
@@ -730,11 +821,9 @@ ${body}`;
             aria-busy={isBusy || undefined}
             className="qk-panel-submit"
           >
-            {isWaitingOnIssue
-              ? t(($) => $.composer.linking)
-              : isSubmitting
-                ? t(($) => $.compose.starting)
-                : tModals(($) => $.create_issue.start_relay)}
+            {isBusy
+              ? t(($) => $.compose.starting)
+              : tModals(($) => $.create_issue.start_relay)}
             {!isBusy && sendShortcut ? (
               <ShortcutKeycaps
                 shortcut={sendShortcut}

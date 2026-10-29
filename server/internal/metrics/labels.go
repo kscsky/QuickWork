@@ -260,6 +260,9 @@ const (
 	// RuntimeLookupSourceTask covers task analytics context and the usage
 	// provider backfill.
 	RuntimeLookupSourceTask = "task"
+	// RuntimeLookupSourceAgentList is the per-agent readiness pass behind the
+	// agent list, which route planning reads before it commits to a leg.
+	RuntimeLookupSourceAgentList = "agent_list"
 	// RuntimeLookupSourceOther is the catch-all for an unclassified call site.
 	RuntimeLookupSourceOther = "other"
 )

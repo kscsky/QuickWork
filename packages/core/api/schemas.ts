@@ -30,6 +30,7 @@ import type {
   GitHubPullRequest,
   InboxItem,
   InboxWorkspaceUnread,
+  RelayActivityEvent,
   Label,
   MemberWithUser,
   IssueProperty,
@@ -1263,6 +1264,10 @@ export const ListIssuesResponseSchema = z.object({
 export const CreateIssueResponseSchema = IssueSchema.extend({
   id: z.string().min(1),
   labels: z.array(LabelSchema).optional().catch(undefined),
+  // Present when the create asked for a relay: the chain was written in the
+  // same transaction, so this is the authoritative first read. `z.lazy` because
+  // the chain schema is declared later in this module.
+  chain: z.lazy(() => IssueChainSchema).optional().catch(undefined),
 }).loose();
 
 export const EMPTY_LIST_ISSUES_RESPONSE: ListIssuesResponse = {
@@ -2241,9 +2246,28 @@ export const IssueChainHandoffFileSchema = z.object({
   kind: z.string().optional(),
 }).loose();
 
+export const IssueChainHandoffAcceptanceSchema = z.object({
+  label: z.string().default(""),
+  requirement: z.string().default(""),
+  delivered: z.string().default(""),
+  state: z.string().default("pass"),
+}).loose();
+
+export const IssueChainHandoffReturnSchema = z.object({
+  reason: z.string().default(""),
+  at: z.string().optional(),
+}).loose();
+
 export const IssueChainHandoffSchema = z.object({
   summary: z.string().default(""),
   files: z.array(IssueChainHandoffFileSchema).default([]),
+  // Fields a server that predates the structured package does not send, and
+  // fields a newer server may shape badly in one slot. Each degrades on its
+  // own: a lost acceptance row must not hide the summary or the files.
+  acceptance: z.array(IssueChainHandoffAcceptanceSchema).default([]).catch([]),
+  open_questions: z.array(z.string()).default([]).catch([]),
+  next_brief: z.array(z.string()).default([]).catch([]),
+  returned: IssueChainHandoffReturnSchema.optional().catch(undefined),
 }).loose();
 
 // One step of a task's relay.
@@ -2259,6 +2283,11 @@ export const IssueChainStepSchema = z.object({
   agent_id: z.string().optional(),
   title: z.string().default(""),
   state: z.string().default("pending"),
+  // The machine's reason code for a parked leg; absent on older backends and
+  // on every non-parked state.
+  parked_reason: z.string().optional(),
+  // Derived leg status; absent on older backends.
+  leg_status: z.string().optional(),
   // The holder's own brief for their leg; absent on older backends.
   plan: z.string().optional(),
   // The published package, when the leg published one; absent on backends
@@ -2271,6 +2300,10 @@ export const IssueChainStepSchema = z.object({
   leg_comment_count: z.number().optional(),
   started_at: z.string().optional(),
   completed_at: z.string().optional(),
+  // Active leg-output run + the newest run's creation time. Absent on older
+  // backends; absent also means "no summary is being written".
+  output_task_id: z.string().optional(),
+  output_task_at: z.string().optional(),
 }).loose();
 
 export const IssueChainSchema = z.object({
@@ -2279,6 +2312,17 @@ export const IssueChainSchema = z.object({
   // Absent on backends that predate the review gate.
   reviewing: z.boolean().default(false),
 }).loose();
+
+// The leg-retry answer: the chain as it now stands plus the run that was
+// queued. `task_id` is absent when the retry parked instead.
+export const IssueChainRetrySchema = IssueChainSchema.extend({
+  task_id: z.string().optional(),
+});
+
+// The chain after a holder stopped a leg's active run(s).
+export const IssueChainCancelSchema = IssueChainSchema.extend({
+  cancelled: z.number().default(0),
+});
 
 // The leg-output ask's answer: which run was queued to write the document.
 // Loose + defaulted — the document itself arrives as the run's comment, so a
@@ -2703,6 +2747,34 @@ export const InboxItemListSchema = z.array(
 );
 
 export const EMPTY_INBOX_ITEMS: InboxItem[] = [];
+
+// ---------------------------------------------------------------------------
+// Workspace activity (`GET /api/activity`). The relay's key decisions, newest
+// first. Lenient like the other list boundaries: an action this client does
+// not know yet still parses and renders as a generic decision; a malformed
+// body returns the empty list rather than blanking the page.
+// ---------------------------------------------------------------------------
+
+export const RelayActivityEventSchema = z
+  .object({
+    id: z.string(),
+    issue_id: z.string(),
+    identifier: z.string(),
+    issue_title: z.string().default(""),
+    actor_id: z.string(),
+    action: z.string(),
+    leg: z.number().default(0),
+    from_user_id: z.string().nullish(),
+    to_user_id: z.string().nullish(),
+    reason: z.string().default(""),
+    admin: z.boolean().default(false),
+    created_at: z.string(),
+  })
+  .loose();
+
+export const RelayActivityListSchema = z.array(RelayActivityEventSchema);
+
+export const EMPTY_RELAY_ACTIVITY: RelayActivityEvent[] = [];
 // ---------------------------------------------------------------------------
 // Runtime model discovery (`POST /api/runtimes/:id/models`,
 // `GET /api/runtimes/:id/models/:requestId`). Both endpoints return the same

@@ -293,7 +293,7 @@ export function MachineRail({
                     className="size-3.5 shrink-0"
                   />
                 )}
-                <span className="min-w-0 truncate text-[12.5px] font-semibold">
+                <span className="min-w-0 truncate text-[13px] font-semibold">
                   {tile.label}
                 </span>
               </span>

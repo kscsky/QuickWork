@@ -49,3 +49,48 @@ bullet lists; no walls of text.
   straight into the handoff.
 - **Write in the holder's language.** The document follows the language the
   holder used in this leg's conversation.
+
+## Machine-readable handoff block (required)
+
+The document is the handoff. At the very end of the comment, after the prose,
+append one fenced block tagged `handoff`. The platform reads exactly this block
+into the holder's structured handoff package — summary, acceptance ledger, open
+questions, next-leg brief — so the holder reviews your claims instead of
+retyping them. Nothing may follow the block.
+
+````markdown
+```handoff
+{
+  "summary": "Two or three sentences: what this leg asked for, what it delivered, and what the holder should check first.",
+  "acceptance": [
+    {
+      "label": "short name",
+      "requirement": "what this leg was required to deliver",
+      "delivered": "what was actually delivered, with the artifact name/link/number",
+      "state": "pass"
+    }
+  ],
+  "open_questions": [
+    "anything unresolved that the next leg must decide or account for"
+  ],
+  "next_brief": [
+    "the first thing the next leg must know or do"
+  ]
+}
+```
+````
+
+Rules for the block:
+
+- `acceptance` needs **at least one row**. Every row needs a label, a
+  requirement and what was delivered; `state` is `pass`, or `warn` when the
+  delivery falls short. A row with no delivery evidence is a `warn`, not a
+  `pass`.
+- `next_brief` needs at least one item unless this is the **final leg** (your
+  briefing says so); then it may be `[]`.
+- `open_questions` may be `[]`. Never turn a question into a silent assumption.
+- The JSON must be valid: double quotes, no trailing commas, no comments.
+  Do not wrap it in extra fences or prose.
+- The prose above the block remains the human-readable document. The block
+  repeats only its actionable claims; do not paste the whole document into
+  `summary`.

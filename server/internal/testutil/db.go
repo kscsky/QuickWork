@@ -246,11 +246,21 @@ func (f *Fixture) Agent(t TB, name, runtimeID string, over ...Cols) string {
 // Task queues a task for agentID.
 func (f *Fixture) Task(t TB, agentID string, over ...Cols) string {
 	t.Helper()
-	return f.Insert(t, "agent_task_queue", merge(Cols{
+	defaults := Cols{
 		"agent_id": agentID,
 		"status":   "queued",
 		"priority": 0,
-	}, over))
+	}
+	var runtimeID *string
+	if err := f.Pool.QueryRow(context.Background(),
+		`SELECT runtime_id::text FROM agent WHERE id = $1`, agentID,
+	).Scan(&runtimeID); err != nil {
+		t.Fatalf("setup: resolve runtime for agent %s: %v", agentID, err)
+	}
+	if runtimeID != nil && *runtimeID != "" {
+		defaults["runtime_id"] = *runtimeID
+	}
+	return f.Insert(t, "agent_task_queue", merge(defaults, over))
 }
 
 // Squad inserts a squad led by leaderID.

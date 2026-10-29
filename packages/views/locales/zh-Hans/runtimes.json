@@ -4,13 +4,10 @@
     "online": "在线",
     "offline": "离线",
     "unbound": "未绑定",
-    "stat_agents_one": "个智能体",
     "stat_agents_other": "个智能体",
     "stat_running": "运行中",
     "stat_queued": "排队",
-    "stat_runtimes_one": "个运行时",
     "stat_runtimes_other": "个运行时",
-    "runtime_agents_one": "{{count}} 个智能体",
     "runtime_agents_other": "{{count}} 个智能体",
     "runtimes_head": "运行时 / RUNTIMES",
     "capacity": "容量 / CAPACITY",
@@ -39,11 +36,8 @@
     "list_online_unit": "在线",
     "list_issues": "异常",
     "list_cap": "运行时",
-    "list_machines_one": "台机器",
     "list_machines_other": "台机器",
-    "list_agents_one": "个智能体",
     "list_agents_other": "个智能体",
-    "list_queued_one": "排队",
     "list_queued_other": "排队",
     "list_sync_hint": "机器与运行时 · 实时",
     "list_tabs_aria": "筛选机器",
@@ -219,11 +213,11 @@
     },
     "visibility_hint": {
       "private": "仅你可以在此运行时上创建智能体。",
-      "public": "空间内任何成员都可以在此运行时上创建智能体。"
+      "public": "空间内任何成员都可以让他们的智能体在这台机器上运行——使用本机安装的 CLI、以你的 CLI 登录和额度执行。只在你信任整个空间时开启。"
     },
     "visibility_hint_readonly": {
       "private": "仅运行时所有者可以在此运行时上创建智能体，也只有他们能切换为「公开」。",
-      "public": "空间内任何成员都可以在此运行时上创建智能体。只有运行时所有者能切回「私有」。"
+      "public": "这台机器已公开：任何成员都可以让他们的智能体在这里运行，使用机主的 CLI 登录和额度。只有机主能切回「私有」。"
     },
     "visibility_toast_updated": "可见性已设为\"{{visibility}}\"",
     "visibility_toast_failed": "更新可见性失败",

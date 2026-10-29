@@ -2,10 +2,15 @@ package handler
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
+	"github.com/jackc/pgx/v5/pgtype"
+
+	"github.com/kscsky/quickwork/server/internal/dispatch"
 	"github.com/kscsky/quickwork/server/internal/service"
 	"github.com/kscsky/quickwork/server/internal/testutil"
 	db "github.com/kscsky/quickwork/server/pkg/db/generated"
@@ -229,9 +234,22 @@ func TestUpdateSquadMemberAgentResumesParkedChain(t *testing.T) {
 	f := newRelayFixture(t)
 
 	// The parked holder now owns an agent — binding it is what should unpark
-	// the relay, without anyone touching the task.
-	runtimeID := handlerTestRuntimeID(t)
-	holderAgentID := dbfx.Agent(t, "holder's agent", runtimeID, testutil.Cols{
+	// the relay, without anyone touching the task. The agent must sit on a
+	// runtime its owner can actually claim on: the shared test runtime is
+	// private to the test user, and the readiness gate correctly refuses to
+	// "resume" onto a machine that will never take the work.
+	holderRuntimeID := dbfx.Insert(t, "agent_runtime", testutil.Cols{
+		"workspace_id": testWorkspaceID,
+		"name":         "Parked holder runtime",
+		"runtime_mode": "cloud",
+		"provider":     "handler_test_holder_runtime",
+		"status":       "online",
+		"device_info":  "holder runtime",
+		"metadata":     testutil.Raw("'{}'::jsonb"),
+		"owner_id":     f.parkedUser,
+		"last_seen_at": testutil.Raw("now()"),
+	})
+	holderAgentID := dbfx.Agent(t, "holder's agent", holderRuntimeID, testutil.Cols{
 		"owner_id":   f.parkedUser,
 		"visibility": "workspace",
 	})
@@ -471,7 +489,11 @@ func TestApproveIssueChainStep(t *testing.T) {
 	// The holder's own 通过 is what moves it, and the next step starts.
 	var resp IssueChainResponse
 	testutil.Call(t, testHandler.ApproveIssueChainStep, testutil.WithURLParams(
-		newRequest(http.MethodPost, "/api/issues/"+f.issueID+"/chain/approve", nil),
+		newRequest(http.MethodPost, "/api/issues/"+f.issueID+"/chain/approve", map[string]any{
+			"summary":    "leg delivered",
+			"acceptance": []map[string]any{{"label": "done", "requirement": "work delivered", "state": "pass"}},
+			"next_brief": []string{"continue the relay"},
+		}),
 		"workspaceId", testWorkspaceID, "id", f.issueID,
 	)).Want(http.StatusOK).JSON(&resp)
 	if resp.Reviewing {
@@ -522,6 +544,12 @@ func TestApproveIssueChainStepHandoff(t *testing.T) {
 				{"name": "实施清单.md", "kind": "attachment", "attachment_id": "11111111-1111-4111-8111-111111111111"},
 				{"name": "feat/retry-backoff", "kind": "branch"},
 			},
+			"acceptance": []map[string]any{
+				{"label": "口径", "requirement": "超 3 次进审计队列", "delivered": "见实施清单 §2", "state": "pass"},
+				{"label": "来源", "requirement": "每个结论可复核", "delivered": "3 条待补", "state": "warn"},
+			},
+			"open_questions": []string{"人工队列的容量上限还没定"},
+			"next_brief":     []string{"补 1/2/4 退避的压测数据", "把审计队列接进对账报表"},
 		}),
 		"workspaceId", testWorkspaceID, "id", f.issueID,
 	)).Want(http.StatusOK).JSON(&resp)
@@ -539,6 +567,14 @@ func TestApproveIssueChainStepHandoff(t *testing.T) {
 	if len(approved.Handoff.Files) != 2 || approved.Handoff.Files[1].Kind != "branch" {
 		t.Fatalf("files did not round-trip: %+v", approved.Handoff.Files)
 	}
+	if len(approved.Handoff.Acceptance) != 2 ||
+		approved.Handoff.Acceptance[1].State != "warn" ||
+		approved.Handoff.Acceptance[0].Label != "口径" {
+		t.Fatalf("acceptance ledger did not round-trip: %+v", approved.Handoff.Acceptance)
+	}
+	if len(approved.Handoff.OpenQuestions) != 1 || len(approved.Handoff.NextBrief) != 2 {
+		t.Fatalf("open questions / next brief did not round-trip: %+v", approved.Handoff)
+	}
 
 	// The package lives on the step: a later chain read (by anyone) shows it.
 	var reread IssueChainResponse
@@ -551,6 +587,160 @@ func TestApproveIssueChainStepHandoff(t *testing.T) {
 	}
 	if reread.Steps[0].Handoff != nil {
 		t.Fatalf("a leg with no package must not grow one: %+v", reread.Steps[0])
+	}
+}
+
+// 退回修改: the holder preserves the package they were reviewing, records why
+// it is not acceptable, and sends the leg back to its own agent. The baton
+// must not move, and the reason must reach the revision run.
+func TestReturnIssueChainStep(t *testing.T) {
+	if testHandler == nil {
+		t.Skip("database not available")
+	}
+	f := newReviewFixture(t)
+
+	testutil.Call(t, testHandler.ReturnIssueChainStep, testutil.WithURLParams(
+		newRequestAsUser(f.outsider, http.MethodPost, "/api/issues/"+f.issueID+"/chain/return",
+			map[string]any{"reason": "not mine"}),
+		"workspaceId", testWorkspaceID, "id", f.issueID,
+	)).Want(http.StatusForbidden)
+	if got := stepState(t, f.issueID, 1); got != service.ChainStateReviewing {
+		t.Fatalf("a refused return moved the step: got %q", got)
+	}
+
+	testutil.Call(t, testHandler.ReturnIssueChainStep, testutil.WithURLParams(
+		newRequest(http.MethodPost, "/api/issues/"+f.issueID+"/chain/return",
+			map[string]any{"reason": "   "}),
+		"workspaceId", testWorkspaceID, "id", f.issueID,
+	)).Want(http.StatusBadRequest)
+	if got := stepState(t, f.issueID, 1); got != service.ChainStateReviewing {
+		t.Fatalf("a reasonless return moved the step: got %q", got)
+	}
+
+	var resp IssueChainResponse
+	testutil.Call(t, testHandler.ReturnIssueChainStep, testutil.WithURLParams(
+		newRequest(http.MethodPost, "/api/issues/"+f.issueID+"/chain/return", map[string]any{
+			"reason":         "  下沉市场证据不足，补齐 6 条来源。  ",
+			"summary":        "第一轮拆解与方案",
+			"acceptance":     []map[string]any{{"label": "来源", "requirement": "每个结论可复核", "delivered": "3 条待补", "state": "warn"}},
+			"open_questions": []string{"下沉市场样本只有 2 条"},
+			"next_brief":     []string{"补齐 6 条来源", "逐条校验 URL"},
+		}),
+		"workspaceId", testWorkspaceID, "id", f.issueID,
+	)).Want(http.StatusOK).JSON(&resp)
+
+	returned := resp.Steps[1]
+	if returned.State != service.ChainStateDoing {
+		t.Fatalf("returned step state: got %q want %q", returned.State, service.ChainStateDoing)
+	}
+	if returned.Handoff == nil || returned.Handoff.Returned == nil {
+		t.Fatalf("the return did not preserve a package with its reason: %+v", returned.Handoff)
+	}
+	if returned.Handoff.Returned.Reason != "下沉市场证据不足，补齐 6 条来源。" {
+		t.Fatalf("return reason was not trimmed and stored: %q", returned.Handoff.Returned.Reason)
+	}
+	if len(returned.Handoff.Acceptance) != 1 || len(returned.Handoff.NextBrief) != 2 {
+		t.Fatalf("the package was not preserved across the return: %+v", returned.Handoff)
+	}
+	if got := stepState(t, f.issueID, 1); got != service.ChainStateDoing {
+		t.Fatalf("returned step state in the database: got %q want %q", got, service.ChainStateDoing)
+	}
+
+	var note string
+	dbfx.QueryRow(t, `
+		SELECT COALESCE(handoff_note, '')
+		FROM agent_task_queue
+		WHERE issue_id = $1 AND agent_id = $2
+		ORDER BY created_at DESC
+		LIMIT 1
+	`, f.issueID, f.nextAgent).Scan(&note)
+	if !strings.Contains(note, "下沉市场证据不足") {
+		t.Fatalf("the revision run did not carry the return reason: %q", note)
+	}
+
+	// The step is doing again — there is nothing left to return.
+	testutil.Call(t, testHandler.ReturnIssueChainStep, testutil.WithURLParams(
+		newRequest(http.MethodPost, "/api/issues/"+f.issueID+"/chain/return",
+			map[string]any{"reason": "again"}),
+		"workspaceId", testWorkspaceID, "id", f.issueID,
+	)).Want(http.StatusConflict)
+}
+
+func TestReturnIssueChainStepWaitsForLegOutput(t *testing.T) {
+	if testHandler == nil {
+		t.Skip("database not available")
+	}
+	f := newReviewFixture(t)
+	dbfx.Insert(t, "agent_task_queue", testutil.Cols{
+		"agent_id":     f.nextAgent,
+		"issue_id":     f.issueID,
+		"runtime_id":   handlerTestRuntimeID(t),
+		"status":       "running",
+		"handoff_note": service.LegOutputInstruction,
+	})
+
+	testutil.Call(t, testHandler.ReturnIssueChainStep, testutil.WithURLParams(
+		newRequest(http.MethodPost, "/api/issues/"+f.issueID+"/chain/return",
+			map[string]any{"reason": "should wait for the summary"}),
+		"workspaceId", testWorkspaceID, "id", f.issueID,
+	)).Want(http.StatusConflict)
+	if got := stepState(t, f.issueID, 1); got != service.ChainStateReviewing {
+		t.Fatalf("a blocked return moved the step: got %q", got)
+	}
+}
+
+// The review gate stays shut while the leg's own summary run is alive. This is
+// the KSCS-25 leak: a page reload dropped the UI's "generating" flag and the
+// empty package was approved underneath a live summary.
+func TestApproveIssueChainStepWaitsForLegOutput(t *testing.T) {
+	if testHandler == nil {
+		t.Skip("database not available")
+	}
+	f := newReviewFixture(t)
+
+	taskID := dbfx.Insert(t, "agent_task_queue", testutil.Cols{
+		"agent_id":     f.nextAgent,
+		"issue_id":     f.issueID,
+		"runtime_id":   handlerTestRuntimeID(t),
+		"status":       "running",
+		"handoff_note": service.LegOutputInstruction,
+	})
+
+	var chain IssueChainResponse
+	testutil.Call(t, testHandler.ListIssueChain, testutil.WithURLParams(
+		newRequest(http.MethodGet, "/api/issues/"+f.issueID+"/chain", nil),
+		"workspaceId", testWorkspaceID, "id", f.issueID,
+	)).Want(http.StatusOK).JSON(&chain)
+	reviewing := chain.Steps[1]
+	if reviewing.OutputTaskID != taskID {
+		t.Fatalf("active summary task not exposed on the reviewing step: %+v", reviewing)
+	}
+	if reviewing.OutputTaskAt == "" {
+		t.Fatalf("summary run start time not exposed: %+v", reviewing)
+	}
+
+	testutil.Call(t, testHandler.ApproveIssueChainStep, testutil.WithURLParams(
+		newRequest(http.MethodPost, "/api/issues/"+f.issueID+"/chain/approve",
+			map[string]any{"summary": "should not land"}),
+		"workspaceId", testWorkspaceID, "id", f.issueID,
+	)).Want(http.StatusConflict)
+	if got := stepState(t, f.issueID, 1); got != service.ChainStateReviewing {
+		t.Fatalf("a blocked approval moved the step: got %q", got)
+	}
+
+	// Once the summary run lands, the same approval goes through.
+	dbfx.Exec(t, `UPDATE agent_task_queue SET status = 'completed', completed_at = now() WHERE id = $1`, taskID)
+	testutil.Call(t, testHandler.ApproveIssueChainStep, testutil.WithURLParams(
+		newRequest(http.MethodPost, "/api/issues/"+f.issueID+"/chain/approve",
+			map[string]any{
+				"summary":    "summary landed",
+				"acceptance": []map[string]any{{"label": "done", "requirement": "delivered", "state": "pass"}},
+				"next_brief": []string{"continue"},
+			}),
+		"workspaceId", testWorkspaceID, "id", f.issueID,
+	)).Want(http.StatusOK)
+	if got := stepState(t, f.issueID, 1); got != service.ChainStateDone {
+		t.Fatalf("step did not pass after the summary landed: got %q", got)
 	}
 }
 
@@ -748,7 +938,10 @@ func TestChainDrivesIssueStatus(t *testing.T) {
 		service.ChainStateReviewing, issueID).Scan(new(string))
 	var resp IssueChainResponse
 	testutil.Call(t, testHandler.ApproveIssueChainStep, testutil.WithURLParams(
-		newRequestAsUser(holder, http.MethodPost, "/api/issues/"+issueID+"/chain/approve", nil),
+		newRequestAsUser(holder, http.MethodPost, "/api/issues/"+issueID+"/chain/approve", map[string]any{
+			"summary":    "final leg delivered",
+			"acceptance": []map[string]any{{"label": "done", "requirement": "work delivered", "state": "pass"}},
+		}),
 		"workspaceId", testWorkspaceID, "id", issueID,
 	)).Want(http.StatusOK).JSON(&resp)
 	if got := statusOf(issueID); got != "done" {
@@ -825,4 +1018,531 @@ func TestGenerateIssueChainLegOutput(t *testing.T) {
 		newRequest(http.MethodPost, "/api/issues/"+f.issueID+"/chain/output", nil),
 		"workspaceId", testWorkspaceID, "id", f.issueID,
 	)).Want(http.StatusConflict)
+}
+
+// A leg whose agent is bound to another member's PRIVATE runtime can never be
+// claimed — ClaimAgentTask refuses it. Advancing the relay must park the leg
+// with that reason instead of enqueueing a task that sits queued forever, which
+// is exactly how KSCS-8/25/26/30's second legs died unnoticed.
+func TestAdvanceChainParksOnForeignPrivateRuntime(t *testing.T) {
+	if testHandler == nil {
+		t.Skip("database not available")
+	}
+	foreign := dbfx.User(t, "Foreign machine owner", "foreign-machine@example.test")
+	dbfx.Member(t, testWorkspaceID, foreign, "member")
+	foreignRuntime := dbfx.Insert(t, "agent_runtime", testutil.Cols{
+		"workspace_id": testWorkspaceID,
+		"name":         "Foreign private Claude",
+		"runtime_mode": "local",
+		"provider":     "claude",
+		"status":       "online",
+		"visibility":   "private",
+		"owner_id":     foreign,
+		"last_seen_at": testutil.Raw("now()"),
+	})
+	stranded := dbfx.Agent(t, "stranded on another machine", foreignRuntime, nil)
+
+	squadID := dbfx.Squad(t, "Parking squad", createHandlerTestAgent(t, "parking leader", nil))
+	issueID := dbfx.Issue(t, "Parked relay", testutil.Cols{
+		"assignee_type": "squad",
+		"assignee_id":   squadID,
+	})
+	dbfx.Insert(t, "issue_chain_step", testutil.Cols{
+		"issue_id": issueID, "position": 0, "holder_user_id": testUserID,
+		"title": "plan", "state": service.ChainStateDone,
+	})
+	dbfx.Insert(t, "issue_chain_step", testutil.Cols{
+		"issue_id": issueID, "position": 1, "holder_user_id": testUserID,
+		"agent_id": stranded, "title": "deliver", "state": service.ChainStatePending,
+	})
+
+	next, err := testHandler.TaskService.AdvanceChain(context.Background(), testHandler.Queries, parseUUID(issueID), pgtype.UUID{})
+	if err != nil {
+		t.Fatalf("advance: %v", err)
+	}
+	if next == nil || next.State != service.ChainStateParked {
+		t.Fatalf("next step = %+v, want a parked leg", next)
+	}
+	if next.ParkedReason != string(dispatch.ReasonRuntimePrivateForeign) {
+		t.Fatalf("parked_reason = %q, want %q", next.ParkedReason, dispatch.ReasonRuntimePrivateForeign)
+	}
+
+	// The point of parking instead of queueing: nothing was handed to the
+	// daemon, because nothing would ever claim it.
+	if n := dbfx.Count(t, `SELECT count(*) FROM agent_task_queue WHERE issue_id = $1`, issueID); n != 0 {
+		t.Fatalf("queued %d task(s) for an agent that cannot claim; want 0", n)
+	}
+
+	// The wire carries the explanation the UI localizes.
+	chain, err := testHandler.chainResponse(context.Background(), parseUUID(issueID))
+	if err != nil {
+		t.Fatalf("chain response: %v", err)
+	}
+	if len(chain.Steps) != 2 || chain.Steps[1].ParkedReason != string(dispatch.ReasonRuntimePrivateForeign) {
+		t.Fatalf("chain response reason = %+v, want the parked reason on step 1", chain.Steps)
+	}
+	if !chain.Parked {
+		t.Fatal("chain response must report parked so the list/detail treat it as a wait")
+	}
+}
+
+// A leg whose run was interrupted (watchdog, stalled stream, cancel) must be
+// restartable by its holder without losing the relay: the step stays doing,
+// the new run keeps the failed run's lineage, and a second click while that
+// run is queued is a conflict instead of a duplicate.
+func TestRetryIssueChainStep(t *testing.T) {
+	if testHandler == nil {
+		t.Skip("database not available")
+	}
+	agentID := createHandlerTestAgent(t, "retry-agent", nil)
+	leader := createHandlerTestAgent(t, "retry-leader", nil)
+	squadID := dbfx.Squad(t, "Retry squad", leader)
+	issueID := dbfx.Issue(t, "Retried relay", testutil.Cols{
+		"assignee_type": "squad",
+		"assignee_id":   squadID,
+	})
+	dbfx.Insert(t, "issue_chain_step", testutil.Cols{
+		"issue_id": issueID, "position": 0, "holder_user_id": testUserID,
+		"agent_id": leader, "title": "plan", "state": service.ChainStateDone,
+	})
+	dbfx.Insert(t, "issue_chain_step", testutil.Cols{
+		"issue_id": issueID, "position": 1, "holder_user_id": testUserID,
+		"agent_id": agentID, "title": "deliver", "state": service.ChainStateDoing,
+	})
+	failedTask := dbfx.Task(t, agentID, testutil.Cols{
+		"issue_id":       issueID,
+		"status":         "failed",
+		"failure_reason": "idle_watchdog",
+		"error":          "agent produced no new messages",
+		"completed_at":   testutil.Raw("now()"),
+	})
+
+	var resp IssueChainRetryResponse
+	testutil.Call(t, testHandler.RetryIssueChainStep, testutil.WithURLParams(
+		newRequest(http.MethodPost, "/api/issues/"+issueID+"/chain/retry", nil),
+		"workspaceId", testWorkspaceID, "id", issueID,
+	)).Want(http.StatusOK).JSON(&resp)
+
+	if resp.TaskID == "" {
+		t.Fatalf("retry returned no task: %+v", resp.Steps)
+	}
+	if resp.Steps[1].State != service.ChainStateDoing {
+		t.Fatalf("retry moved the leg: state = %q, want doing", resp.Steps[1].State)
+	}
+	var rerunOf string
+	dbfx.QueryRow(t, `SELECT rerun_of_task_id::text FROM agent_task_queue WHERE id = $1`, resp.TaskID).Scan(&rerunOf)
+	if rerunOf != failedTask {
+		t.Fatalf("retry lineage = %q, want the failed task %q", rerunOf, failedTask)
+	}
+
+	// The new run holds the leg's turn; a second retry must not stack another.
+	testutil.Call(t, testHandler.RetryIssueChainStep, testutil.WithURLParams(
+		newRequest(http.MethodPost, "/api/issues/"+issueID+"/chain/retry", nil),
+		"workspaceId", testWorkspaceID, "id", issueID,
+	)).Want(http.StatusConflict)
+}
+
+// Creating a relay writes the chain and dispatches the leader in one request.
+// When the leader cannot claim, the chain's head must say so instead of
+// pretending a run is in flight — the exact "chain lies" failure that left
+// KSCS-8's first leg doing with nothing behind it.
+func TestCreateIssueWithChainParksBlockedLeader(t *testing.T) {
+	if testHandler == nil {
+		t.Skip("database not available")
+	}
+	foreign := dbfx.User(t, "Relay foreign owner", "relay-foreign@example.test")
+	dbfx.Member(t, testWorkspaceID, foreign, "member")
+	foreignRuntime := dbfx.Insert(t, "agent_runtime", testutil.Cols{
+		"workspace_id": testWorkspaceID,
+		"name":         "Foreign private leader runtime",
+		"runtime_mode": "local",
+		"provider":     "claude",
+		"status":       "online",
+		"visibility":   "private",
+		"owner_id":     foreign,
+		"last_seen_at": testutil.Raw("now()"),
+	})
+	// Owned by the caller, bound to another member's private machine.
+	blockedLeader := dbfx.Agent(t, "blocked relay leader", foreignRuntime, nil)
+	squadID := dbfx.Squad(t, "Atomic relay squad", blockedLeader)
+	dbfx.SquadMember(t, squadID, "member", testUserID, testutil.Cols{
+		"role":     "leader",
+		"agent_id": blockedLeader,
+	})
+
+	w := httptest.NewRecorder()
+	testHandler.CreateIssue(w, newRequest(http.MethodPost, "/api/issues?workspace_id="+testWorkspaceID, map[string]any{
+		"title":         "Blocked relay create",
+		"assignee_type": "squad",
+		"assignee_id":   squadID,
+		"chain_steps":   []any{},
+	}))
+	if w.Code != http.StatusCreated {
+		t.Fatalf("create relay: got %d: %s", w.Code, w.Body.String())
+	}
+	var out struct {
+		ID     string              `json:"id"`
+		Status string              `json:"status"`
+		Chain  *IssueChainResponse `json:"chain"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &out); err != nil {
+		t.Fatalf("decode create response: %v", err)
+	}
+	if out.Chain == nil || len(out.Chain.Steps) != 1 {
+		t.Fatalf("create response carried no chain: %s", w.Body.String())
+	}
+	if out.Chain.Steps[0].State != service.ChainStateParked ||
+		out.Chain.Steps[0].ParkedReason != string(dispatch.ReasonRuntimePrivateForeign) {
+		t.Fatalf("leader step = %+v, want parked/runtime_private_foreign", out.Chain.Steps[0])
+	}
+	if out.Status != "blocked" {
+		t.Fatalf("issue status = %q, want blocked for a parked leader", out.Status)
+	}
+	if n := dbfx.Count(t, `SELECT count(*) FROM agent_task_queue WHERE issue_id = $1`, out.ID); n != 0 {
+		t.Fatalf("queued %d leader task(s) for an agent that cannot claim", n)
+	}
+}
+
+// The same request on a runnable leader writes step 0 as doing and enqueues
+// the leader's run — the chain and the dispatch agree from the first read.
+func TestCreateIssueWithChainStartsReadyLeader(t *testing.T) {
+	if testHandler == nil {
+		t.Skip("database not available")
+	}
+	leaderAgent := createHandlerTestAgent(t, "ready relay leader", nil)
+	squadID := dbfx.Squad(t, "Ready relay squad", leaderAgent)
+	dbfx.SquadMember(t, squadID, "member", testUserID, testutil.Cols{
+		"role":     "leader",
+		"agent_id": leaderAgent,
+	})
+
+	w := httptest.NewRecorder()
+	testHandler.CreateIssue(w, newRequest(http.MethodPost, "/api/issues?workspace_id="+testWorkspaceID, map[string]any{
+		"title":         "Ready relay create",
+		"assignee_type": "squad",
+		"assignee_id":   squadID,
+		"chain_steps":   []any{},
+	}))
+	if w.Code != http.StatusCreated {
+		t.Fatalf("create relay: got %d: %s", w.Code, w.Body.String())
+	}
+	var out struct {
+		ID    string              `json:"id"`
+		Chain *IssueChainResponse `json:"chain"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &out); err != nil {
+		t.Fatalf("decode create response: %v", err)
+	}
+	if out.Chain == nil || len(out.Chain.Steps) != 1 || out.Chain.Steps[0].State != service.ChainStateDoing {
+		t.Fatalf("leader step = %+v, want one doing step", out.Chain)
+	}
+	if n := dbfx.Count(t, `SELECT count(*) FROM agent_task_queue WHERE issue_id = $1 AND agent_id = $2`, out.ID, leaderAgent); n != 1 {
+		t.Fatalf("leader task count = %d, want 1", n)
+	}
+}
+
+// The holder can stop a stalled run. The step stays doing, and the cancelled
+// run is exactly what the retry action accepts — the second half of the
+// stall → cancel → retry loop.
+func TestCancelIssueChainStep(t *testing.T) {
+	if testHandler == nil {
+		t.Skip("database not available")
+	}
+	agentID := createHandlerTestAgent(t, "cancel-agent", nil)
+	leader := createHandlerTestAgent(t, "cancel-leader", nil)
+	squadID := dbfx.Squad(t, "Cancel squad", leader)
+	issueID := dbfx.Issue(t, "Cancelled relay", testutil.Cols{
+		"assignee_type": "squad",
+		"assignee_id":   squadID,
+	})
+	dbfx.Insert(t, "issue_chain_step", testutil.Cols{
+		"issue_id": issueID, "position": 0, "holder_user_id": testUserID,
+		"agent_id": leader, "title": "plan", "state": service.ChainStateDone,
+	})
+	dbfx.Insert(t, "issue_chain_step", testutil.Cols{
+		"issue_id": issueID, "position": 1, "holder_user_id": testUserID,
+		"agent_id": agentID, "title": "deliver", "state": service.ChainStateDoing,
+	})
+	taskID := dbfx.Task(t, agentID, testutil.Cols{
+		"issue_id":   issueID,
+		"status":     "running",
+		"started_at": testutil.Raw("now()"),
+	})
+
+	var resp IssueChainCancelResponse
+	testutil.Call(t, testHandler.CancelIssueChainStep, testutil.WithURLParams(
+		newRequest(http.MethodPost, "/api/issues/"+issueID+"/chain/cancel", nil),
+		"workspaceId", testWorkspaceID, "id", issueID,
+	)).Want(http.StatusOK).JSON(&resp)
+
+	if resp.Cancelled != 1 {
+		t.Fatalf("cancelled = %d, want 1", resp.Cancelled)
+	}
+	if resp.Steps[1].State != service.ChainStateDoing {
+		t.Fatalf("cancel moved the leg: state = %q, want doing", resp.Steps[1].State)
+	}
+	var status string
+	dbfx.QueryRow(t, `SELECT status FROM agent_task_queue WHERE id = $1`, taskID).Scan(&status)
+	if status != "cancelled" {
+		t.Fatalf("task status = %q, want cancelled", status)
+	}
+	testutil.Call(t, testHandler.CancelIssueChainStep, testutil.WithURLParams(
+		newRequest(http.MethodPost, "/api/issues/"+issueID+"/chain/cancel", nil),
+		"workspaceId", testWorkspaceID, "id", issueID,
+	)).Want(http.StatusConflict)
+}
+
+// A leg that parks on someone must land in that person's inbox, not only in
+// the room's feed: the relay's next action is theirs.
+func TestParkedLegNotifiesItsHolder(t *testing.T) {
+	if testHandler == nil {
+		t.Skip("database not available")
+	}
+	leader := createHandlerTestAgent(t, "notify-leader", nil)
+	holder := dbfx.User(t, "Notify holder", "notify-holder@example.test")
+	dbfx.Member(t, testWorkspaceID, holder, "member")
+	squadID := dbfx.Squad(t, "Notify squad", leader)
+	issueID := dbfx.Issue(t, "Notify relay", testutil.Cols{
+		"assignee_type": "squad",
+		"assignee_id":   squadID,
+	})
+	dbfx.Insert(t, "issue_chain_step", testutil.Cols{
+		"issue_id": issueID, "position": 0, "holder_user_id": testUserID,
+		"agent_id": leader, "title": "plan", "state": service.ChainStateReviewing,
+	})
+	dbfx.Insert(t, "issue_chain_step", testutil.Cols{
+		"issue_id": issueID, "position": 1, "holder_user_id": holder,
+		"title": "deliver", "state": service.ChainStatePending,
+	})
+
+	testutil.Call(t, testHandler.ApproveIssueChainStep, testutil.WithURLParams(
+		newRequest(http.MethodPost, "/api/issues/"+issueID+"/chain/approve", map[string]any{
+			"summary":    "leg delivered",
+			"acceptance": []map[string]any{{"label": "done", "requirement": "delivered", "state": "pass"}},
+			"next_brief": []string{"take the next leg"},
+		}),
+		"workspaceId", testWorkspaceID, "id", issueID,
+	)).Want(http.StatusOK)
+
+	if n := dbfx.Count(t, `SELECT count(*) FROM inbox_item WHERE recipient_id = $1 AND type = 'relay_turn'`, holder); n != 1 {
+		t.Fatalf("relay-turn inbox items for the holder = %d, want 1", n)
+	}
+}
+
+// Approving the final leg closes the relay and leaves a completion record in
+// the room: total legs, skipped legs, and how long the whole relay took.
+func TestFinalApprovalRecordsRelayCompletion(t *testing.T) {
+	if testHandler == nil {
+		t.Skip("database not available")
+	}
+	leader := createHandlerTestAgent(t, "complete-leader", nil)
+	squadID := dbfx.Squad(t, "Complete squad", leader)
+	issueID := dbfx.Issue(t, "Completing relay", testutil.Cols{
+		"assignee_type": "squad",
+		"assignee_id":   squadID,
+	})
+	dbfx.Insert(t, "issue_chain_step", testutil.Cols{
+		"issue_id": issueID, "position": 0, "holder_user_id": testUserID,
+		"agent_id": leader, "title": "only leg", "state": service.ChainStateReviewing,
+		"started_at": testutil.Raw("now() - interval '2 hours'"),
+	})
+
+	testutil.Call(t, testHandler.ApproveIssueChainStep, testutil.WithURLParams(
+		newRequest(http.MethodPost, "/api/issues/"+issueID+"/chain/approve", map[string]any{
+			"summary":    "final delivery",
+			"acceptance": []map[string]any{{"label": "done", "requirement": "delivered", "state": "pass"}},
+		}),
+		"workspaceId", testWorkspaceID, "id", issueID,
+	)).Want(http.StatusOK)
+
+	if n := dbfx.Count(t, `SELECT count(*) FROM squad_message WHERE squad_id = $1 AND kind = 'chain_completed'`, squadID); n != 1 {
+		t.Fatalf("completion records = %d, want 1", n)
+	}
+}
+
+// A workspace owner/admin can recover a leg whose holder is unreachable. The
+// retry still passes the invoke gate on the agent; the override is logged.
+func TestWorkspaceAdminRetriesSomeoneElsesLeg(t *testing.T) {
+	if testHandler == nil {
+		t.Skip("database not available")
+	}
+	holder := dbfx.User(t, "Admin retry holder", "admin-retry-holder@example.test")
+	dbfx.Member(t, testWorkspaceID, holder, "member")
+	holderRuntime := dbfx.Insert(t, "agent_runtime", testutil.Cols{
+		"workspace_id": testWorkspaceID,
+		"name":         "Admin retry holder runtime",
+		"runtime_mode": "cloud",
+		"provider":     "handler_test_admin_retry_runtime",
+		"status":       "online",
+		"device_info":  "holder runtime",
+		"metadata":     testutil.Raw("'{}'::jsonb"),
+		"owner_id":     holder,
+		"last_seen_at": testutil.Raw("now()"),
+	})
+	holderAgent := dbfx.Agent(t, "admin retry agent", holderRuntime, testutil.Cols{
+		"owner_id":        holder,
+		"visibility":      "workspace",
+		"permission_mode": "public_to",
+	})
+	dbfx.Exec(t, `
+		INSERT INTO agent_invocation_target (agent_id, target_type, target_id)
+		VALUES ($1, 'workspace', $2) ON CONFLICT DO NOTHING
+	`, holderAgent, testWorkspaceID)
+	leader := createHandlerTestAgent(t, "admin retry leader", nil)
+	squadID := dbfx.Squad(t, "Admin retry squad", leader)
+	issueID := dbfx.Issue(t, "Admin retry relay", testutil.Cols{
+		"assignee_type": "squad",
+		"assignee_id":   squadID,
+	})
+	dbfx.Insert(t, "issue_chain_step", testutil.Cols{
+		"issue_id": issueID, "position": 0, "holder_user_id": testUserID,
+		"agent_id": leader, "title": "plan", "state": service.ChainStateDone,
+	})
+	dbfx.Insert(t, "issue_chain_step", testutil.Cols{
+		"issue_id": issueID, "position": 1, "holder_user_id": holder,
+		"agent_id": holderAgent, "title": "deliver", "state": service.ChainStateDoing,
+	})
+	dbfx.Task(t, holderAgent, testutil.Cols{
+		"issue_id":     issueID,
+		"status":       "cancelled",
+		"completed_at": testutil.Raw("now()"),
+	})
+
+	var resp IssueChainRetryResponse
+	testutil.Call(t, testHandler.RetryIssueChainStep, testutil.WithURLParams(
+		newRequest(http.MethodPost, "/api/issues/"+issueID+"/chain/retry", nil),
+		"workspaceId", testWorkspaceID, "id", issueID,
+	)).Want(http.StatusOK).JSON(&resp)
+	if resp.TaskID == "" {
+		t.Fatal("admin retry queued no task")
+	}
+}
+
+// The leg-output document is the single handoff artifact: its `handoff` block
+// is extracted into the reviewing step's package, and the explicit re-extract
+// reports a document without that block instead of silently doing nothing.
+func TestExtractIssueChainHandoff(t *testing.T) {
+	if testHandler == nil {
+		t.Skip("database not available")
+	}
+	agentID := createHandlerTestAgent(t, "extract-agent", nil)
+	leader := createHandlerTestAgent(t, "extract-leader", nil)
+	squadID := dbfx.Squad(t, "Extract squad", leader)
+	issueID := dbfx.Issue(t, "Extract relay", testutil.Cols{
+		"assignee_type": "squad",
+		"assignee_id":   squadID,
+	})
+	dbfx.Insert(t, "issue_chain_step", testutil.Cols{
+		"issue_id": issueID, "position": 0, "holder_user_id": testUserID,
+		"agent_id": leader, "title": "plan", "state": service.ChainStateDone,
+	})
+	dbfx.Insert(t, "issue_chain_step", testutil.Cols{
+		"issue_id": issueID, "position": 1, "holder_user_id": testUserID,
+		"agent_id": agentID, "title": "deliver", "state": service.ChainStateReviewing,
+	})
+	taskID := dbfx.Task(t, agentID, testutil.Cols{
+		"issue_id":     issueID,
+		"status":       "completed",
+		"handoff_note": service.LegOutputInstruction,
+		"started_at":   testutil.Raw("now() - interval '3 minutes'"),
+		"completed_at": testutil.Raw("now()"),
+	})
+	commentID := dbfx.Insert(t, "comment", testutil.Cols{
+		"issue_id":       issueID,
+		"workspace_id":   testWorkspaceID,
+		"author_type":    "agent",
+		"author_id":      agentID,
+		"content":        "# 交付文档\n\n正文。\n\n```handoff\n{\"summary\":\"提取后的摘要\",\"acceptance\":[{\"label\":\"口径\",\"requirement\":\"超 3 次进审计队列\",\"delivered\":\"见 §2\",\"state\":\"pass\"}],\"open_questions\":[\"容量上限\"],\"next_brief\":[\"补压测数据\"]}\n```\n",
+		"source_task_id": taskID,
+	})
+
+	var resp IssueChainResponse
+	testutil.Call(t, testHandler.ExtractIssueChainHandoff, testutil.WithURLParams(
+		newRequest(http.MethodPost, "/api/issues/"+issueID+"/chain/extract", nil),
+		"workspaceId", testWorkspaceID, "id", issueID,
+	)).Want(http.StatusOK).JSON(&resp)
+	if resp.Steps[1].Handoff == nil {
+		t.Fatalf("extract returned no handoff: %+v", resp.Steps[1])
+	}
+	if resp.Steps[1].Handoff.Summary != "提取后的摘要" ||
+		len(resp.Steps[1].Handoff.Acceptance) != 1 ||
+		len(resp.Steps[1].Handoff.NextBrief) != 1 {
+		t.Fatalf("extracted package = %+v", resp.Steps[1].Handoff)
+	}
+
+	// A document without the block is a conflict the holder can act on, not a
+	// silent success.
+	dbfx.Exec(t, `UPDATE comment SET content = $1 WHERE id = $2`, "只有正文，没有 handoff 块。", commentID)
+	testutil.Call(t, testHandler.ExtractIssueChainHandoff, testutil.WithURLParams(
+		newRequest(http.MethodPost, "/api/issues/"+issueID+"/chain/extract", nil),
+		"workspaceId", testWorkspaceID, "id", issueID,
+	)).Want(http.StatusConflict)
+}
+
+// An unreachable holder must not dead-end the relay. An owner/admin can move a
+// waiting leg to another squad member; a plain member cannot, and a reassigned
+// reviewing leg keeps the agent that did the work.
+func TestReassignReviewingChainStep(t *testing.T) {
+	if testHandler == nil {
+		t.Skip("database not available")
+	}
+	f := newReviewFixture(t)
+	var squadID string
+	dbfx.QueryRow(t, `SELECT assignee_id::text FROM issue WHERE id = $1`, f.issueID).Scan(&squadID)
+	dbfx.SquadMember(t, squadID, "member", f.outsider, testutil.Cols{"role": "executor"})
+
+	var resp IssueChainResponse
+	testutil.Call(t, testHandler.ReassignIssueChainStep, testutil.WithURLParams(
+		newRequest(http.MethodPost, "/api/issues/"+f.issueID+"/chain/reassign",
+			map[string]any{"holder_user_id": f.outsider}),
+		"workspaceId", testWorkspaceID, "id", f.issueID,
+	)).Want(http.StatusOK).JSON(&resp)
+	if resp.Steps[1].HolderUserID != f.outsider {
+		t.Fatalf("holder = %q, want the new holder %q", resp.Steps[1].HolderUserID, f.outsider)
+	}
+	if resp.Steps[1].State != service.ChainStateReviewing {
+		t.Fatalf("reassign changed the state: %q", resp.Steps[1].State)
+	}
+	var agentID string
+	dbfx.QueryRow(t, `SELECT agent_id::text FROM issue_chain_step WHERE issue_id = $1 AND position = 1`, f.issueID).Scan(&agentID)
+	if agentID != f.nextAgent {
+		t.Fatalf("reassign replaced the working agent: %q, want %q", agentID, f.nextAgent)
+	}
+
+	// A plain member cannot move someone else's turn.
+	testutil.Call(t, testHandler.ReassignIssueChainStep, testutil.WithURLParams(
+		newRequestAs(f.outsider, http.MethodPost, "/api/issues/"+f.issueID+"/chain/reassign",
+			map[string]any{"holder_user_id": testUserID}),
+		"workspaceId", testWorkspaceID, "id", f.issueID,
+	)).Want(http.StatusForbidden)
+}
+
+// Skipping a reviewing leg bypasses its holder's judgment, so it is reserved
+// for owner/admin; skipping a parked leg stays the room's ordinary escape.
+func TestAdminSkipsReviewingChainStep(t *testing.T) {
+	if testHandler == nil {
+		t.Skip("database not available")
+	}
+	f := newReviewFixture(t)
+
+	// A plain member cannot skip the review.
+	testutil.Call(t, testHandler.SkipIssueChainStep, testutil.WithURLParams(
+		newRequestAs(f.outsider, http.MethodPost, "/api/issues/"+f.issueID+"/chain/skip", nil),
+		"workspaceId", testWorkspaceID, "id", f.issueID,
+	)).Want(http.StatusConflict)
+	if got := stepState(t, f.issueID, 1); got != service.ChainStateReviewing {
+		t.Fatalf("a non-admin skip moved the step: %q", got)
+	}
+
+	// The owner may skip it; the next leg starts.
+	testutil.Call(t, testHandler.SkipIssueChainStep, testutil.WithURLParams(
+		newRequest(http.MethodPost, "/api/issues/"+f.issueID+"/chain/skip", nil),
+		"workspaceId", testWorkspaceID, "id", f.issueID,
+	)).Want(http.StatusOK)
+	if got := stepState(t, f.issueID, 1); got != service.ChainStateSkipped {
+		t.Fatalf("step 1 state = %q, want skipped", got)
+	}
+	if got := stepState(t, f.issueID, 2); got != service.ChainStateDoing {
+		t.Fatalf("step 2 state = %q, want doing", got)
+	}
 }

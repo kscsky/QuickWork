@@ -473,6 +473,14 @@ export interface Agent {
   runtime_id: string;
   /** False exactly when the agent has no runtime. Older backends omit it. */
   runtime_bound?: boolean;
+  /**
+   * List-time execution readiness: whether this agent can claim work right
+   * now, and the machine's reason code when it cannot (`runtime_offline`,
+   * `runtime_private_foreign`, `runtime_unusable`, `agent_runtime_required`,
+   * `target_unavailable`). Present on list responses only; absent means
+   * "not evaluated", never "blocked".
+   */
+  runnability?: { ready: boolean; reason?: string };
   name: string;
   description: string;
   /** What this agent's owner wrote. For a system agent this holds only the

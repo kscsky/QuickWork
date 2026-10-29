@@ -44,6 +44,20 @@ SELECT EXISTS (
     AND details->>'task_id' = @task_id::text
 ) AS exists;
 
+-- name: ListRelayActivityEvents :many
+-- The workspace activity page: only the decisions that change the relay
+-- (approve / return / reassign / skip). Runs, comments and parking stay on the
+-- issue, so this list stays short enough to read.
+SELECT ae.*,
+       i.number AS issue_number,
+       i.title AS issue_title
+FROM activity_log ae
+JOIN issue i ON i.id = ae.issue_id
+WHERE ae.workspace_id = $1
+  AND ae.action IN ('relay_approved', 'relay_returned', 'relay_reassigned', 'relay_skipped')
+ORDER BY ae.created_at DESC, ae.id DESC
+LIMIT $2;
+
 -- name: CountAssigneeChangesByActor :many
 -- Count how many times a user assigned each target via assignee_changed activities.
 SELECT

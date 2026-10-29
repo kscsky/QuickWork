@@ -484,7 +484,7 @@ describe("SourceContextBadge", () => {
   it.each([
     ["archived", "member", "Alice at capture · now Fox · archived"],
     ["deleted_agent", "agent", "Alice · deleted agent"],
-    ["no_longer_in_workspace", "member", "Alice · no longer in workspace"],
+    ["no_longer_in_workspace", "member", "Alice · no longer in space"],
   ] as const)("renders the captured-author %s state", async (state, type, expected) => {
     const context: IssueSourceContext = {
       ...baseContext,
@@ -568,7 +568,7 @@ describe("SourceContextBadge", () => {
     { name: "renamed", type: "member", state: "renamed", current_name: "Fox", expected: "Alice at capture · now Fox" },
     { name: "archived", type: "agent", state: "archived", current_name: "Fox", expected: "Alice at capture · now Fox · archived" },
     { name: "deleted agent", type: "agent", state: "deleted_agent", current_name: undefined, expected: "Alice · deleted agent" },
-    { name: "left workspace", type: "member", state: "no_longer_in_workspace", current_name: undefined, expected: "Alice · no longer in workspace" },
+    { name: "left workspace", type: "member", state: "no_longer_in_workspace", current_name: undefined, expected: "Alice · no longer in space" },
     { name: "unavailable", type: "member", state: "unavailable", current_name: undefined, expected: "Alice at capture" },
   ] as const;
   const viewerMatrix = displayCases.flatMap((display) =>

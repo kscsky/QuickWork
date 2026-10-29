@@ -678,7 +678,7 @@ export function AutopilotDialog(props: AutopilotDialogProps) {
                           onClick={() => setScheduleOpen(true)}
                           className="min-w-0 cursor-pointer rounded-[9px] border border-border bg-background px-3 py-2.5 text-left transition-colors hover:border-input"
                         >
-                          <div className="text-[10.5px] leading-4 text-faint-foreground">
+                          <div className="text-[11px] leading-4 text-faint-foreground">
                             {t(($) => $.schedule_editor.time_label)}
                           </div>
                           <div
@@ -698,7 +698,7 @@ export function AutopilotDialog(props: AutopilotDialogProps) {
                           onClick={() => setScheduleOpen(true)}
                           className="min-w-0 cursor-pointer rounded-[9px] border border-border bg-background px-3 py-2.5 text-left transition-colors hover:border-input"
                         >
-                          <div className="text-[10.5px] leading-4 text-faint-foreground">
+                          <div className="text-[11px] leading-4 text-faint-foreground">
                             {t(($) => $.schedule_editor.days_label)}
                           </div>
                           <div
@@ -713,7 +713,7 @@ export function AutopilotDialog(props: AutopilotDialogProps) {
                           onClick={() => setScheduleOpen(true)}
                           className="min-w-0 cursor-pointer rounded-[9px] border border-border bg-background px-3 py-2.5 text-left transition-colors hover:border-input"
                         >
-                          <div className="text-[10.5px] leading-4 text-faint-foreground">
+                          <div className="text-[11px] leading-4 text-faint-foreground">
                             {t(($) => $.schedule_editor.timezone_label)}
                           </div>
                           <div
@@ -733,7 +733,7 @@ export function AutopilotDialog(props: AutopilotDialogProps) {
                       <div className="mt-2 flex min-w-0 items-center gap-2.5 pt-1">
                         <code
                           title={scheduleSummary.cron}
-                          className="shrink-0 rounded-[5px] bg-muted px-1.5 py-0.5 font-mono text-[11.5px] text-muted-foreground"
+                          className="shrink-0 rounded-[5px] bg-muted px-1.5 py-0.5 font-mono text-[12px] text-muted-foreground"
                         >
                           {scheduleSummary.cron}
                         </code>
@@ -908,7 +908,7 @@ function SectionLabel({
 }) {
   return (
     <div className="mb-2 flex items-baseline gap-1.5">
-      <span className="shrink-0 text-caption font-semibold text-foreground/80">
+      <span className="shrink-0 text-caption font-semibold text-foreground">
         {children}
         {required === true && (
           <span aria-hidden className="ml-0.5 text-destructive">
@@ -1151,7 +1151,7 @@ function TriggerKindSection({
   const { t } = useT("autopilots");
   return (
     <div className="flex items-center gap-3">
-      <span className="text-caption font-semibold text-foreground/80">
+      <span className="text-caption font-semibold text-foreground">
         {t(($) => $.dialog.trigger_short)}
       </span>
       <div className="w-fit">

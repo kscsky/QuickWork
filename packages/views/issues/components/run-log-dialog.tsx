@@ -21,6 +21,7 @@ import { cn } from "@quickwork/ui/lib/utils";
 import { formatDuration } from "../../agents/components/agent-activity-hover-content";
 import { useT } from "../../i18n";
 import { ProviderLogo } from "../../runtimes/components/provider-logo";
+import { legRunActivity, silentMinutes } from "./leg-run-activity";
 import {
   buildRunActions,
   formatTokensCompact,
@@ -183,6 +184,8 @@ export function RunLogDialog({
   task,
   agentName,
   stepLabel,
+  onRetry,
+  retryPending,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -190,17 +193,31 @@ export function RunLogDialog({
   agentName: string;
   /** "第 1/3 棒" — names the leg this run belongs to. */
   stepLabel?: string;
+  /** Holder-only: restart the leg after this run was interrupted. */
+  onRetry?: () => void;
+  retryPending?: boolean;
 }) {
   const { t } = useT("issues");
   const wsId = useWorkspaceId();
-  const running = task.status !== "completed" && task.status !== "failed" && task.status !== "cancelled";
+  // A queued task has not been picked up; `dispatched` is the claim handshake
+  // and reads as preparing. Neither is "running" — there is no process and no
+  // output until the daemon starts the run.
+  const queued =
+    task.status === "queued" || task.status === "waiting_local_directory";
+  const preparing = task.status === "dispatched";
+  const running = task.status === "running";
+  const terminal =
+    task.status === "completed" ||
+    task.status === "failed" ||
+    task.status === "cancelled";
+  const live = running || preparing;
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
-    if (!open || !running) return;
+    if (!open || !live) return;
     setNow(Date.now());
     const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
-  }, [open, running]);
+  }, [open, live]);
 
   const { data: runtimes = [] } = useQuery(runtimeListOptions(wsId));
   const provider = runtimes.find((runtime) => runtime.id === task.runtime_id)?.provider ?? "";
@@ -213,10 +230,19 @@ export function RunLogDialog({
     (sum, entry) => sum + (isRunActionFold(entry) ? entry.count : entry.kind === "tool" ? 1 : 0),
     0,
   );
-  const startedIso = task.started_at ?? task.dispatched_at ?? null;
+  const startedIso = task.started_at ?? (queued ? null : task.dispatched_at ?? null);
   const elapsed = startedIso
-    ? formatDuration(startedIso, running ? now : new Date(task.completed_at ?? Date.now()).getTime())
+    ? formatDuration(startedIso, live ? now : new Date(task.completed_at ?? Date.now()).getTime())
     : "";
+  // Two hours is the daemon's force-stop bound; the person watching needs an
+  // earlier, softer signal, and it must be measured from the last event.
+  const activity = legRunActivity({
+    live,
+    lastEventAt: messages[messages.length - 1]?.created_at ?? null,
+    startedAt: startedIso,
+    now,
+  });
+  const retryable = (task.status === "failed" || task.status === "cancelled") && !!onRetry;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -232,12 +258,34 @@ export function RunLogDialog({
             </DialogDescription>
           </div>
           <span className="grow" />
-          {running ? (
-            <span className="inline-flex shrink-0 items-center gap-1.5 text-micro text-inflight">
-              <span className="size-1.5 animate-pulse rounded-full bg-inflight" aria-hidden="true" />
-              {t(($) => $.room.chat_running)}
-              {elapsed ? <span className="font-mono text-muted-foreground">{elapsed}</span> : null}
+          {queued ? (
+            <span className="inline-flex shrink-0 items-center gap-1.5 text-micro text-muted-foreground">
+              <span className="size-1.5 rounded-full bg-muted-foreground/40" aria-hidden="true" />
+              {t(($) => $.room.state_waiting)}
             </span>
+          ) : live ? (
+            activity.stalled ? (
+              <span
+                className="inline-flex shrink-0 items-center gap-1.5 text-micro text-warning"
+                title={t(($) => $.room.run_stalled_hint, {
+                  n: silentMinutes(activity.silentMs),
+                })}
+              >
+                <span className="size-1.5 rounded-full bg-warning" aria-hidden="true" />
+                {t(($) => $.room.run_stalled)}
+                <span className="font-mono">
+                  {t(($) => $.room.run_last_activity, {
+                    n: silentMinutes(activity.silentMs),
+                  })}
+                </span>
+              </span>
+            ) : (
+              <span className="inline-flex shrink-0 items-center gap-1.5 text-micro text-inflight">
+                <span className="size-1.5 animate-pulse rounded-full bg-inflight" aria-hidden="true" />
+                {preparing ? t(($) => $.room.run_preparing) : t(($) => $.room.chat_running)}
+                {elapsed ? <span className="font-mono text-muted-foreground">{elapsed}</span> : null}
+              </span>
+            )
           ) : (
             <span className="inline-flex shrink-0 items-center gap-1.5 text-micro text-muted-foreground">
               {elapsed ? <span className="font-mono">{elapsed}</span> : null}
@@ -252,7 +300,15 @@ export function RunLogDialog({
         <div className="min-h-0 flex-1 overflow-y-auto px-3 py-2.5">
           {entries.length === 0 ? (
             <p className="px-2 py-6 text-center text-caption text-faint-foreground">
-              {t(($) => $.room.run_live_waiting)}
+              {queued
+                ? t(($) => $.room.run_queued_waiting)
+                : terminal
+                  ? t(($) => $.detail.execution_no_result)
+                  : activity.stalled
+                    ? t(($) => $.room.run_stalled_hint, {
+                        n: silentMinutes(activity.silentMs),
+                      })
+                    : t(($) => $.room.run_live_waiting)}
             </p>
           ) : (
             <div className="flex flex-col gap-0.5">
@@ -276,6 +332,21 @@ export function RunLogDialog({
               <span>
                 {t(($) => $.room.run_log_total_tokens, { n: formatTokensCompact(usage.total) })}
               </span>
+            </>
+          ) : null}
+          {retryable ? (
+            <>
+              <span className="grow" />
+              <button
+                type="button"
+                onClick={onRetry}
+                disabled={retryPending}
+                className="rounded-[4px] border border-surface-border bg-surface px-2 py-0.5 text-micro text-foreground transition-colors hover:bg-muted disabled:opacity-50"
+              >
+                {retryPending
+                  ? t(($) => $.room.run_retrying)
+                  : t(($) => $.room.run_retry)}
+              </button>
             </>
           ) : null}
         </footer>

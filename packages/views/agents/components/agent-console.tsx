@@ -277,7 +277,7 @@ function Module({
         <span className="shrink-0 font-mono text-[10px] font-semibold tracking-[0.07em] text-[var(--hue)]">
           {id}
         </span>
-        <span className="truncate text-[13.5px] font-semibold">{title}</span>
+        <span className="truncate text-[14px] font-semibold">{title}</span>
         <span className="min-w-0 flex-1" />
         {chip}
       </header>
@@ -315,7 +315,7 @@ function StateChip({
   return (
     <span
       className={cn(
-        "inline-flex shrink-0 items-center rounded-[3px] px-1.5 py-px font-mono text-[10.5px] whitespace-nowrap",
+        "inline-flex shrink-0 items-center rounded-[3px] px-1.5 py-px font-mono text-[11px] whitespace-nowrap",
         tone === "ok" && "bg-success/15 text-[color-mix(in_oklab,var(--success)_72%,var(--foreground))]",
         tone === "warn" && "qw-shimmer bg-warning/20 qw-st-none",
         tone === "none" && "qw-shimmer bg-warning/20 qw-st-none",
@@ -452,7 +452,7 @@ function MachineSeatCard({
       </div>
       <div className="relative mt-2 flex flex-wrap items-center gap-1.5">
         <span
-          className="rounded-[3px] px-1.5 py-px font-mono text-[10.5px]"
+          className="rounded-[3px] px-1.5 py-px font-mono text-[11px]"
           style={{
             background: `color-mix(in oklab, oklch(0.55 0.15 ${hue}) 12%, transparent)`,
             color: `color-mix(in oklab, oklch(0.55 0.15 ${hue}) 70%, var(--foreground))`,
@@ -460,7 +460,7 @@ function MachineSeatCard({
         >
           {t(($) => $.console.hue, { value: hue })}
         </span>
-        <span className="rounded-[3px] bg-muted px-1.5 py-px font-mono text-[10.5px] text-muted-foreground">
+        <span className="rounded-[3px] bg-muted px-1.5 py-px font-mono text-[11px] text-muted-foreground">
           {runtime.runtime_mode === "cloud"
             ? t(($) => $.row.fallback_runtime_cloud)
             : t(($) => $.row.fallback_runtime_local)}
@@ -598,7 +598,7 @@ function RelayCard({ agent }: { agent: Agent }) {
               <span className="min-w-0 flex-1 truncate text-caption">
                 {squad.name}
               </span>
-              <span className="shrink-0 rounded-[3px] bg-muted px-1.5 py-px font-mono text-[10.5px] text-muted-foreground">
+              <span className="shrink-0 rounded-[3px] bg-muted px-1.5 py-px font-mono text-[11px] text-muted-foreground">
                 {role === "leader"
                   ? t(($) => $.console.relay_leader)
                   : t(($) => $.console.relay_member)}

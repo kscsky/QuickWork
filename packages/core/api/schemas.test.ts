@@ -2219,6 +2219,23 @@ describe("IssueChainSchema (the relay's review gate)", () => {
     expect(parsed.steps[0]?.plan).toBeUndefined();
   });
 
+  it("carries the active leg-output run used by the review gate", () => {
+    const parsed = IssueChainSchema.parse({
+      steps: [
+        {
+          id: "s1",
+          position: 0,
+          holder_user_id: "u1",
+          state: "reviewing",
+          output_task_id: "task-1",
+          output_task_at: "2026-10-28T06:04:11Z",
+        },
+      ],
+    });
+    expect(parsed.steps[0]?.output_task_id).toBe("task-1");
+    expect(parsed.steps[0]?.output_task_at).toBe("2026-10-28T06:04:11Z");
+  });
+
   it("keeps an unknown state rather than blanking the chain", () => {
     const parsed = IssueChainSchema.parse({
       steps: [
@@ -2244,6 +2261,13 @@ describe("IssueChainSchema (the relay's review gate)", () => {
               { name: "feat/retry-backoff", kind: "branch" },
               { name: "未来的新鲜玩意", kind: "hologram" },
             ],
+            acceptance: [
+              { label: "口径", requirement: "超 3 次进审计队列", delivered: "见 §2", state: "pass" },
+              { label: "来源", requirement: "每个结论可复核", delivered: "3 条待补", state: "warn" },
+            ],
+            open_questions: ["人工队列的容量上限还没定"],
+            next_brief: ["补压测数据", "接进对账报表"],
+            returned: { reason: "来源不可复核", at: "2026-10-28T03:00:00Z" },
           },
         },
       ],
@@ -2251,6 +2275,50 @@ describe("IssueChainSchema (the relay's review gate)", () => {
     expect(parsed.steps[0]?.handoff?.summary).toContain("1/2/4");
     expect(parsed.steps[0]?.handoff?.files).toHaveLength(3);
     expect(parsed.steps[0]?.handoff?.files[2]?.kind).toBe("hologram");
+    expect(parsed.steps[0]?.handoff?.acceptance?.[1]?.state).toBe("warn");
+    expect(parsed.steps[0]?.handoff?.open_questions).toEqual(["人工队列的容量上限还没定"]);
+    expect(parsed.steps[0]?.handoff?.next_brief).toHaveLength(2);
+    expect(parsed.steps[0]?.handoff?.returned?.reason).toBe("来源不可复核");
+  });
+
+  it("defaults the structured package on older handoffs", () => {
+    const parsed = IssueChainSchema.parse({
+      steps: [
+        {
+          id: "s1",
+          position: 0,
+          holder_user_id: "u1",
+          state: "done",
+          handoff: { summary: "old package", files: [] },
+        },
+      ],
+    });
+    expect(parsed.steps[0]?.handoff?.acceptance).toEqual([]);
+    expect(parsed.steps[0]?.handoff?.open_questions).toEqual([]);
+    expect(parsed.steps[0]?.handoff?.next_brief).toEqual([]);
+    expect(parsed.steps[0]?.handoff?.returned).toBeUndefined();
+  });
+
+  it("degrades one malformed structured field without dropping the package", () => {
+    const parsed = IssueChainSchema.parse({
+      steps: [
+        {
+          id: "s1",
+          position: 0,
+          holder_user_id: "u1",
+          state: "done",
+          handoff: {
+            summary: "still readable",
+            files: [],
+            acceptance: "not-a-ledger",
+            open_questions: "not-a-list",
+          },
+        },
+      ],
+    });
+    expect(parsed.steps[0]?.handoff?.summary).toBe("still readable");
+    expect(parsed.steps[0]?.handoff?.acceptance).toEqual([]);
+    expect(parsed.steps[0]?.handoff?.open_questions).toEqual([]);
   });
 
   it("keeps the chain when a leg reports no handoff at all", () => {

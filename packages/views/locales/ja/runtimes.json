@@ -4,13 +4,10 @@
     "online": "オンライン",
     "offline": "オフライン",
     "unbound": "未接続",
-    "stat_agents_one": "エージェント",
     "stat_agents_other": "エージェント",
     "stat_running": "実行中",
     "stat_queued": "待機中",
-    "stat_runtimes_one": "ランタイム",
     "stat_runtimes_other": "ランタイム",
-    "runtime_agents_one": "{{count}} エージェント",
     "runtime_agents_other": "{{count}} エージェント",
     "runtimes_head": "ランタイム / RUNTIMES",
     "capacity": "容量 / CAPACITY",
@@ -39,11 +36,8 @@
     "list_online_unit": "オンライン",
     "list_issues": "問題",
     "list_cap": "ランタイム",
-    "list_machines_one": "台のマシン",
     "list_machines_other": "台のマシン",
-    "list_agents_one": "エージェント",
     "list_agents_other": "エージェント",
-    "list_queued_one": "待機",
     "list_queued_other": "待機",
     "list_sync_hint": "マシンとランタイム · リアルタイム",
     "list_tabs_aria": "マシンを絞り込む",
@@ -219,11 +213,11 @@
     },
     "visibility_hint": {
       "private": "あなたのみが、このランタイムでエージェントを作成できます。",
-      "public": "スペースのメンバーなら誰でも、このランタイムでエージェントを作成できます。"
+      "public": "スペースのメンバーなら誰でも、このマシンで自分のエージェントを実行できます——このマシンにインストールされた CLI と、あなたの CLI ログイン・利用枠を使います。信頼できるスペースにだけ公開してください。"
     },
     "visibility_hint_readonly": {
       "private": "このランタイムでエージェントを作成できるのは所有者だけで、公開に切り替えられるのも所有者だけです。",
-      "public": "スペースのメンバーなら誰でも、このランタイムでエージェントを作成できます。非公開に戻せるのは所有者だけです。"
+      "public": "このマシンは公開されています：どのメンバーも自分のエージェントをここで実行でき、所有者の CLI ログインと利用枠を使います。非公開に戻せるのは所有者だけです。"
     },
     "visibility_toast_updated": "公開範囲を {{visibility}} に設定しました",
     "visibility_toast_failed": "公開範囲を更新できませんでした",

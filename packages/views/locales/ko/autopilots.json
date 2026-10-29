@@ -501,7 +501,6 @@
     "offline": "오프라인",
     "working": "실행 중",
     "idle": "대기 중",
-    "subscribers_count_one": "{{count}}명",
     "subscribers_count_other": "{{count}}명",
     "runs": "최근 실행 / RUNS",
     "empty": "이 필터에 자동화가 없습니다",

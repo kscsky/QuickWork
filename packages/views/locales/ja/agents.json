@@ -1031,7 +1031,6 @@
     "col_capacity": "容量",
     "col_activity": "アクティビティ 7日",
     "col_actions": "操作",
-    "group_count_one": "{{count}} エージェント · {{running}} 実行中",
     "group_count_other": "{{count}} エージェント · {{running}} 実行中",
     "open_agent": "{{name}} を開く",
     "running_no_task": "起動中…",
@@ -1047,7 +1046,6 @@
     "stop_aria": "{{name}} のタスクを停止",
     "no_filter_title": "このフィルターにエージェントはいません",
     "no_filter_hint": "別の状態やランタイムを選択してください。",
-    "footer_summary_one": "{{agents}} エージェント · {{runtimes}} ランタイム · {{queued}} タスク待機中",
     "footer_summary_other": "{{agents}} エージェント · {{runtimes}} ランタイム · {{queued}} タスク待機中",
     "footer_hint": "ランタイムで絞り込み · タスクをクリックで詳細",
     "toggle_group": "{{name}} を展開または折りたたむ"

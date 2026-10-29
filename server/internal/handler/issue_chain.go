@@ -13,6 +13,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
+	obsmetrics "github.com/kscsky/quickwork/server/internal/metrics"
 	"github.com/kscsky/quickwork/server/internal/service"
 	"github.com/kscsky/quickwork/server/internal/util"
 	db "github.com/kscsky/quickwork/server/pkg/db/generated"
@@ -23,10 +24,115 @@ import (
 // crosses the leg boundary, and it is stored on the step row — the caps keep a
 // curated package curated rather than a second copy of the working directory.
 const (
-	maxHandoffFiles    = 50
-	maxHandoffSummary  = 2000
-	maxHandoffFileName = 300
+	maxHandoffFiles = 50
+	// A leg-output document is a full markdown handoff, not a one-line note:
+	// the agent's summary routinely runs to several KB. The cap still keeps the
+	// package curated, but must not reject the document the product itself
+	// generated. The same document is also carried as an editable .md file.
+	maxHandoffSummary        = 50000
+	maxHandoffFileName       = 300
+	maxHandoffAcceptance     = 20
+	maxHandoffAcceptanceText = 500
+	maxHandoffOpenQuestions  = 20
+	maxHandoffOpenQuestion   = 1000
+	maxHandoffNextBrief      = 20
+	maxHandoffNextBriefItem  = 500
+	maxHandoffReturnReason   = 2000
 )
+
+// handoffPayload is the JSON body shared by approve and return. Summary is a
+// pointer so "omitted" (an older client) and "explicitly empty" stay distinct.
+type handoffPayload struct {
+	Summary       *string                          `json:"summary"`
+	Files         []service.ChainHandoffFile       `json:"files"`
+	Acceptance    []service.ChainHandoffAcceptance `json:"acceptance"`
+	OpenQuestions []string                         `json:"open_questions"`
+	NextBrief     []string                         `json:"next_brief"`
+}
+
+// buildHandoff normalizes and validates one package. It returns nil when the
+// payload carries no package at all; an empty error message means valid.
+func buildHandoff(body *handoffPayload) (*service.ChainHandoff, string) {
+	if body.Summary == nil && len(body.Files) == 0 && len(body.Acceptance) == 0 &&
+		len(body.OpenQuestions) == 0 && len(body.NextBrief) == 0 {
+		return nil, ""
+	}
+	if len(body.Files) > maxHandoffFiles {
+		return nil, "at most " + strconv.Itoa(maxHandoffFiles) + " files can travel in a handoff package"
+	}
+	summary := ""
+	if body.Summary != nil {
+		summary = strings.TrimSpace(*body.Summary)
+		if len(summary) > maxHandoffSummary {
+			return nil, "the handoff summary is too long"
+		}
+	}
+	for i := range body.Files {
+		body.Files[i].Name = strings.TrimSpace(body.Files[i].Name)
+		if body.Files[i].Name == "" || len(body.Files[i].Name) > maxHandoffFileName {
+			return nil, "each handoff file needs a name"
+		}
+	}
+	if len(body.Acceptance) > maxHandoffAcceptance {
+		return nil, "at most " + strconv.Itoa(maxHandoffAcceptance) + " acceptance rows can travel in a handoff package"
+	}
+	acceptance := make([]service.ChainHandoffAcceptance, 0, len(body.Acceptance))
+	for _, row := range body.Acceptance {
+		row.Label = strings.TrimSpace(row.Label)
+		row.Requirement = strings.TrimSpace(row.Requirement)
+		row.Delivered = strings.TrimSpace(row.Delivered)
+		row.State = strings.TrimSpace(row.State)
+		if row.Label == "" && row.Requirement == "" && row.Delivered == "" {
+			continue
+		}
+		if row.Label == "" || row.Requirement == "" {
+			return nil, "each acceptance row needs a label and a requirement"
+		}
+		if len(row.Label) > 80 || len(row.Requirement) > maxHandoffAcceptanceText ||
+			len(row.Delivered) > maxHandoffAcceptanceText {
+			return nil, "an acceptance row is too long"
+		}
+		if row.State != "pass" && row.State != "warn" {
+			row.State = "pass"
+		}
+		acceptance = append(acceptance, row)
+	}
+	if len(body.OpenQuestions) > maxHandoffOpenQuestions {
+		return nil, "at most " + strconv.Itoa(maxHandoffOpenQuestions) + " open questions can travel in a handoff package"
+	}
+	openQuestions := make([]string, 0, len(body.OpenQuestions))
+	for _, question := range body.OpenQuestions {
+		question = strings.TrimSpace(question)
+		if question == "" {
+			continue
+		}
+		if len(question) > maxHandoffOpenQuestion {
+			return nil, "an open question is too long"
+		}
+		openQuestions = append(openQuestions, question)
+	}
+	if len(body.NextBrief) > maxHandoffNextBrief {
+		return nil, "at most " + strconv.Itoa(maxHandoffNextBrief) + " next-leg items can travel in a handoff package"
+	}
+	nextBrief := make([]string, 0, len(body.NextBrief))
+	for _, item := range body.NextBrief {
+		item = strings.TrimSpace(item)
+		if item == "" {
+			continue
+		}
+		if len(item) > maxHandoffNextBriefItem {
+			return nil, "a next-leg item is too long"
+		}
+		nextBrief = append(nextBrief, item)
+	}
+	return &service.ChainHandoff{
+		Summary:       summary,
+		Files:         body.Files,
+		Acceptance:    acceptance,
+		OpenQuestions: openQuestions,
+		NextBrief:     nextBrief,
+	}, ""
+}
 
 // A task's chain, and the playbooks a squad walks again.
 //
@@ -46,6 +152,18 @@ type IssueChainStepResponse struct {
 	State   string `json:"state"`
 	// "pending" | "doing" | "reviewing" | "done" | "parked" | "skipped"
 	//
+	// The machine's reason code for a parked step (no_agent,
+	// runtime_private_foreign, runtime_offline, runtime_unusable,
+	// agent_runtime_required, target_unavailable). Empty for non-parked steps
+	// and for backends that predate the reason. Clients localize it and offer
+	// the matching fix instead of an indefinite "waiting".
+	ParkedReason string `json:"parked_reason,omitempty"`
+	// LegStatus is the single derived status of this leg: pending, queued,
+	// preparing, running, reviewing, parked, done, or skipped. The chain state
+	// and the run state are two layers; this is the one every surface should
+	// render. Absent on backends that predate it.
+	LegStatus string `json:"leg_status,omitempty"`
+	//
 	// The holder's own brief for this leg, written by them (or empty while
 	// they have not written it yet). Only the holder can set it.
 	Plan string `json:"plan,omitempty"`
@@ -58,6 +176,30 @@ type IssueChainStepResponse struct {
 	LegCommentCount int    `json:"leg_comment_count,omitempty"`
 	StartedAt       string `json:"started_at,omitempty"`
 	CompletedAt     string `json:"completed_at,omitempty"`
+	// The active leg-output run, when the holder has asked their leg's agent
+	// to write the handoff summary. The review gate reads this so a page
+	// reload does not lose "still generating" and approve a live leg.
+	OutputTaskID string `json:"output_task_id,omitempty"`
+	// When the newest leg-output run was created, active or finished. This is
+	// the baseline for lifting a summary that landed while the page was
+	// closed; it survives the task's completion so the lift still works.
+	OutputTaskAt string `json:"output_task_at,omitempty"`
+}
+
+// IssueChainRetryResponse is the chain after a leg retry, plus the run that
+// was queued. TaskID is empty when the retry parked instead (the agent can no
+// longer claim this leg); the steps then carry the parked_reason.
+type IssueChainRetryResponse struct {
+	IssueChainResponse
+	TaskID string `json:"task_id,omitempty"`
+}
+
+// IssueChainCancelResponse is the chain after the holder stopped the leg's
+// in-flight run(s). The step stays doing; the cancelled run is what makes the
+// retry action available.
+type IssueChainCancelResponse struct {
+	IssueChainResponse
+	Cancelled int `json:"cancelled"`
 }
 
 type IssueChainResponse struct {
@@ -77,6 +219,7 @@ func chainStepToResponse(s db.IssueChainStep) IssueChainStepResponse {
 		HolderUserID: uuidToString(s.HolderUserID),
 		Title:        s.Title,
 		State:        s.State,
+		ParkedReason: s.ParkedReason,
 		Plan:         s.Plan,
 	}
 	if s.AgentID.Valid {
@@ -95,8 +238,25 @@ func chainStepToResponse(s db.IssueChainStep) IssueChainStepResponse {
 			files = nil
 		}
 	}
-	if s.HandoffSummary != "" || len(files) > 0 {
-		out.Handoff = &service.ChainHandoff{Summary: s.HandoffSummary, Files: files}
+	var pkg service.ChainHandoffPackage
+	if len(s.HandoffPackage) > 0 {
+		if err := json.Unmarshal(s.HandoffPackage, &pkg); err != nil {
+			// Same rule as files: a bad structured blob degrades to "no
+			// structured package", never to a chain that fails to read.
+			pkg = service.ChainHandoffPackage{}
+		}
+	}
+	if s.HandoffSummary != "" || len(files) > 0 ||
+		len(pkg.Acceptance) > 0 || len(pkg.OpenQuestions) > 0 ||
+		len(pkg.NextBrief) > 0 || pkg.Returned != nil {
+		out.Handoff = &service.ChainHandoff{
+			Summary:       s.HandoffSummary,
+			Files:         files,
+			Acceptance:    pkg.Acceptance,
+			OpenQuestions: pkg.OpenQuestions,
+			NextBrief:     pkg.NextBrief,
+			Returned:      pkg.Returned,
+		}
 	}
 	if s.StartedAt.Valid {
 		out.StartedAt = timestampToString(s.StartedAt)
@@ -136,7 +296,95 @@ func (h *Handler) chainResponse(ctx context.Context, issueID pgtype.UUID) (Issue
 			counts[uuidToString(row.ChainStepID)] = int(row.CommentCount)
 		}
 	}
-	return chainToResponse(steps, counts), nil
+	outputTasks, err := h.Queries.ListLegOutputTasksForIssue(ctx, db.ListLegOutputTasksForIssueParams{
+		IssueID:     issueID,
+		HandoffNote: pgtype.Text{String: service.LegOutputInstruction, Valid: true},
+	})
+	if err != nil {
+		// The gate is a protection, not the chain itself: a failed read must
+		// not blank the relay. The UI falls back to its local generating flag.
+		slog.Warn("leg output tasks could not be read for the chain",
+			"issue_id", uuidToString(issueID), "error", err)
+		outputTasks = nil
+	}
+	latestOutput := map[string]db.ListLegOutputTasksForIssueRow{}
+	activeOutput := map[string]string{}
+	for _, task := range outputTasks {
+		agentID := uuidToString(task.AgentID)
+		if _, seen := latestOutput[agentID]; !seen {
+			latestOutput[agentID] = task
+		}
+		if isActiveAgentTaskStatus(task.Status) {
+			if _, seen := activeOutput[agentID]; !seen {
+				activeOutput[agentID] = uuidToString(task.ID)
+			}
+		}
+	}
+	resp := chainToResponse(steps, counts)
+	for i := range resp.Steps {
+		agentID := resp.Steps[i].AgentID
+		if agentID == "" {
+			continue
+		}
+		if taskID, ok := activeOutput[agentID]; ok {
+			resp.Steps[i].OutputTaskID = taskID
+		}
+		if task, ok := latestOutput[agentID]; ok {
+			resp.Steps[i].OutputTaskAt = timestampToString(task.CreatedAt)
+		}
+	}
+
+	// One derived status per leg, so the list/inbox/detail do not each
+	// recombine the chain state with the run state. The handoff-writing run is
+	// not the leg's work and is excluded.
+	legTasks, taskErr := h.Queries.ListTasksByIssue(ctx, issueID)
+	if taskErr != nil {
+		slog.Warn("chain leg tasks could not be read for leg_status",
+			"issue_id", uuidToString(issueID), "error", taskErr)
+		legTasks = nil
+	}
+	latestLeg := map[string]db.AgentTaskQueue{}
+	for _, task := range legTasks {
+		if task.HandoffNote.Valid && task.HandoffNote.String == service.LegOutputInstruction {
+			continue
+		}
+		agentID := uuidToString(task.AgentID)
+		if _, seen := latestLeg[agentID]; !seen {
+			latestLeg[agentID] = task
+		}
+	}
+	for i := range resp.Steps {
+		step := &resp.Steps[i]
+		if step.State != service.ChainStateDoing {
+			step.LegStatus = step.State
+			continue
+		}
+		latest, ok := latestLeg[step.AgentID]
+		if !ok {
+			step.LegStatus = "queued"
+			continue
+		}
+		switch latest.Status {
+		case "queued", "deferred":
+			step.LegStatus = "queued"
+		case "dispatched", "waiting_local_directory":
+			step.LegStatus = "preparing"
+		case "running":
+			step.LegStatus = "running"
+		default:
+			step.LegStatus = "queued"
+		}
+	}
+	return resp, nil
+}
+
+func isActiveAgentTaskStatus(status string) bool {
+	switch status {
+	case "queued", "dispatched", "waiting_local_directory", "running", "deferred":
+		return true
+	default:
+		return false
+	}
 }
 
 // ListIssueChain returns a task's relay, oldest step first.
@@ -164,14 +412,28 @@ func (h *Handler) ListIssueChain(w http.ResponseWriter, r *http.Request) {
 // jumping it would race that run.
 func (h *Handler) SkipIssueChainStep(w http.ResponseWriter, r *http.Request) {
 	workspaceID := workspaceIDFromURL(r, "workspaceId")
-	if _, ok := h.requireWorkspaceMember(w, r, workspaceID, "workspace not found"); !ok {
+	member, ok := h.requireWorkspaceMember(w, r, workspaceID, "workspace not found")
+	if !ok {
 		return
 	}
 	issue, ok := h.loadIssueForUser(w, r, chi.URLParam(r, "id"))
 	if !ok {
 		return
 	}
-	if _, err := h.TaskService.SkipParkedStep(r.Context(), h.Queries, issue); err != nil {
+	userID, ok := requireUserID(w, r)
+	if !ok {
+		return
+	}
+	actorID, err := util.ParseUUID(userID)
+	if err != nil {
+		writeError(w, http.StatusUnauthorized, "user not authenticated")
+		return
+	}
+	// Skipping a parked step is the room's own way around an absent holder.
+	// Skipping a REVIEWING step bypasses that holder's judgment, so it is an
+	// owner/admin fallback only.
+	allowReviewing := member.Role == "owner" || member.Role == "admin"
+	if _, err := h.TaskService.SkipChainStep(r.Context(), h.Queries, issue, allowReviewing, actorID, allowReviewing); err != nil {
 		switch {
 		case errors.Is(err, service.ErrNoChain):
 			writeError(w, http.StatusBadRequest, "this task has no chain")
@@ -218,38 +480,15 @@ func (h *Handler) ApproveIssueChainStep(w http.ResponseWriter, r *http.Request) 
 	if !ok {
 		return
 	}
-	var handoff *service.ChainHandoff
-	{
-		var body struct {
-			Summary *string                    `json:"summary"`
-			Files   []service.ChainHandoffFile `json:"files"`
-		}
-		if err := json.NewDecoder(r.Body).Decode(&body); err != nil && !errors.Is(err, io.EOF) {
-			writeError(w, http.StatusBadRequest, "invalid request body")
-			return
-		}
-		if body.Summary != nil || len(body.Files) > 0 {
-			if len(body.Files) > maxHandoffFiles {
-				writeError(w, http.StatusBadRequest, "at most "+strconv.Itoa(maxHandoffFiles)+" files can travel in a handoff package")
-				return
-			}
-			summary := ""
-			if body.Summary != nil {
-				summary = strings.TrimSpace(*body.Summary)
-				if len(summary) > maxHandoffSummary {
-					writeError(w, http.StatusBadRequest, "the handoff summary is too long")
-					return
-				}
-			}
-			for i := range body.Files {
-				body.Files[i].Name = strings.TrimSpace(body.Files[i].Name)
-				if body.Files[i].Name == "" || len(body.Files[i].Name) > maxHandoffFileName {
-					writeError(w, http.StatusBadRequest, "each handoff file needs a name")
-					return
-				}
-			}
-			handoff = &service.ChainHandoff{Summary: summary, Files: body.Files}
-		}
+	var body handoffPayload
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil && !errors.Is(err, io.EOF) {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	handoff, handoffErr := buildHandoff(&body)
+	if handoffErr != "" {
+		writeError(w, http.StatusBadRequest, handoffErr)
+		return
 	}
 	if _, err := h.TaskService.ApproveChainStep(r.Context(), h.Queries, issue, holder, handoff); err != nil {
 		switch {
@@ -259,6 +498,14 @@ func (h *Handler) ApproveIssueChainStep(w http.ResponseWriter, r *http.Request) 
 			writeError(w, http.StatusConflict, "nothing is waiting for review on this task")
 		case errors.Is(err, service.ErrNotStepHolder):
 			writeError(w, http.StatusForbidden, "only the step's holder can approve it")
+		case errors.Is(err, service.ErrLegOutputRunning):
+			writeError(w, http.StatusConflict, "the leg's summary is still being generated")
+		case errors.Is(err, service.ErrHandoffRequired):
+			writeError(w, http.StatusConflict, "write a handoff summary before passing the leg")
+		case errors.Is(err, service.ErrHandoffAcceptanceRequired):
+			writeError(w, http.StatusConflict, "add at least one acceptance item before passing the leg")
+		case errors.Is(err, service.ErrHandoffNextBriefRequired):
+			writeError(w, http.StatusConflict, "write a brief for the next leg before passing this one")
 		default:
 			writeError(w, http.StatusInternalServerError, "failed to approve the step")
 		}
@@ -267,6 +514,87 @@ func (h *Handler) ApproveIssueChainStep(w http.ResponseWriter, r *http.Request) 
 	resp, err := h.chainResponse(r.Context(), issue.ID)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "the step was approved but the chain could not be read back")
+		return
+	}
+	writeJSON(w, http.StatusOK, resp)
+}
+
+// ReturnIssueChainStep is the holder's 退回修改: the run is done, but they are
+// not willing to hand it on. The package they were reviewing is preserved with
+// the reason on it, the leg goes back to doing, and the leg's own agent gets a
+// revision run. Only the holder can do this — the same boundary as approve.
+func (h *Handler) ReturnIssueChainStep(w http.ResponseWriter, r *http.Request) {
+	workspaceID := workspaceIDFromURL(r, "workspaceId")
+	if _, ok := h.requireWorkspaceMember(w, r, workspaceID, "workspace not found"); !ok {
+		return
+	}
+	userID, ok := requireUserID(w, r)
+	if !ok {
+		return
+	}
+	holder, err := util.ParseUUID(userID)
+	if err != nil {
+		writeError(w, http.StatusUnauthorized, "user not authenticated")
+		return
+	}
+	issue, ok := h.loadIssueForUser(w, r, chi.URLParam(r, "id"))
+	if !ok {
+		return
+	}
+	var body struct {
+		Summary       *string                          `json:"summary"`
+		Files         []service.ChainHandoffFile       `json:"files"`
+		Acceptance    []service.ChainHandoffAcceptance `json:"acceptance"`
+		OpenQuestions []string                         `json:"open_questions"`
+		NextBrief     []string                         `json:"next_brief"`
+		Reason        string                           `json:"reason"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	reason := strings.TrimSpace(body.Reason)
+	if reason == "" {
+		writeError(w, http.StatusBadRequest, "a return needs a reason")
+		return
+	}
+	if len(reason) > maxHandoffReturnReason {
+		writeError(w, http.StatusBadRequest, "the return reason is too long")
+		return
+	}
+	handoff, handoffErr := buildHandoff(&handoffPayload{
+		Summary:       body.Summary,
+		Files:         body.Files,
+		Acceptance:    body.Acceptance,
+		OpenQuestions: body.OpenQuestions,
+		NextBrief:     body.NextBrief,
+	})
+	if handoffErr != "" {
+		writeError(w, http.StatusBadRequest, handoffErr)
+		return
+	}
+	if _, err := h.TaskService.ReturnChainStep(r.Context(), h.Queries, issue, holder, handoff, reason); err != nil {
+		switch {
+		case errors.Is(err, service.ErrNoChain):
+			writeError(w, http.StatusBadRequest, "this task has no chain")
+		case errors.Is(err, service.ErrNoReviewingStep):
+			writeError(w, http.StatusConflict, "nothing is waiting for review on this task")
+		case errors.Is(err, service.ErrNotStepHolder):
+			writeError(w, http.StatusForbidden, "only the step's holder can return it")
+		case errors.Is(err, service.ErrNoStepAgent):
+			writeError(w, http.StatusConflict, "this leg has no agent to revise the work")
+		case errors.Is(err, service.ErrLegOutputRunning):
+			writeError(w, http.StatusConflict, "the leg's summary is still being generated")
+		case errors.Is(err, service.ErrDuplicatePendingTask):
+			writeError(w, http.StatusConflict, "this leg's agent is already running")
+		default:
+			writeError(w, http.StatusInternalServerError, "failed to return the step")
+		}
+		return
+	}
+	resp, err := h.chainResponse(r.Context(), issue.ID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "the step was returned but the chain could not be read back")
 		return
 	}
 	writeJSON(w, http.StatusOK, resp)
@@ -317,14 +645,6 @@ func (h *Handler) SetIssueChainStepPlan(w http.ResponseWriter, r *http.Request) 
 	writeJSON(w, http.StatusOK, resp)
 }
 
-// legOutputInstruction is the opening frame for a leg-output run — the
-// handoff_note the daemon renders into the run's prompt. The rules live in the
-// quickwork-relay-leg-output builtin skill; this note only names the task and
-// the delivery mechanics the skill cannot know.
-const legOutputInstruction = "Write THIS relay leg's handoff document — follow the quickwork-relay-leg-output skill. " +
-	"Post exactly one comment on this issue: the comment body IS the final markdown document, nothing else. " +
-	"Your holder will review it and approve to carry it on."
-
 // GenerateIssueChainLegOutput — POST /api/issues/{id}/chain/output
 //
 // The holder asks their leg's own agent for the leg's output: one run that
@@ -373,7 +693,7 @@ func (h *Handler) GenerateIssueChainLegOutput(w http.ResponseWriter, r *http.Req
 		writeError(w, http.StatusConflict, "the relay is not on a leg with an agent")
 		return
 	}
-	task, err := h.TaskService.EnqueueTaskForMentionWithNote(r.Context(), issue, target.AgentID, pgtype.UUID{}, legOutputInstruction)
+	task, err := h.TaskService.EnqueueTaskForMentionWithNote(r.Context(), issue, target.AgentID, pgtype.UUID{}, service.LegOutputInstruction)
 	if err != nil {
 		if errors.Is(err, service.ErrDuplicatePendingTask) {
 			// A run for this leg's agent is already queued or running — it
@@ -393,6 +713,242 @@ func (h *Handler) GenerateIssueChainLegOutput(w http.ResponseWriter, r *http.Req
 		"task_id": uuidToString(task.ID),
 		"status":  "queued",
 	})
+}
+
+// ReassignIssueChainStep moves a waiting leg (reviewing or parked) to another
+// squad member. Owner/admin only: it is the fallback for a holder who is
+// unreachable, and it changes whose judgment the relay waits on.
+func (h *Handler) ReassignIssueChainStep(w http.ResponseWriter, r *http.Request) {
+	workspaceID := workspaceIDFromURL(r, "workspaceId")
+	member, ok := h.requireWorkspaceMember(w, r, workspaceID, "workspace not found")
+	if !ok {
+		return
+	}
+	if member.Role != "owner" && member.Role != "admin" {
+		writeError(w, http.StatusForbidden, "only a workspace owner or admin can reassign a leg")
+		return
+	}
+	var req struct {
+		HolderUserID string `json:"holder_user_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	newHolder, ok := parseUUIDOrBadRequest(w, req.HolderUserID, "holder_user_id")
+	if !ok {
+		return
+	}
+	issue, ok := h.loadIssueForUser(w, r, chi.URLParam(r, "id"))
+	if !ok {
+		return
+	}
+	userID, ok := requireUserID(w, r)
+	if !ok {
+		return
+	}
+	actorID, err := util.ParseUUID(userID)
+	if err != nil {
+		writeError(w, http.StatusUnauthorized, "user not authenticated")
+		return
+	}
+	if _, err := h.TaskService.ReassignChainStep(r.Context(), h.Queries, issue, actorID, newHolder); err != nil {
+		switch {
+		case errors.Is(err, service.ErrNoChain):
+			writeError(w, http.StatusBadRequest, "this task has no chain")
+		case errors.Is(err, service.ErrNewHolderNotInSquad):
+			writeError(w, http.StatusBadRequest, "the new holder is not a member of this squad")
+		case errors.Is(err, service.ErrNoReassignableStep):
+			writeError(w, http.StatusConflict, "no reviewing or parked leg to reassign")
+		default:
+			writeError(w, http.StatusInternalServerError, "failed to reassign the leg")
+		}
+		return
+	}
+	chain, err := h.chainResponse(r.Context(), issue.ID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "the leg was reassigned but the chain could not be read back")
+		return
+	}
+	writeJSON(w, http.StatusOK, chain)
+}
+
+// ExtractIssueChainHandoff re-reads the newest leg-output document and rewrites
+// the structured handoff package from its machine-readable block. The holder
+// uses it when the automatic extraction missed or the document was edited.
+func (h *Handler) ExtractIssueChainHandoff(w http.ResponseWriter, r *http.Request) {
+	workspaceID := workspaceIDFromURL(r, "workspaceId")
+	member, ok := h.requireWorkspaceMember(w, r, workspaceID, "workspace not found")
+	if !ok {
+		return
+	}
+	userID, ok := requireUserID(w, r)
+	if !ok {
+		return
+	}
+	holder, err := util.ParseUUID(userID)
+	if err != nil {
+		writeError(w, http.StatusUnauthorized, "user not authenticated")
+		return
+	}
+	issue, ok := h.loadIssueForUser(w, r, chi.URLParam(r, "id"))
+	if !ok {
+		return
+	}
+	override := member.Role == "owner" || member.Role == "admin"
+	if _, err := h.TaskService.ReextractLegHandoff(r.Context(), issue, holder, override); err != nil {
+		switch {
+		case errors.Is(err, service.ErrNoChain):
+			writeError(w, http.StatusBadRequest, "this task has no chain")
+		case errors.Is(err, service.ErrNoReviewingStep):
+			writeError(w, http.StatusConflict, "nothing is waiting for review on this task")
+		case errors.Is(err, service.ErrNotStepHolder):
+			writeError(w, http.StatusForbidden, "only the step's holder can extract its handoff")
+		case errors.Is(err, service.ErrNoStepAgent):
+			writeError(w, http.StatusConflict, "this leg has no agent document")
+		case errors.Is(err, service.ErrLegOutputRunning):
+			writeError(w, http.StatusConflict, "the leg's summary is still being generated")
+		case errors.Is(err, service.ErrNoHandoffDocument):
+			writeError(w, http.StatusConflict, "this leg has no completed output document to extract")
+		case errors.Is(err, service.ErrHandoffBlockMissing):
+			writeError(w, http.StatusConflict, "the output document has no handoff block")
+		default:
+			writeError(w, http.StatusInternalServerError, "failed to extract the handoff")
+		}
+		return
+	}
+	chain, err := h.chainResponse(r.Context(), issue.ID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "the handoff was extracted but the chain could not be read back")
+		return
+	}
+	writeJSON(w, http.StatusOK, chain)
+}
+
+// CancelIssueChainStep stops the running leg at its holder's request. It is
+// the first half of recovery from a stalled run; the holder cancels, then the
+// leg's cancelled run makes RetryIssueChainStep available.
+func (h *Handler) CancelIssueChainStep(w http.ResponseWriter, r *http.Request) {
+	workspaceID := workspaceIDFromURL(r, "workspaceId")
+	member, ok := h.requireWorkspaceMember(w, r, workspaceID, "workspace not found")
+	if !ok {
+		return
+	}
+	userID, ok := requireUserID(w, r)
+	if !ok {
+		return
+	}
+	holder, err := util.ParseUUID(userID)
+	if err != nil {
+		writeError(w, http.StatusUnauthorized, "user not authenticated")
+		return
+	}
+	issue, ok := h.loadIssueForUser(w, r, chi.URLParam(r, "id"))
+	if !ok {
+		return
+	}
+	// The holder owns the turn; a workspace owner/admin is the fallback when
+	// the holder is unreachable. The service logs every override.
+	override := member.Role == "owner" || member.Role == "admin"
+	_, cancelled, err := h.TaskService.CancelChainStep(r.Context(), h.Queries, issue, holder, override)
+	if err != nil {
+		switch {
+		case errors.Is(err, service.ErrNoChain):
+			writeError(w, http.StatusBadRequest, "this task has no chain")
+		case errors.Is(err, service.ErrNoActiveStep):
+			writeError(w, http.StatusConflict, "no leg is being worked on right now")
+		case errors.Is(err, service.ErrNotStepHolder):
+			writeError(w, http.StatusForbidden, "only the step's holder can cancel it")
+		case errors.Is(err, service.ErrNoStepAgent):
+			writeError(w, http.StatusConflict, "this leg has no agent")
+		case errors.Is(err, service.ErrLegNoActiveRun):
+			writeError(w, http.StatusConflict, "this leg has no active run to cancel")
+		default:
+			writeError(w, http.StatusInternalServerError, "failed to cancel the leg")
+		}
+		return
+	}
+	chain, err := h.chainResponse(r.Context(), issue.ID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "the leg was cancelled but the chain could not be read back")
+		return
+	}
+	writeJSON(w, http.StatusOK, IssueChainCancelResponse{
+		IssueChainResponse: chain,
+		Cancelled:          cancelled,
+	})
+}
+
+// RetryIssueChainStep re-runs the leg that is doing after its run was
+// interrupted (watchdog, stalled stream, or an explicit cancel). It is the
+// holder's operational recovery, not a review action: the step and the baton
+// stay where they are.
+func (h *Handler) RetryIssueChainStep(w http.ResponseWriter, r *http.Request) {
+	workspaceID := workspaceIDFromURL(r, "workspaceId")
+	member, ok := h.requireWorkspaceMember(w, r, workspaceID, "workspace not found")
+	if !ok {
+		return
+	}
+	userID, ok := requireUserID(w, r)
+	if !ok {
+		return
+	}
+	holder, err := util.ParseUUID(userID)
+	if err != nil {
+		writeError(w, http.StatusUnauthorized, "user not authenticated")
+		return
+	}
+	issue, ok := h.loadIssueForUser(w, r, chi.URLParam(r, "id"))
+	if !ok {
+		return
+	}
+	override := member.Role == "owner" || member.Role == "admin"
+
+	// The retry reruns the leg's own agent, so it passes the same invoke gate
+	// a manual rerun does. The holder check inside the service is the relay's
+	// personal-view boundary; this stops a holder from re-firing an agent that
+	// was never theirs to invoke.
+	actorType, actorID := h.resolveActor(r, userID, workspaceID)
+	originatorUserID := h.invokeOriginatorFromRequest(r, actorType, actorID)
+	canInvoke := func(agent db.Agent) bool {
+		return h.canInvokeAgent(r.Context(), agent, actorType, actorID, originatorUserID, workspaceID)
+	}
+
+	task, _, err := h.TaskService.RetryChainStep(r.Context(), h.Queries, issue, holder, canInvoke, override)
+	if err != nil {
+		switch {
+		case errors.Is(err, service.ErrNoChain):
+			writeError(w, http.StatusBadRequest, "this task has no chain")
+		case errors.Is(err, service.ErrNoActiveStep):
+			writeError(w, http.StatusConflict, "no leg is being worked on right now")
+		case errors.Is(err, service.ErrNotStepHolder):
+			writeError(w, http.StatusForbidden, "only the step's holder can retry it")
+		case errors.Is(err, service.ErrNoStepAgent):
+			writeError(w, http.StatusConflict, "this leg has no agent to retry")
+		case errors.Is(err, service.ErrLegAlreadyRunning):
+			writeError(w, http.StatusConflict, "this leg's agent is still running")
+		case errors.Is(err, service.ErrLegDelivered):
+			writeError(w, http.StatusConflict, "this leg's run already finished; review it")
+		case errors.Is(err, service.ErrLegNoRetryableRun):
+			writeError(w, http.StatusConflict, "this leg has no interrupted run to retry")
+		case errors.Is(err, service.ErrRerunInvokeNotAllowed):
+			h.writeDispatchBlocked(w, http.StatusForbidden, ReasonInvocationNotAllowed)
+		default:
+			writeError(w, http.StatusInternalServerError, "failed to retry the leg")
+		}
+		return
+	}
+
+	chain, err := h.chainResponse(r.Context(), issue.ID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "the leg was retried but the chain could not be read back")
+		return
+	}
+	resp := IssueChainRetryResponse{IssueChainResponse: chain}
+	if task != nil {
+		resp.TaskID = uuidToString(task.ID)
+	}
+	writeJSON(w, http.StatusOK, resp)
 }
 
 type ListIssueChainsRequest struct {
@@ -544,7 +1100,20 @@ func (h *Handler) CreateIssueChain(w http.ResponseWriter, r *http.Request) {
 	}
 	defer tx.Rollback(r.Context())
 
-	steps, err := h.TaskService.InstantiateChain(r.Context(), h.Queries.WithTx(tx), issue, squad, extra)
+	// The head's state must agree with whether a leader run can claim. This
+	// handler is the two-request path (create, then attach the relay); the
+	// one-request create decides the same way inside its transaction. Without
+	// this, a blocked leader left a doing step with nothing behind it.
+	leaderState, leaderReason := service.ChainStateDoing, ""
+	if leader, aerr := h.Queries.GetAgent(r.Context(), squad.LeaderID); aerr == nil {
+		if verdict, verr := service.AgentReadiness(r.Context(), h.runtimeLookup(obsmetrics.RuntimeLookupSourceIssue), leader); verr == nil && verdict.Blocked() {
+			leaderState = service.ChainStateParked
+			leaderReason = string(verdict.Reason)
+		}
+	}
+	steps, err := h.TaskService.InstantiateChainWithLeaderState(
+		r.Context(), h.Queries.WithTx(tx), issue, squad, extra, leaderState, leaderReason, true,
+	)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "failed to write the chain")
 		return
@@ -557,6 +1126,7 @@ func (h *Handler) CreateIssueChain(w http.ResponseWriter, r *http.Request) {
 	h.publish(protocol.EventIssueChainChanged, workspaceID, "member", requestUserID(r), map[string]any{
 		"issue_id": uuidToString(issue.ID),
 	})
+	h.TaskService.NotifyParkedChainSteps(r.Context(), issue, steps)
 	writeJSON(w, http.StatusCreated, chainToResponse(steps, nil))
 }
 

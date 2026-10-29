@@ -47,7 +47,6 @@
     "placeholder": "작업, 프로젝트, 에이전트, 멤버, 설정 검색…",
     "close": "검색 닫기",
     "scope": "워크스페이스 / {{slug}} · {{count}}개 색인",
-    "result_count_one": "결과 {{count}}개",
     "result_count_other": "결과 {{count}}개",
     "no_results_count": "결과 없음",
     "recent_count": "최근 {{count}}개",

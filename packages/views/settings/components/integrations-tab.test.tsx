@@ -29,6 +29,8 @@ vi.mock("@tanstack/react-query", () => ({
   queryOptions: <T,>(opts: T) => opts,
 }));
 
+vi.mock("@quickwork/core/hooks", () => ({ useWorkspaceId: () => "ws-1" }));
+
 vi.mock("@quickwork/core/composio", () => ({
   composioToolkitsOptions: () => ({ queryKey: ["composio", "toolkits"] }),
 }));
@@ -89,8 +91,10 @@ describe("Settings IntegrationsTab", () => {
     renderTab();
 
     expect(screen.queryByTestId("composio-tab")).toBeNull();
-    expect(queryCallsRef.current).toHaveLength(1);
-    expect(queryCallsRef.current[0]?.enabled).toBe(false);
+    const composioQuery = queryCallsRef.current.find(
+      (call) => Array.isArray(call.queryKey) && call.queryKey.includes("composio"),
+    );
+    expect(composioQuery?.enabled).toBe(false);
   });
 
   it("shows Composio when the feature flag is on and the integration is configured", () => {

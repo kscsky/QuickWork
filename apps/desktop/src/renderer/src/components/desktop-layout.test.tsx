@@ -65,6 +65,7 @@ vi.mock("@quickwork/views/layout", () => ({
   AppSidebar: () => null,
   GlobalShortcuts: () => null,
   NavigationProgress: () => null,
+  CanvasBackdrop: () => null,
 }));
 
 vi.mock("@quickwork/views/modals/registry", () => ({ ModalRegistry: () => null }));

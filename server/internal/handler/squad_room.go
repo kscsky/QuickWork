@@ -12,6 +12,7 @@ import (
 
 	"github.com/kscsky/quickwork/server/internal/util"
 	db "github.com/kscsky/quickwork/server/pkg/db/generated"
+	"github.com/kscsky/quickwork/server/pkg/dbid"
 	"github.com/kscsky/quickwork/server/pkg/protocol"
 )
 
@@ -313,6 +314,7 @@ func (h *Handler) notifySquadMessageInbox(
 			continue
 		}
 		item, err := h.Queries.CreateInboxItem(ctx, db.CreateInboxItemParams{
+			ID:            dbid.NewV7(),
 			WorkspaceID:   wsUUID,
 			RecipientType: "member",
 			RecipientID:   member.MemberID,

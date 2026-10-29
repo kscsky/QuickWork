@@ -47,7 +47,6 @@
     "placeholder": "タスク、プロジェクト、エージェント、メンバー、設定を検索…",
     "close": "検索を閉じる",
     "scope": "ワークスペース / {{slug}} · {{count}} 種類の索引",
-    "result_count_one": "{{count}} 件",
     "result_count_other": "{{count}} 件",
     "no_results_count": "結果なし",
     "recent_count": "最近 {{count}} 件",

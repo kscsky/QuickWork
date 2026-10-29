@@ -69,7 +69,7 @@ describe("issue surface view store registry", () => {
     projectA.getState().togglePriorityFilter("high");
 
     expect(projectA.getState().viewMode).toBe("list");
-    expect(projectB.getState().viewMode).toBe("board");
+    expect(projectB.getState().viewMode).toBe("list");
     expect(projectB.getState().priorityFilters).toEqual([]);
 
     const raw = localStorage.getItem(`${ISSUE_SURFACE_VIEW_STORAGE_KEY}:acme`);
@@ -120,7 +120,7 @@ describe("issue surface view store registry", () => {
     expect(projectA.getState().tableGrouping).toBe("status");
     expect(projectA.getState().tableCalculation).toBe("average");
 
-    expect(projectB.getState().viewMode).toBe("board");
+    expect(projectB.getState().viewMode).toBe("list");
     expect(
       projectB.getState().tableColumns.some((column) =>
         column.key.startsWith("property:"),
@@ -142,7 +142,7 @@ describe("issue surface view store registry", () => {
 
     setCurrentWorkspace("beta", "ws_b");
     await flush();
-    expect(projectA.getState().viewMode).toBe("board");
+    expect(projectA.getState().viewMode).toBe("list");
     projectA.getState().setViewMode("gantt");
 
     setCurrentWorkspace("acme", "ws_a");
@@ -164,7 +164,7 @@ describe("issue surface view store registry", () => {
 
     clearIssueSurfaceViewState("project:a");
 
-    expect(projectA.getState().viewMode).toBe("board");
+    expect(projectA.getState().viewMode).toBe("list");
     expect(projectB.getState().viewMode).toBe("gantt");
     expect(getIssueSurfaceViewStateRegistrySnapshot()["project:a"]).toBeUndefined();
     expect(getIssueSurfaceViewStateRegistrySnapshot()["project:b"]?.state.viewMode).toBe(
@@ -183,7 +183,7 @@ describe("issue surface view store registry", () => {
     pruneIssueSurfaceViewStates(["project:a"]);
 
     expect(projectA.getState().viewMode).toBe("list");
-    expect(projectB.getState().viewMode).toBe("board");
+    expect(projectB.getState().viewMode).toBe("list");
     expect(getIssueSurfaceViewStateRegistrySnapshot()["project:a"]?.state.viewMode).toBe(
       "list",
     );
@@ -194,6 +194,7 @@ describe("issue surface view store registry", () => {
     setCurrentWorkspace("acme", "ws_a");
     await flush();
     const store = getIssueSurfaceViewStore("project:provider");
+    store.getState().setViewMode("board");
 
     function Probe() {
       const viewMode = useViewStore((state) => state.viewMode);

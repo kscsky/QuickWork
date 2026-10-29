@@ -2785,6 +2785,11 @@ type CreateIssueRequest struct {
 	// origin_id=agent_task_queue.id).
 	OriginType *string `json:"origin_type,omitempty"`
 	OriginID   *string `json:"origin_id,omitempty"`
+	// ChainSteps, when present, writes the squad relay in the same transaction
+	// as the issue. The leader is always step 0 and is written by the server;
+	// these are the steps AFTER the leader. An empty array asks for the squad's
+	// own order. Omit entirely for a plain issue.
+	ChainSteps *[]service.ChainStepSpec `json:"chain_steps,omitempty"`
 
 	AllowDuplicate bool `json:"allow_duplicate,omitempty"`
 }
@@ -3015,6 +3020,32 @@ func (h *Handler) CreateIssue(w http.ResponseWriter, r *http.Request) {
 		return out
 	}
 
+	// A relay create carries its route in the same request. Validate and
+	// resolve it before the transaction so a bad step fails without creating
+	// an issue; the chain rows themselves are written inside Create, before
+	// the leader task is enqueued.
+	var chainSpecs []service.ChainStepSpec
+	chainRequested := req.ChainSteps != nil
+	if chainRequested {
+		if !assigneeType.Valid || assigneeType.String != "squad" || !assigneeID.Valid {
+			writeError(w, http.StatusBadRequest, "chain_steps require a squad assignee")
+			return
+		}
+		squad, serr := h.Queries.GetSquadInWorkspace(r.Context(), db.GetSquadInWorkspaceParams{
+			ID:          assigneeID,
+			WorkspaceID: wsUUID,
+		})
+		if serr != nil {
+			writeError(w, http.StatusBadRequest, "the squad this task is assigned to no longer exists")
+			return
+		}
+		specs, ok := h.chainSpecsFrom(w, r, workspaceID, squad, "", *req.ChainSteps)
+		if !ok {
+			return
+		}
+		chainSpecs = specs
+	}
+
 	res, err := h.IssueService.Create(r.Context(), service.IssueCreateParams{
 		WorkspaceID:    wsUUID,
 		Title:          req.Title,
@@ -3035,6 +3066,8 @@ func (h *Handler) CreateIssue(w http.ResponseWriter, r *http.Request) {
 		AttachmentIDs:  attachmentIDs,
 		LabelIDs:       labelIDs,
 		AllowDuplicate: req.AllowDuplicate,
+		ChainRequested: chainRequested,
+		ChainSteps:     chainSpecs,
 	}, service.IssueCreateOpts{
 		ActorID:          actualCreatorID,
 		AnalyticsAgentID: analyticsAgentID,
@@ -3086,6 +3119,10 @@ func (h *Handler) CreateIssue(w http.ResponseWriter, r *http.Request) {
 			"the target status was archived while this request was in flight; reload the status list and retry")
 		return
 	}
+	if errors.Is(err, service.ErrChainRequiresSquad) {
+		writeError(w, http.StatusBadRequest, "a relay can only be created for a squad-assigned issue")
+		return
+	}
 	if err != nil {
 		slog.Warn("create issue failed", append(logger.RequestAttrs(r), "error", err, "workspace_id", workspaceID)...)
 		writeError(w, http.StatusInternalServerError, "failed to create issue: "+err.Error())
@@ -3103,7 +3140,17 @@ func (h *Handler) CreateIssue(w http.ResponseWriter, r *http.Request) {
 	// understood label_ids and skip its legacy post-create attach fallback.
 	labelResponses := labelsToResponse(res.Labels)
 	resp.Labels = &labelResponses
-	writeJSON(w, http.StatusCreated, resp)
+	var chainResp *IssueChainResponse
+	if chainRequested {
+		chain := chainToResponse(res.ChainSteps, nil)
+		chainResp = &chain
+	}
+	// Embedded, so the body stays the issue object older clients parse; the
+	// relay rides alongside it for clients that created one.
+	writeJSON(w, http.StatusCreated, struct {
+		IssueResponse
+		Chain *IssueChainResponse `json:"chain,omitempty"`
+	}{IssueResponse: resp, Chain: chainResp})
 }
 
 type UpdateIssueRequest struct {

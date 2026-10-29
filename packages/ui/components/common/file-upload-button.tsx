@@ -55,7 +55,7 @@ function FileUploadButton({
         )}
       >
         {showLabel ? <Plus className={iconSize} /> : <Paperclip className={iconSize} />}
-        {showLabel ? <span className="text-[9.5px]">{attachLabel}</span> : null}
+        {showLabel ? <span className="text-micro">{attachLabel}</span> : null}
       </Button>
       <input
         ref={inputRef}

@@ -16,6 +16,7 @@ vi.mock("@quickwork/core/chat", () => ({
 vi.mock("@quickwork/core/paths", () => ({
   useWorkspacePaths: () => ({
     inbox: () => "/w/inbox",
+    tasks: () => "/w/tasks",
     chat: () => "/w/chat",
     myIssues: () => "/w/my-issues",
     issues: () => "/w/issues",

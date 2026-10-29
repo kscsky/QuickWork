@@ -331,6 +331,15 @@
     "note_squad": "First leg: {{name}} takes it immediately; each leg hands off after acceptance.",
     "note_squad_unassigned": "No one leads this squad yet — the first leg is unassigned.",
     "parked_notice_short": "{{name}} has no agent — this leg parks.",
-    "title_required_solo": "Give this dispatch note an action"
+    "blocked_notice_short": "{{name}}'s agent cannot take this leg: {{reason}} — it will park here.",
+    "blocked_reason_offline": "the machine is offline",
+    "blocked_reason_private": "the machine is private to someone else",
+    "blocked_reason_unavailable": "the agent is unavailable",
+    "blocked_reason_unbound": "the agent has no machine bound",
+    "blocked_reason_unusable": "the machine cannot execute its CLI",
+    "blocked_reason_fallback": "it is not runnable right now",
+    "title_required_solo": "Give this dispatch note an action",
+    "active_duplicate": "An active task with this title already exists: {{identifier}} “{{title}}”. Open it instead of creating a duplicate.",
+    "open_existing": "Open existing task"
   }
 }

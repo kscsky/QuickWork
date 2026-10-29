@@ -115,8 +115,8 @@ function CreateIssueDialogBody({
 }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [createType, setCreateType] = useState<"single" | "squad">("single");
-  // A squad dispatch in flight owns the dialog: the issue link and chain
-  // write happen in the body's effects, so closing would strand them.
+  // A squad create owns the dialog only while the issue + route writes are in
+  // flight; both are direct requests, not an agent-created issue to poll for.
   const [squadBusy, setSquadBusy] = useState(false);
   const effectiveData = sourceContextData
     ? { ...(data ?? {}), ...sourceContextData }

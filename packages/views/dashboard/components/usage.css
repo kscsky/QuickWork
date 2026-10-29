@@ -110,13 +110,13 @@ html[lang|="ko"] .qw-us-page {
   align-items: center;
   gap: 8px;
   margin: 8px 0 0;
-  font-size: 11.5px;
+  font-size: 12px;
   color: var(--muted-foreground);
 }
 
 .qw-us-live b {
   font-family: var(--qw-us-mono);
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--foreground);
   font-variant-numeric: tabular-nums;
@@ -250,7 +250,7 @@ html[lang|="ko"] .qw-us-page {
   border: 0;
   background: none;
   color: var(--muted-foreground);
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 500;
   cursor: pointer;
   transition: color 140ms;
@@ -412,7 +412,7 @@ html[lang|="ko"] .qw-us-page {
 
 .qw-us-sec-head h2 {
   margin: 0;
-  font-size: 15.5px;
+  font-size: 16px;
   line-height: 20px;
   font-weight: 650;
   color: var(--foreground);
@@ -769,7 +769,7 @@ html[lang|="ko"] .qw-us-page {
 
 .qw-us-rail-head h3 {
   margin: 0;
-  font-size: 13.5px;
+  font-size: 14px;
   font-weight: 650;
   color: var(--foreground);
 }
@@ -1620,7 +1620,7 @@ html[lang|="ko"] .qw-us-page {
 .qw-us-empty {
   padding: 64px 0;
   text-align: center;
-  font-size: 11.5px;
+  font-size: 12px;
   color: var(--faint-foreground);
 }
 

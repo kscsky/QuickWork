@@ -107,7 +107,7 @@ function isNavActive(pathname: string, href: string): boolean {
  */
 const NAV_BUTTON_CLASS =
   "my-px h-[36px] gap-[9px] rounded-[4px] border border-transparent " +
-  "px-[8px] py-0 text-[13.5px] font-medium text-muted-foreground " +
+  "px-[8px] py-0 text-[14px] font-medium text-muted-foreground " +
   "hover:not-data-active:bg-foreground/5 hover:not-data-active:text-foreground " +
   "data-active:border-border data-active:bg-surface data-active:text-foreground " +
   "data-active:font-semibold data-active:hover:bg-surface data-active:hover:text-foreground " +
@@ -240,7 +240,7 @@ function NavCount({ text, hot }: { text: string; hot: boolean }) {
   return (
     <span
       className={cn(
-        "ml-auto shrink-0 font-mono text-[10.5px] tabular-nums",
+        "ml-auto shrink-0 font-mono text-[11px] tabular-nums",
         hot ? "text-inflight" : "text-faint-foreground",
       )}
     >
@@ -265,6 +265,7 @@ const EMPTY_INBOX_SUMMARY: Awaited<ReturnType<typeof api.getInboxUnreadSummary>>
 // Only parameterless paths are valid nav destinations.
 type NavKey =
   | "inbox"
+  | "activity"
   | "tasks"
   | "projects"
   | "autopilots"
@@ -285,6 +286,7 @@ type NavKey =
 // icons derived from the destination path via routeIconForPath.
 type NavLabelKey =
   | "inbox"
+  | "activity"
   | "tasks"
   | "projects"
   | "autopilots"
@@ -304,11 +306,8 @@ type NavLabelKey =
 // Nav icons are NOT declared here: they are derived from each item's
 // destination path at render time, so the sidebar and the desktop tab bar
 // always agree. See route-icon-components.tsx.
-const personalNav: { key: NavKey; labelKey: NavLabelKey }[] = [
-  { key: "inbox", labelKey: "inbox" },
-];
-
 const workspaceNav: { key: NavKey; labelKey: NavLabelKey }[] = [
+  { key: "activity", labelKey: "activity" },
   { key: "tasks", labelKey: "tasks" },
   { key: "projects", labelKey: "projects" },
   { key: "autopilots", labelKey: "autopilots" },
@@ -619,7 +618,7 @@ const SidebarNavItem = React.memo(function SidebarNavItem({
           <CappedNumberFlow
             value={inboxUnread}
             animated={false}
-            className="ml-auto font-mono text-[10.5px] tabular-nums"
+            className="ml-auto font-mono text-[11px] tabular-nums"
           />
         ) : null}
         {count ? <NavCount {...count} /> : null}
@@ -631,7 +630,6 @@ const SidebarNavItem = React.memo(function SidebarNavItem({
 /** The only part of the sidebar that tracks the active route. */
 function SidebarNavigation({
   paths,
-  unreadCount,
   visiblePinned,
   getPinHref,
   onUnpin,
@@ -642,7 +640,6 @@ function SidebarNavigation({
   onDragEnd,
 }: {
   paths: ReturnType<typeof useWorkspacePaths>;
-  unreadCount: number;
   visiblePinned: PinnedItem[];
   getPinHref: (pin: PinnedItem) => string;
   onUnpin: (pin: PinnedItem) => void;
@@ -661,26 +658,6 @@ function SidebarNavigation({
 
   return (
     <>
-      <SidebarGroup>
-        <SidebarGroupContent>
-          <SidebarMenu className="gap-[3px]">
-            {personalNav.map((item) => {
-              const href = paths[item.key]();
-              return (
-                <SidebarNavItem
-                  key={item.key}
-                  href={href}
-                  navKey={item.key}
-                  label={t(($) => $.nav[item.labelKey])}
-                  isActive={isNavActive(pathname, href)}
-                  inboxUnread={item.key === "inbox" ? unreadCount : undefined}
-                />
-              );
-            })}
-          </SidebarMenu>
-        </SidebarGroupContent>
-      </SidebarGroup>
-
       {visiblePinned.length > 0 && (
         <Collapsible defaultOpen>
           <SidebarGroup className="group/pinned">
@@ -855,8 +832,14 @@ export function AppSidebar({ topSlot, searchSlot, headerClassName, headerStyle }
   // three separate queries.
   const runningWork = useRunningWork(wsId ?? "");
   const navCounts = React.useMemo(
-    () => navCountText(runningWork, t),
-    [runningWork, t],
+    () => {
+      const counts = navCountText(runningWork, t);
+      if (unreadCount > 0) {
+        counts.activity = { text: String(unreadCount), hot: true };
+      }
+      return counts;
+    },
+    [runningWork, t, unreadCount],
   );
   const handleDragStart = useCallback(() => {
     isDraggingRef.current = true;
@@ -1126,7 +1109,6 @@ export function AppSidebar({ topSlot, searchSlot, headerClassName, headerStyle }
           <CloseMobileSidebarOnNavigate />
           <SidebarNavigation
             paths={p}
-            unreadCount={unreadCount}
             visiblePinned={visiblePinned}
             getPinHref={getPinHref}
             onUnpin={handleUnpin}

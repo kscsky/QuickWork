@@ -68,11 +68,7 @@ describe("RequirementClarificationCard", () => {
     renderCard();
 
     expect(screen.getByText("Requirement clarification")).toBeTruthy();
-    fireEvent.click(
-      screen.getByText(
-        "Write down how you understand the requirement, its boundaries, and acceptance criteria.",
-      ),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "Add clarification" }));
 
     const textarea = screen.getByPlaceholderText(
       "Scope / boundaries / acceptance criteria…",
@@ -80,7 +76,7 @@ describe("RequirementClarificationCard", () => {
     fireEvent.change(textarea, {
       target: { value: "  Clarify the scope.  " },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save clarification" }));
 
     await waitFor(() => {
       expect(saveMetadata).toHaveBeenCalledWith(

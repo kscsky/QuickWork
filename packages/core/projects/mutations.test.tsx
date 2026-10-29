@@ -56,6 +56,6 @@ describe("useDeleteProject", () => {
     });
 
     expect(deleteProject).toHaveBeenCalledWith("p1");
-    expect(store.getState().viewMode).toBe("board");
+    expect(store.getState().viewMode).toBe("list");
   });
 });

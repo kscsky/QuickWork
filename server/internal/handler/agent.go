@@ -46,9 +46,21 @@ type AgentConversationStarter struct {
 	Prompt string `json:"prompt"`
 }
 
+// AgentRunnability is the list-time readiness verdict for one agent: whether
+// it can claim work right now, and the machine's own reason when it cannot.
+// Only the list response computes it (route planning is the reader); absent
+// elsewhere means "not asked", never "blocked".
+type AgentRunnability struct {
+	Ready  bool   `json:"ready"`
+	Reason string `json:"reason,omitempty"`
+}
+
 type AgentResponse struct {
 	ID          string `json:"id"`
 	WorkspaceID string `json:"workspace_id"`
+	// Runnability is present on list responses only. Absent = the backend or
+	// endpoint did not evaluate it; callers must not read that as blocked.
+	Runnability *AgentRunnability `json:"runnability,omitempty"`
 	// RuntimeID is the empty string when the agent is unbound — it kept its
 	// configuration and history when its runtime was deleted, and needs a new
 	// runtime before it can run again (MUL-5559). The wire type stays a string
@@ -1079,6 +1091,13 @@ func (h *Handler) ListAgents(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		resp := h.agentToResponse(a)
+		// Route planning reads this to warn BEFORE a leg is dispatched: an
+		// agent that is archived, unbound, offline, or parked behind another
+		// member's private runtime cannot claim the work. A failed lookup stays
+		// absent rather than becoming a false verdict.
+		if verdict, err := service.AgentReadiness(r.Context(), h.runtimeLookup(obsmetrics.RuntimeLookupSourceAgentList), a); err == nil {
+			resp.Runnability = &AgentRunnability{Ready: verdict.Ready(), Reason: string(verdict.Reason)}
+		}
 		applyInvocationTargetsToResponse(&resp, targets)
 		if skills, ok := skillMap[resp.ID]; ok {
 			resp.Skills = skills

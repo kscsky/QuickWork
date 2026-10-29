@@ -26,6 +26,7 @@ vi.mock("@quickwork/core/workspace/queries", () => ({
         name: "Scout",
         description: "Researches things",
         archived_at: null,
+        owner_id: "user-1",
         runtime_id: "runtime-1",
       },
     ],
@@ -56,6 +57,15 @@ vi.mock("@quickwork/core/autopilots/mutations", () => ({
   useCreateAutopilotTrigger: () => ({ mutateAsync: mockCreateTrigger }),
   useUpdateAutopilot: () => ({ mutateAsync: vi.fn() }),
   useUpdateAutopilotTrigger: () => ({ mutateAsync: vi.fn() }),
+}));
+
+vi.mock("@quickwork/core/permissions", () => ({
+  useCurrentMember: () => ({
+    userId: "user-1",
+    role: "owner",
+    member: null,
+    isLoading: false,
+  }),
 }));
 
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
@@ -118,7 +128,7 @@ function renderCreateDialog() {
 }
 
 const createButton = () => screen.getByRole("button", { name: "Create autopilot" });
-const assigneeTrigger = () => screen.getByRole("button", { name: /Select agent or squad/ });
+const assigneeTrigger = () => screen.getByRole("button", { name: /Choose an agent|Select agent/ });
 
 describe("AutopilotDialog required-field feedback", () => {
   beforeEach(() => {

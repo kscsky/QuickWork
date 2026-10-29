@@ -16,6 +16,23 @@ export type IssueChainStepState =
   | "parked"
   | "skipped";
 
+/**
+ * The chain after a leg retry, plus the queued run. `task_id` is absent when
+ * the retry parked instead (the leg's agent can no longer claim it); the
+ * parked step then carries its reason.
+ */
+export interface IssueChainRetryResult extends IssueChain {
+  task_id?: string;
+}
+
+/**
+ * The chain after the holder stopped a leg's in-flight run(s). The step stays
+ * doing; the cancelled run is what makes the retry action available.
+ */
+export interface IssueChainCancelResult extends IssueChain {
+  cancelled: number;
+}
+
 export interface IssueChainStep {
   id: string;
   position: number;
@@ -28,6 +45,20 @@ export interface IssueChainStep {
   agent_id?: string;
   title: string;
   state: IssueChainStepState | string;
+  /**
+   * The machine's reason code for a parked step: `no_agent`,
+   * `runtime_private_foreign`, `runtime_offline`, `runtime_unusable`,
+   * `agent_runtime_required`, or `target_unavailable`. Empty/absent for other
+   * states and on older backends — render the generic waiting copy then.
+   */
+  parked_reason?: string;
+  /**
+   * The single derived status of this leg: pending, queued, preparing,
+   * running, reviewing, parked, done, or skipped. Chain state and run state
+   * are two layers; this is the one the surfaces render. Absent on older
+   * backends — fall back to `state` + the run state then.
+   */
+  leg_status?: string;
   /**
    * The holder's own brief for this leg. Written by them — nobody authors a
    * brief on another person's behalf, and the next person is handed the
@@ -47,6 +78,17 @@ export interface IssueChainStep {
   leg_comment_count?: number;
   started_at?: string;
   completed_at?: string;
+  /**
+   * The active leg-output run that is writing this leg's handoff summary.
+   * Present across reloads, so the review gate can stay shut while the run is
+   * alive; absent once it lands or fails.
+   */
+  output_task_id?: string;
+  /**
+   * When the newest leg-output run was created (active or finished). Used as
+   * the baseline for lifting a summary that landed while the page was closed.
+   */
+  output_task_at?: string;
 }
 
 /** One entry of a leg's handoff package. */
@@ -59,9 +101,43 @@ export interface IssueChainHandoffFile {
   kind?: string;
 }
 
+/**
+ * One row of the handoff's acceptance ledger. `state` is "pass" | "warn" from
+ * this server; a newer writer's value renders as a pass and must not be
+ * rejected. "warn" is a known gap the next holder should see, not a failure.
+ */
+export interface IssueChainHandoffAcceptance {
+  label: string;
+  requirement: string;
+  delivered: string;
+  state: string;
+}
+
+/** The holder sent the leg back for revision; the reason survives the rerun. */
+export interface IssueChainHandoffReturn {
+  reason: string;
+  at?: string;
+}
+
 export interface IssueChainHandoff {
   summary: string;
   files: IssueChainHandoffFile[];
+  acceptance: IssueChainHandoffAcceptance[];
+  open_questions: string[];
+  next_brief: string[];
+  returned?: IssueChainHandoffReturn;
+}
+
+/**
+ * What a client sends when it publishes or preserves a package. Returned is
+ * server-owned: a client never writes it, the return endpoint does.
+ */
+export interface IssueChainHandoffInput {
+  summary: string;
+  files: IssueChainHandoffFile[];
+  acceptance?: IssueChainHandoffAcceptance[];
+  open_questions?: string[];
+  next_brief?: string[];
 }
 
 export interface IssueChain {

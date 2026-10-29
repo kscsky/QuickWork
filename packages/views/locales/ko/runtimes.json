@@ -4,13 +4,10 @@
     "online": "온라인",
     "offline": "오프라인",
     "unbound": "미연결",
-    "stat_agents_one": "에이전트",
     "stat_agents_other": "에이전트",
     "stat_running": "실행 중",
     "stat_queued": "대기",
-    "stat_runtimes_one": "런타임",
     "stat_runtimes_other": "런타임",
-    "runtime_agents_one": "{{count}} 에이전트",
     "runtime_agents_other": "{{count}} 에이전트",
     "runtimes_head": "런타임 / RUNTIMES",
     "capacity": "용량 / CAPACITY",
@@ -39,11 +36,8 @@
     "list_online_unit": "온라인",
     "list_issues": "문제",
     "list_cap": "런타임",
-    "list_machines_one": "대 머신",
     "list_machines_other": "대 머신",
-    "list_agents_one": "에이전트",
     "list_agents_other": "에이전트",
-    "list_queued_one": "대기",
     "list_queued_other": "대기",
     "list_sync_hint": "머신과 런타임 · 실시간",
     "list_tabs_aria": "머신 필터",
@@ -219,11 +213,11 @@
     },
     "visibility_hint": {
       "private": "본인만 이 런타임에 에이전트를 만들 수 있습니다.",
-      "public": "스페이스 멤버라면 누구나 이 런타임에 에이전트를 만들 수 있습니다."
+      "public": "스페이스 멤버라면 누구나 이 머신에서 자기 에이전트를 실행할 수 있습니다——이 머신에 설치된 CLI와 당신의 CLI 로그인·할당량을 사용합니다. 신뢰하는 스페이스에만 공개하세요."
     },
     "visibility_hint_readonly": {
       "private": "이 런타임에 에이전트를 만들 수 있는 사람은 런타임 owner뿐이며, 공개로 바꿀 수 있는 사람도 owner뿐입니다.",
-      "public": "스페이스 멤버라면 누구나 이 런타임에 에이전트를 만들 수 있습니다. 다시 비공개로 바꿀 수 있는 사람은 런타임 owner뿐입니다."
+      "public": "이 머신은 공유 중입니다: 누구나 자기 에이전트를 여기서 실행할 수 있고, owner의 CLI 로그인과 할당량을 사용합니다. 비공개로 되돌릴 수 있는 사람은 owner뿐입니다."
     },
     "visibility_toast_updated": "공개 범위를 {{visibility}}(으)로 설정했습니다",
     "visibility_toast_failed": "공개 범위를 업데이트하지 못했습니다",

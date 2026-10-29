@@ -33,6 +33,7 @@ WHERE s.holder_user_id = $1
 UPDATE issue_chain_step
    SET agent_id = $3,
        state = 'doing',
+       parked_reason = '',
        started_at = COALESCE(started_at, now())
  WHERE issue_id = $1 AND position = $2
 RETURNING *;
@@ -46,21 +47,48 @@ SELECT * FROM issue_chain_step WHERE issue_id = $1 AND position = $2;
 UPDATE issue_chain_step SET plan = $3 WHERE issue_id = $1 AND position = $2 RETURNING *;
 
 -- name: SetIssueChainStepState :one
+-- Any transition away from parked clears the reason. Leaving it on a done or
+-- reviewing leg would make the card explain a wait that is already over.
 UPDATE issue_chain_step
    SET state = $3,
+       parked_reason = CASE WHEN $3 <> 'parked' THEN '' ELSE parked_reason END,
        started_at = CASE WHEN $3 = 'doing' THEN COALESCE(started_at, now()) ELSE started_at END,
        completed_at = CASE WHEN $3 IN ('done', 'skipped') THEN now() ELSE completed_at END
  WHERE issue_id = $1 AND position = $2
 RETURNING *;
 
--- name: SetIssueChainStepHandoff :one
--- The package the holder publishes with their 通过. Written before the state
--- moves to done so the approve response already carries it.
+-- name: SetIssueChainStepParked :one
+-- Parks a leg with the dispatch reason that caused it. The reason is the
+-- machine's own word (no_agent / runtime_private_foreign / ...), not prose:
+-- the room localizes it and offers the matching fix.
 UPDATE issue_chain_step
-   SET handoff_summary = $3,
-       handoff_files = $4
+   SET state = 'parked',
+       parked_reason = $3
  WHERE issue_id = $1 AND position = $2
 RETURNING *;
+
+-- name: SetIssueChainStepHandoff :one
+-- The package the holder publishes with their 通过, or the package preserved
+-- when they return the leg. Written before the state moves so the response
+-- already carries it.
+UPDATE issue_chain_step
+   SET handoff_summary = $3,
+       handoff_files = $4,
+       handoff_package = $5
+ WHERE issue_id = $1 AND position = $2
+RETURNING *;
+
+-- name: ListLegOutputTasksForIssue :many
+-- The leg-output runs on this task. The chain read uses the active ones to
+-- lock the review gate across reloads, and the newest one as the baseline for
+-- lifting a summary that landed while the page was closed. Exact handoff_note
+-- match: these are the runs the holder explicitly asked their leg's agent to
+-- write, not ordinary mentions.
+SELECT id, agent_id, status, created_at
+FROM agent_task_queue
+WHERE issue_id = $1
+  AND handoff_note = $2
+ORDER BY created_at DESC;
 
 -- name: CountIssueChainStepComments :many
 -- How many leg-scoped comments each step carries. Readers who are not the
@@ -72,3 +100,13 @@ GROUP BY chain_step_id;
 
 -- name: DeleteIssueChain :exec
 DELETE FROM issue_chain_step WHERE issue_id = $1;
+
+-- name: SetIssueChainStepHolder :one
+-- Reassigns a leg to another squad member. The agent is passed explicitly:
+-- a reviewing leg keeps the agent that did the work (the new holder reviews
+-- it), while a parked leg takes the new holder's lent agent.
+UPDATE issue_chain_step
+   SET holder_user_id = $3,
+       agent_id = $4
+ WHERE issue_id = $1 AND position = $2
+RETURNING *;

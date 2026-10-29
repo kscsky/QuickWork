@@ -47,7 +47,6 @@
     "placeholder": "搜索任务、项目、智能体、成员或配置…",
     "close": "关闭搜索",
     "scope": "空间 / {{slug}} · {{count}} 类索引",
-    "result_count_one": "{{count}} 条结果",
     "result_count_other": "{{count}} 条结果",
     "no_results_count": "没有结果",
     "recent_count": "最近 {{count}} 条",

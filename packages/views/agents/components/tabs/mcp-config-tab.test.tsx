@@ -378,7 +378,7 @@ describe("McpConfigTab workspace servers", () => {
     renderTab({ mcp_config: null });
 
     expect(await screen.findByText("shared-linear")).toBeInTheDocument();
-    expect(screen.getByText(/From the workspace library/)).toBeInTheDocument();
+    expect(screen.getByText(/From the space library/)).toBeInTheDocument();
   });
 
   // The defining property of this model: a library entry nobody assigned must
@@ -388,7 +388,7 @@ describe("McpConfigTab workspace servers", () => {
     renderTab({ mcp_config: null });
 
     expect(
-      await screen.findByText(/No workspace MCP servers assigned/),
+      await screen.findByText(/No space MCP servers assigned/),
     ).toBeInTheDocument();
     expect(screen.queryByText("not-assigned")).toBeNull();
   });
@@ -398,7 +398,7 @@ describe("McpConfigTab workspace servers", () => {
     workspaceMcp.library = [wsServer({ id: "srv-9", name: "pickable" })];
     renderTab({ mcp_config: null });
 
-    await user.click(await screen.findByRole("button", { name: /Add from workspace/ }));
+    await user.click(await screen.findByRole("button", { name: /Add from space/ }));
     await user.click(await screen.findByRole("menuitem", { name: /pickable/ }));
 
     await waitFor(() => expect(mockAddServer).toHaveBeenCalledWith("srv-9"));
@@ -415,7 +415,7 @@ describe("McpConfigTab workspace servers", () => {
     renderTab({ mcp_config: null });
 
     await user.click(
-      await screen.findByRole("button", { name: /Add from workspace/ }),
+      await screen.findByRole("button", { name: /Add from space/ }),
     );
 
     const items = await screen.findAllByRole("menuitem");
@@ -480,7 +480,7 @@ describe("McpConfigTab workspace servers", () => {
     );
 
     expect(await screen.findByText("shared-linear")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Add from workspace/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Add from space/ })).toBeNull();
     expect(screen.queryByRole("switch")).toBeNull();
     expect(screen.queryByRole("button", { name: /Remove shared-linear/i })).toBeNull();
   });

@@ -223,6 +223,54 @@ describe("ApiClient issue chains", () => {
   });
 });
 
+describe("ApiClient activity response schema", () => {
+  it("parses relay decisions and degrades a malformed body to an empty log", async () => {
+    const valid = [
+      {
+        id: "a-1",
+        issue_id: "issue-1",
+        identifier: "KSCS-36",
+        issue_title: "程序员现状 3",
+        actor_id: "user-1",
+        action: "relay_reassigned",
+        leg: 2,
+        from_user_id: "user-1",
+        to_user_id: "user-2",
+        reason: "machine is someone else's private runtime",
+        admin: true,
+        created_at: "2026-10-29T07:02:18Z",
+      },
+    ];
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify(valid), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ events: "not-an-array" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+    const client = new ApiClient("https://api.example.test");
+
+    const events = await client.listActivity();
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      identifier: "KSCS-36",
+      action: "relay_reassigned",
+      leg: 2,
+      admin: true,
+    });
+
+    await expect(client.listActivity()).resolves.toEqual([]);
+  });
+});
+
 describe("ApiClient pull-request response schema", () => {
   const validPR = {
     id: "pr-1",

@@ -324,6 +324,15 @@
     "note_squad": "開始後、第1区間は {{name}} がすぐに引き受け、各区間の承認後に次へ渡します。",
     "note_squad_unassigned": "まだリーダーがいません。第1区間は未割り当てです。",
     "parked_notice_short": "{{name}} はエージェント未設定のため、この区間で待機します。",
-    "title_required_solo": "この派遣メモにアクションを設定してください"
+    "blocked_notice_short": "{{name}} のエージェントはこの区間を引き受けられません：{{reason}}。ここで待機します。",
+    "blocked_reason_offline": "マシンがオフライン",
+    "blocked_reason_private": "マシンが他のメンバーのプライベート",
+    "blocked_reason_unavailable": "エージェントが利用不可",
+    "blocked_reason_unbound": "マシン未接続",
+    "blocked_reason_unusable": "マシンで CLI を実行できない",
+    "blocked_reason_fallback": "現在実行できない",
+    "title_required_solo": "この派遣メモにアクションを設定してください",
+    "active_duplicate": "同じタイトルの進行中タスク {{identifier}}「{{title}}」があります。重複作成せず既存タスクを開いてください。",
+    "open_existing": "既存タスクを開く"
   }
 }

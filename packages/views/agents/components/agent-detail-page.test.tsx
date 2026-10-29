@@ -375,56 +375,7 @@ describe("AgentDetailPage direct-detail fallback", () => {
   });
 });
 
-describe("AgentDetailPage DM button", () => {
-  it("navigates to the chat deep link when the user can chat with the agent", async () => {
-    const { push } = renderPage();
-    fireEvent.click(await screen.findByRole("button", { name: "DM" }));
-    expect(push).toHaveBeenCalledWith("/acme/chat?agent=agent-1");
-    expect(mockToastError).not.toHaveBeenCalled();
-  });
-
-  it("shows a toast instead of navigating when the user lacks chat access", async () => {
-    // Post-MUL-3963 a workspace admin can VIEW another member's private agent
-    // but can no longer invoke (chat with) it — the exact case where the DM
-    // button must explain itself rather than navigate.
-    agentsRef.current = [
-      { ...baseAgent, permission_mode: "private", invocation_targets: [] },
-    ];
-    membersRef.current = [{ user_id: "user-1", role: "admin" }];
-    const { push } = renderPage();
-    fireEvent.click(await screen.findByRole("button", { name: "DM" }));
-    expect(mockToastError).toHaveBeenCalledWith(
-      "You don't have access to chat with this agent.",
-    );
-    expect(push).not.toHaveBeenCalled();
-  });
-
-  it("disables DM while membership is resolving instead of toasting a false deny", async () => {
-    // Review P2: a pending member query collapses role to null, which the
-    // rules read as not_member — a legitimate public_to+workspace member
-    // would get a wrong "no access" toast. Undetermined must disable, not deny.
-    membersPendingRef.current = true;
-    const { push } = renderPage();
-    // The control is an anchor now, so "disabled" is expressed the only way a
-    // link can express it: aria-disabled plus removal from the tab order.
-    const dm = await screen.findByRole("button", { name: "DM" });
-    expect(dm).toHaveAttribute("aria-disabled", "true");
-    expect(dm).toHaveAttribute("tabindex", "-1");
-    fireEvent.click(dm);
-    expect(mockToastError).not.toHaveBeenCalled();
-    expect(push).not.toHaveBeenCalled();
-  });
-
-  it("hides the DM button on an archived agent", async () => {
-    agentsRef.current = [
-      { ...baseAgent, archived_at: "2026-06-01T00:00:00Z" },
-    ];
-    renderPage();
-    // The archived banner is the signal the page has settled past loading.
-    await screen.findByText(/This agent is archived/);
-    expect(screen.queryByRole("button", { name: "DM" })).not.toBeInTheDocument();
-  });
-
+describe("AgentDetailPage actions", () => {
   it("hides the more-actions trigger when no menu actions are available", async () => {
     // The gate must survive a caller who genuinely CAN archive: an admin
     // passes `canEditAgent`, so `canArchive` is true. The only thing keeping
@@ -476,10 +427,5 @@ describe("AgentDetailPage DM button", () => {
       screen.getByRole("button", { name: "Bind runtime" }),
     ).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "DM" }));
-    expect(mockToastError).toHaveBeenCalledWith(
-      "Bind a runtime before running this agent.",
-    );
-    expect(mockModalOpen).not.toHaveBeenCalled();
   });
 });

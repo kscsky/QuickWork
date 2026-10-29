@@ -104,11 +104,11 @@
  * a separate ramp and stays out of this scale on purpose. */
 @theme {
     /* counters, badges, timestamps, overline labels */
-    --text-micro: 12px;
-    --text-micro--line-height: 17px;
+    --text-micro: 11px;
+    --text-micro--line-height: 15px;
     /* secondary and helper text — was text-xs */
-    --text-caption: 13px;
-    --text-caption--line-height: 18px;
+    --text-caption: 12px;
+    --text-caption--line-height: 16px;
     /* dense labels: table headers, metadata rows */
     --text-label: 13px;
     --text-label--line-height: 18px;
@@ -188,7 +188,7 @@
        sidebar / sidebar-accent / muted / surface-selected / surface, with the
        worst case at 4.88:1. Raise it and the nav labels fail again. Hue and
        chroma are unchanged so the neutral ramp keeps its cast. */
-    --muted-foreground: #68717e;
+    --muted-foreground: #5f6876;
     /* The quiet step below muted, for marks that are not text: disclosure
        chevrons, separator glyphs, the em dash standing in for an empty cell,
        the large icon in an empty state. It exists because the alternative
@@ -200,7 +200,7 @@
        for text: text has one floor, --muted-foreground, and there is no room
        for a third readable step (AA caps a lighter text tone at L 0.523 here,
        0.018 away from muted — a difference no one can see). */
-    --faint-foreground: #919aa6;
+    --faint-foreground: #7a8492;
     --accent: #e9edf2;
     --accent-foreground: #14181f;
     --destructive: #b23a2a;

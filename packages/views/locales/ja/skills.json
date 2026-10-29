@@ -337,7 +337,6 @@
       "check_desc": "説明あり",
       "check_content": "SKILL.md の内容あり",
       "editor_foot": "Markdown · 見出し、トリガー、納品手順",
-      "line_count_one": "{{count}} 行",
       "line_count_other": "{{count}} 行",
       "consequence": "保存すると Skills ライブラリに表示され、このスペースのどのエージェントにも割り当てられます。",
       "add_agents_failed": "Skill は作成しましたが、一部のエージェントに割り当てられませんでした。"

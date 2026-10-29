@@ -60,6 +60,13 @@ vi.mock("@quickwork/core/auth", () => ({
 }));
 
 vi.mock("@quickwork/core/api", () => ({
+  ApiError: class ApiError extends Error {
+    status: number;
+    constructor(status: number, message: string) {
+      super(message);
+      this.status = status;
+    }
+  },
   api: {
     listWorkspaces: mockApiListWorkspaces,
     verifyCode: mockApiVerifyCode,

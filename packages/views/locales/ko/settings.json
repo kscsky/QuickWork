@@ -790,13 +790,9 @@
     "projects_remove_action": "제거",
     "projects_removing": "제거 중…",
     "projects_picker_description": "가져올 저장소를 선택하세요. 선택한 저장소마다 QuickWork 프로젝트를 만들고 연결합니다.",
-    "projects_selected_one": "{{count}}개 저장소 선택됨",
     "projects_selected_other": "{{count}}개 저장소 선택됨",
-    "projects_import_action_one": "{{count}}개 가져오기",
     "projects_import_action_other": "{{count}}개 가져오기",
-    "projects_imported_one": "GitHub 프로젝트 {{count}}개를 가져왔습니다",
     "projects_imported_other": "GitHub 프로젝트 {{count}}개를 가져왔습니다",
-    "projects_import_failed_one": "저장소 {{count}}개를 가져오지 못했습니다",
     "projects_import_failed_other": "저장소 {{count}}개를 가져오지 못했습니다",
     "toast_failed": "GitHub 설정을 업데이트하지 못했습니다"
   },

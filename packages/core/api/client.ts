@@ -42,6 +42,7 @@ import type {
   UpdateRuntimeProfileRequest,
   ModelPoolCatalog,
   InboxItem,
+  RelayActivityEvent,
   InboxWorkspaceUnread,
   IssueSubscriber,
   Comment,
@@ -207,9 +208,11 @@ import type {
   SquadPlaybook,
   SquadRoom,
   IssueChain,
+  IssueChainRetryResult,
+  IssueChainCancelResult,
   ChainLegOutputResponse,
   IssueChainForIssue,
-  IssueChainHandoffFile,
+  IssueChainHandoffInput,
   DispatchStep,
   SquadMember,
   SquadMemberStatusListResponse,
@@ -318,6 +321,8 @@ import {
   SquadMessageSchema,
   SquadRoomSchema,
   IssueChainSchema,
+  IssueChainRetrySchema,
+  IssueChainCancelSchema,
   IssueChainListSchema,
   EMPTY_ISSUE_CHAIN_RESPONSE,
   ChainLegOutputResponseSchema,
@@ -364,6 +369,8 @@ import {
   EMPTY_INBOX_UNREAD_SUMMARY,
   InboxItemListSchema,
   EMPTY_INBOX_ITEMS,
+  RelayActivityListSchema,
+  EMPTY_RELAY_ACTIVITY,
   NotificationPreferenceResponseSchema,
   EMPTY_NOTIFICATION_PREFERENCE_RESPONSE,
   LabelSchema,
@@ -778,12 +785,17 @@ export class ApiClient {
     if (!res.ok) {
       if (res.status === 401) this.handleUnauthorized();
       const { message, body } = await this.parseErrorBody(res, `API error: ${res.status} ${res.statusText}`);
-      // 401 and 404 are control-flow signals, not failures. A 401 is answered
-      // by handleUnauthorized above (and, on the sign-in page, is simply what
-      // "not logged in yet" looks like); a 404 is often a feature probe. Both
-      // were being logged at error level, which painted a red console error and
-      // tripped the dev error overlay on a page that was working correctly.
-      const logLevel = res.status === 401 || res.status === 404 ? "warn" : "error";
+      // 401, 404 and 409 are control-flow signals, not failures. A 401 is
+      // answered by handleUnauthorized above (and, on the sign-in page, is
+      // simply what "not logged in yet" looks like); a 404 is often a feature
+      // probe; a 409 is often an expected conflict the caller renders itself
+      // (active duplicate issue, leg already approved). Logging them at error
+      // level painted a red console error and tripped the dev error overlay on
+      // a page that was working correctly.
+      const logLevel =
+        res.status === 401 || res.status === 404 || res.status === 409
+          ? "warn"
+          : "error";
       this.logger[logLevel](`← ${res.status} ${path}`, { rid, duration: `${Date.now() - start}ms`, error: message });
       throw new ApiError(message, res.status, res.statusText, body);
     }
@@ -1090,7 +1102,7 @@ export class ApiClient {
     return issue;
   }
 
-  async createIssue(data: CreateIssueRequest): Promise<Issue> {
+  async createIssue(data: CreateIssueRequest): Promise<Issue & { chain?: IssueChain }> {
     // Parse through a schema (not a raw cast): the create modal keys its
     // label-attach compatibility fallback off `labels` being absent vs a
     // validated Label[], so an unvalidated wrong shape must not slip through.
@@ -2219,6 +2231,14 @@ export class ApiClient {
     const raw = await this.fetch<unknown>("/api/inbox");
     return parseWithFallback(raw, InboxItemListSchema, EMPTY_INBOX_ITEMS, {
       endpoint: "GET /api/inbox",
+    });
+  }
+
+  /** Key relay decisions across the workspace, newest first. */
+  async listActivity(limit = 100): Promise<RelayActivityEvent[]> {
+    const raw = await this.fetch<unknown>(`/api/activity?limit=${limit}`);
+    return parseWithFallback(raw, RelayActivityListSchema, EMPTY_RELAY_ACTIVITY, {
+      endpoint: "GET /api/activity",
     });
   }
 
@@ -3952,15 +3972,94 @@ export class ApiClient {
    */
   async approveIssueChainStep(
     issueId: string,
-    handoff?: { summary: string; files: IssueChainHandoffFile[] },
+    handoff?: IssueChainHandoffInput,
   ): Promise<IssueChain> {
     const raw = await this.fetch<unknown>(`/api/issues/${issueId}/chain/approve`, {
       method: "POST",
-      body: JSON.stringify(handoff ? { summary: handoff.summary, files: handoff.files } : {}),
+      body: JSON.stringify(handoff ?? {}),
     });
     return parseWithFallback(raw, IssueChainSchema, EMPTY_ISSUE_CHAIN_RESPONSE, {
       endpoint: "POST /api/issues/:id/chain/approve",
     }) as IssueChain;
+  }
+
+  /**
+   * The holder's 退回修改 on the step waiting for review. The package they were
+   * reviewing is preserved with the reason on it, the leg goes back to doing,
+   * and its agent gets a revision run. The baton does not move.
+   */
+  async returnIssueChainStep(
+    issueId: string,
+    payload: IssueChainHandoffInput & { reason: string },
+  ): Promise<IssueChain> {
+    const raw = await this.fetch<unknown>(`/api/issues/${issueId}/chain/return`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+    return parseWithFallback(raw, IssueChainSchema, EMPTY_ISSUE_CHAIN_RESPONSE, {
+      endpoint: "POST /api/issues/:id/chain/return",
+    }) as IssueChain;
+  }
+
+  /**
+   * Restarts the leg that is currently doing after its run was interrupted
+   * (watchdog, stalled stream, or an explicit cancel). Holder-only; the step
+   * stays doing and no review happens. `task_id` is absent when the retry
+   * parked instead — the leg's agent can no longer claim it, and the parked
+   * step carries the reason.
+   */
+  /**
+   * Stops the leg's in-flight run(s) at the holder's request — the first half
+   * of recovery from a stalled run. The step stays doing; the cancelled run
+   * is what makes `retryIssueChainStep` available.
+   */
+  /**
+   * Re-reads the leg's newest completed output document and rewrites the
+   * structured handoff package from its `handoff` block. Holder-only.
+   */
+  /**
+   * Owner/admin fallback: moves a waiting leg (reviewing or parked) to another
+   * squad member. The server keeps the working agent of a reviewing leg and
+   * starts a parked leg on the new holder's agent when it can claim.
+   */
+  async reassignIssueChainStep(issueId: string, holderUserId: string): Promise<IssueChain> {
+    const raw = await this.fetch<unknown>(`/api/issues/${issueId}/chain/reassign`, {
+      method: "POST",
+      body: JSON.stringify({ holder_user_id: holderUserId }),
+    });
+    return parseWithFallback(raw, IssueChainSchema, EMPTY_ISSUE_CHAIN_RESPONSE, {
+      endpoint: "POST /api/issues/:id/chain/reassign",
+    }) as IssueChain;
+  }
+
+  async extractIssueChainHandoff(issueId: string): Promise<IssueChain> {
+    const raw = await this.fetch<unknown>(`/api/issues/${issueId}/chain/extract`, {
+      method: "POST",
+      body: JSON.stringify({}),
+    });
+    return parseWithFallback(raw, IssueChainSchema, EMPTY_ISSUE_CHAIN_RESPONSE, {
+      endpoint: "POST /api/issues/:id/chain/extract",
+    }) as IssueChain;
+  }
+
+  async cancelIssueChainStep(issueId: string): Promise<IssueChainCancelResult> {
+    const raw = await this.fetch<unknown>(`/api/issues/${issueId}/chain/cancel`, {
+      method: "POST",
+      body: JSON.stringify({}),
+    });
+    return parseWithFallback(raw, IssueChainCancelSchema, EMPTY_ISSUE_CHAIN_RESPONSE, {
+      endpoint: "POST /api/issues/:id/chain/cancel",
+    }) as IssueChainCancelResult;
+  }
+
+  async retryIssueChainStep(issueId: string): Promise<IssueChainRetryResult> {
+    const raw = await this.fetch<unknown>(`/api/issues/${issueId}/chain/retry`, {
+      method: "POST",
+      body: JSON.stringify({}),
+    });
+    return parseWithFallback(raw, IssueChainRetrySchema, EMPTY_ISSUE_CHAIN_RESPONSE, {
+      endpoint: "POST /api/issues/:id/chain/retry",
+    }) as IssueChainRetryResult;
   }
 
   /**

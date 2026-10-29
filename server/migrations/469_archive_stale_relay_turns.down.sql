@@ -1,0 +1,1 @@
+-- One-way data cleanup: which rows were previously unread cannot be restored.

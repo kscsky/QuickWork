@@ -2082,6 +2082,20 @@ func (h *Handler) buildClaimedTaskResponse(r *http.Request, task *db.AgentTaskQu
 			"error_agent_runtime_changed", http.StatusConflict, "agent runtime changed before task delivery",
 		)
 	}
+	// Shared-runtime audit: a public runtime is its owner's consent to lend
+	// the machine and the CLI login on it to the workspace. Every run that
+	// executes an agent the owner does not own leaves a durable log line, so
+	// the consent is visible after the fact rather than only at toggle time.
+	if runtime.Visibility == "public" && runtime.OwnerID.Valid && agent.OwnerID.Valid &&
+		uuidToString(runtime.OwnerID) != uuidToString(agent.OwnerID) {
+		slog.Info("shared runtime: executing a foreign agent",
+			"task_id", uuidToString(task.ID),
+			"runtime_id", uuidToString(runtime.ID),
+			"runtime_owner_id", uuidToString(runtime.OwnerID),
+			"agent_id", uuidToString(agent.ID),
+			"agent_owner_id", uuidToString(agent.OwnerID),
+		)
+	}
 	if runtime.Visibility == "private" && runtime.OwnerID.Valid &&
 		(!agent.OwnerID.Valid || agent.OwnerID != runtime.OwnerID) {
 		userMessage := "This private runtime cannot run the assigned agent because the agent and runtime have different owners."

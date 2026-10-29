@@ -224,11 +224,11 @@
     },
     "visibility_hint": {
       "private": "Only you can create agents on this runtime.",
-      "public": "Any space member can create agents on this runtime."
+      "public": "Any space member can run their agents on this machine, using the CLIs installed here and your CLI login and quota. Only share it with a space you trust."
     },
     "visibility_hint_readonly": {
       "private": "Only the runtime owner can create agents on this runtime, and only they can switch it to Public.",
-      "public": "Any space member can create agents on this runtime. Only the runtime owner can switch it back to Private."
+      "public": "This machine is shared: any member can run their agents here, using the owner's CLI login and quota. Only the runtime owner can switch it back to Private."
     },
     "visibility_toast_updated": "Visibility set to {{visibility}}",
     "visibility_toast_failed": "Failed to update visibility",

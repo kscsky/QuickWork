@@ -153,7 +153,7 @@ describe("InvitationsPage", () => {
     // Select Acme via its label/checkbox row.
     fireEvent.click(screen.getByText("Acme"));
 
-    fireEvent.click(screen.getByRole("button", { name: /join 1 workspace/i }));
+    fireEvent.click(screen.getByRole("button", { name: /join 1 space/i }));
 
     await waitFor(() => {
       expect(acceptInvitation).toHaveBeenCalledWith("inv-1");

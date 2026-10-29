@@ -177,7 +177,7 @@ export function RelayFlowRail({
               </span>
             ) : (
               <span className="ml-1.5">
-                <ChainStateTag state={step.state} runState={runState} />
+                <ChainStateTag state={step.state} runState={runState} legStatus={step.leg_status} />
               </span>
             )}
             {agentless ? (
@@ -325,7 +325,7 @@ export function SubtaskList({
                     {t(($) => $.room.flow_done)}
                   </span>
                 ) : (
-                  <ChainStateTag state={step.state} runState={runState} />
+                  <ChainStateTag state={step.state} runState={runState} legStatus={step.leg_status} />
                 )}
               </span>
               <span className="flex min-w-0 items-center gap-1.5 font-mono text-micro text-muted-foreground">

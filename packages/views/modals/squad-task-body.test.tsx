@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { screen } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { renderWithI18n } from "../test/i18n";
 import { useIssueDraftStore } from "@quickwork/core/issues/stores/draft-store";
@@ -8,7 +8,12 @@ import { SquadTaskBody } from "./squad-task-body";
 
 const mocks = vi.hoisted(() => ({
   squads: [] as Array<{ id: string; name: string }>,
-  agents: [] as Array<{ id: string; name: string; owner_id?: string }>,
+  agents: [] as Array<{
+    id: string;
+    name: string;
+    owner_id?: string;
+    runnability?: { ready: boolean; reason?: string };
+  }>,
   members: [] as Array<{
     member_type: string;
     member_id: string;
@@ -20,7 +25,9 @@ const mocks = vi.hoisted(() => ({
     name: string;
     steps: Array<{ holder_user_id: string; title: string }>;
   }>,
-  orchestrate: vi.fn(),
+  createIssue: vi.fn(),
+  createIssueChain: vi.fn(),
+  navigate: vi.fn(),
 }));
 
 vi.mock("@tanstack/react-query", () => ({
@@ -39,7 +46,10 @@ vi.mock("@tanstack/react-query", () => ({
     isSuccess: false,
     isError: false,
   }),
-  useQueryClient: () => ({ invalidateQueries: vi.fn() }),
+  useQueryClient: () => ({
+    invalidateQueries: vi.fn(),
+    setQueryData: vi.fn(),
+  }),
 }));
 
 vi.mock("@quickwork/core/workspace/queries", () => ({
@@ -56,14 +66,35 @@ vi.mock("@quickwork/core/agents/queries", () => ({
 
 vi.mock("@quickwork/core/issues/queries", () => ({
   issuesByIdsOptions: () => ({ queryKey: ["issues"] }),
+  issueKeys: {
+    chain: (issueId: string) => ["issues", "chain", issueId],
+  },
 }));
 
 vi.mock("@quickwork/core/api", () => ({
   api: {
     saveSquadPlaybook: vi.fn(),
-    quickCreateIssue: vi.fn(),
-    createIssueChain: vi.fn(),
+    createIssueChain: mocks.createIssueChain,
   },
+  ApiError: class ApiError extends Error {
+    status: number;
+    body?: unknown;
+    constructor(message: string, status: number) {
+      super(message);
+      this.status = status;
+    }
+  },
+}));
+
+vi.mock("@quickwork/core/issues/mutations", () => ({
+  useCreateIssue: () => ({
+    mutateAsync: mocks.createIssue,
+    isPending: false,
+  }),
+}));
+
+vi.mock("../navigation", () => ({
+  useNavigation: () => ({ push: mocks.navigate }),
 }));
 
 vi.mock("@quickwork/core/hooks", () => ({
@@ -72,6 +103,9 @@ vi.mock("@quickwork/core/hooks", () => ({
 
 vi.mock("@quickwork/core/paths", () => ({
   useCurrentWorkspace: () => ({ name: "Acme" }),
+  useWorkspacePaths: () => ({
+    issueDetail: (id: string) => `/acme/issues/${id}`,
+  }),
 }));
 
 vi.mock("@quickwork/core/modals", () => ({
@@ -112,15 +146,6 @@ vi.mock("../common/actor-avatar", () => ({
   ActorAvatar: () => null,
 }));
 
-vi.mock("../home/use-orchestrate", () => ({
-  useOrchestrate: () => ({
-    orchestrate: mocks.orchestrate,
-    isBusy: false,
-    isSubmitting: false,
-    isWaitingOnIssue: false,
-  }),
-}));
-
 const LEADER = {
   member_type: "member",
   member_id: "u-lead",
@@ -148,7 +173,9 @@ beforeEach(() => {
   ];
   mocks.members = [LEADER, PARKED, FREE];
   mocks.playbooks = [];
-  mocks.orchestrate.mockClear();
+  mocks.createIssue.mockReset().mockResolvedValue({ id: "issue-1" });
+  mocks.createIssueChain.mockReset().mockResolvedValue({ steps: [] });
+  mocks.navigate.mockReset();
 });
 
 async function typePrompt(text = "Rework the payment retry path") {
@@ -223,11 +250,49 @@ describe("SquadTaskBody (the squad half of the merged create dialog)", () => {
 
     await start();
 
-    expect(mocks.orchestrate).toHaveBeenCalledWith(
-      "s-1",
-      "Rework the payment retry path",
-      { steps: [{ holder_user_id: "u-free", title: "Verify" }] },
+    await waitFor(() => expect(mocks.createIssue).toHaveBeenCalled());
+    expect(mocks.createIssue).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: "Rework the payment retry path",
+        assignee_type: "squad",
+        assignee_id: "s-1",
+        chain_steps: [{ holder_user_id: "u-free", title: "Verify" }],
+      }),
     );
+    expect(mocks.createIssueChain).not.toHaveBeenCalled();
+    expect(mocks.navigate).toHaveBeenCalledWith("/acme/issues/issue-1");
+  });
+
+  // The route is planned before anything is dispatched. A holder whose agent
+  // cannot claim (here: the machine is another member's private runtime) must
+  // be told now, not discover it as a leg that silently parks.
+  it("warns when a holder's agent cannot claim on its machine", () => {
+    mocks.agents = [
+      { id: "a-arch", name: "Architect Agent", owner_id: "u-lead" },
+      {
+        id: "a-fe",
+        name: "Frontend Agent",
+        owner_id: "u-free",
+        runnability: { ready: false, reason: "runtime_private_foreign" },
+      },
+    ];
+    mocks.playbooks = [
+      {
+        id: "pb-1",
+        name: "Payment route",
+        steps: [
+          { holder_user_id: "u-park", title: "Implement" },
+          { holder_user_id: "u-free", title: "Verify" },
+        ],
+      },
+    ];
+    renderBody();
+
+    expect(
+      screen.getByText(
+        /Chen Chen's agent cannot take this leg: the machine is private to someone else/,
+      ),
+    ).toBeInTheDocument();
   });
 
   it("shows each squad member by name without an agent picker", () => {
@@ -249,7 +314,7 @@ describe("SquadTaskBody (the squad half of the merged create dialog)", () => {
     expect(screen.queryByLabelText("Step title for Li Tejie")).toBeNull();
   });
 
-  it("names the playbook while the body still agrees with it", async () => {
+  it("sends the chosen route with the create", async () => {
     mocks.playbooks = [
       {
         id: "pb-1",
@@ -264,11 +329,16 @@ describe("SquadTaskBody (the squad half of the merged create dialog)", () => {
     await typePrompt();
     await start();
 
-    expect(mocks.orchestrate).toHaveBeenCalledWith(
-      "s-1",
-      "Rework the payment retry path",
-      { playbookId: "pb-1" },
+    await waitFor(() => expect(mocks.createIssue).toHaveBeenCalled());
+    expect(mocks.createIssue).toHaveBeenCalledWith(
+      expect.objectContaining({
+        chain_steps: [
+          { holder_user_id: "u-park", title: "Implement" },
+          { holder_user_id: "u-free", title: "Verify" },
+        ],
+      }),
     );
+    expect(mocks.createIssueChain).not.toHaveBeenCalled();
     expect(document.querySelector(".qk-create-paper")).toHaveClass("is-stamping");
   });
 
@@ -280,16 +350,16 @@ describe("SquadTaskBody (the squad half of the merged create dialog)", () => {
     await typePrompt();
     await start();
 
-    expect(mocks.orchestrate).toHaveBeenCalledWith(
-      "s-1",
-      "Rework the payment retry path",
-      {
-        steps: [
+    await waitFor(() => expect(mocks.createIssue).toHaveBeenCalled());
+    expect(mocks.createIssue).toHaveBeenCalledWith(
+      expect.objectContaining({
+        chain_steps: [
           { holder_user_id: "u-park", title: "" },
           { holder_user_id: "u-free", title: "" },
         ],
-      },
+      }),
     );
+    expect(mocks.createIssueChain).not.toHaveBeenCalled();
   });
 
   it("will not dispatch without a deliverable", () => {

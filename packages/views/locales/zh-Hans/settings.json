@@ -790,13 +790,9 @@
     "projects_remove_action": "移除",
     "projects_removing": "正在移除…",
     "projects_picker_description": "选择要导入的仓库；每选一个会创建一个绑定了该仓库的 QuickWork 项目。",
-    "projects_selected_one": "已选 {{count}} 个仓库",
     "projects_selected_other": "已选 {{count}} 个仓库",
-    "projects_import_action_one": "导入 {{count}} 个项目",
     "projects_import_action_other": "导入 {{count}} 个项目",
-    "projects_imported_one": "已导入 {{count}} 个 GitHub 项目",
     "projects_imported_other": "已导入 {{count}} 个 GitHub 项目",
-    "projects_import_failed_one": "{{count}} 个仓库导入失败",
     "projects_import_failed_other": "{{count}} 个仓库导入失败",
     "toast_failed": "更新 GitHub 设置失败"
   },

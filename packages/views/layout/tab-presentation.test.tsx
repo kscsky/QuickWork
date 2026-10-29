@@ -96,9 +96,9 @@ beforeEach(() => {
 
 describe("useTabPresentation — live from cache", () => {
   it("page: page icon + localized page name", () => {
-    expect(presentationOf("/acme/issues")).toEqual({
+    expect(presentationOf("/acme/tasks")).toEqual({
       visual: { kind: "icon", icon: "ListTodo" },
-      title: "Issues",
+      title: "Task list",
     });
   });
 
@@ -150,7 +150,7 @@ describe("useTabPresentation — live from cache", () => {
   it("archived inbox: selected issue resolves against the archived list", () => {
     // a1 lives only in the archived list; without ?view=archived it must NOT
     // resolve (title stays Inbox), and with it, it resolves to i1's title.
-    expect(presentationOf("/acme/inbox?issue=i1").title).toBe("Inbox");
+    expect(presentationOf("/acme/inbox?issue=i1").title).toBe("Notifications");
     expect(presentationOf("/acme/inbox?view=archived&issue=i1")).toEqual({
       visual: { kind: "icon", icon: "Inbox" },
       title: "MUL-1: Fix login",

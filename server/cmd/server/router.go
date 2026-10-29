@@ -1796,8 +1796,20 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 					r.Get("/chain", h.ListIssueChain)
 					r.Post("/chain", h.CreateIssueChain)
 					r.Post("/chain/skip", h.SkipIssueChainStep)
+					// Owner/admin fallback: move a waiting leg to another member
+					// when its holder is unreachable.
+					r.Post("/chain/reassign", h.ReassignIssueChainStep)
 					// The leg's own review gate: only its holder approves.
 					r.Post("/chain/approve", h.ApproveIssueChainStep)
+					// The other review outcome: send the leg back for revision.
+					r.Post("/chain/return", h.ReturnIssueChainStep)
+					// Operational recovery: the holder stops a stalled run,
+					// then restarts the leg. The step stays doing throughout.
+					r.Post("/chain/cancel", h.CancelIssueChainStep)
+					r.Post("/chain/retry", h.RetryIssueChainStep)
+					// Re-read the leg's output document into the structured
+					// handoff package (the single-artifact fallback).
+					r.Post("/chain/extract", h.ExtractIssueChainHandoff)
 					// The holder's own brief for their leg.
 					r.Post("/chain/plan", h.SetIssueChainStepPlan)
 					// The finished leg's output: the holder asks their leg's
@@ -2194,6 +2206,10 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 			// thread (?id for a specific one, else the thread the session is in).
 			r.Get("/api/chat/history", h.GetChatChannelHistory)
 			r.Get("/api/chat/thread", h.GetChatThread)
+
+			// Activity page: the relay's key decisions (approve / return /
+			// reassign / skip) across the workspace, newest first.
+			r.Get("/api/activity", h.ListActivityEvents)
 
 			// Inbox
 			r.Route("/api/inbox", func(r chi.Router) {

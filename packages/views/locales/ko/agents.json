@@ -1031,7 +1031,6 @@
     "col_capacity": "용량",
     "col_activity": "활동 7일",
     "col_actions": "작업",
-    "group_count_one": "{{count}}개 에이전트 · {{running}}개 실행 중",
     "group_count_other": "{{count}}개 에이전트 · {{running}}개 실행 중",
     "open_agent": "{{name}} 열기",
     "running_no_task": "시작 중…",
@@ -1047,7 +1046,6 @@
     "stop_aria": "{{name}} 작업 중지",
     "no_filter_title": "이 필터에 에이전트가 없습니다",
     "no_filter_hint": "다른 상태나 런타임을 선택하세요.",
-    "footer_summary_one": "에이전트 {{agents}}개 · 런타임 {{runtimes}}개 · 작업 {{queued}}개 대기",
     "footer_summary_other": "에이전트 {{agents}}개 · 런타임 {{runtimes}}개 · 작업 {{queued}}개 대기",
     "footer_hint": "런타임으로 좁히기 · 작업을 눌러 상세 보기",
     "toggle_group": "{{name}} 펼치기 또는 접기"

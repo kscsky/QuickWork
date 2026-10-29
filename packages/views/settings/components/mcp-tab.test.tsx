@@ -199,7 +199,7 @@ describe("McpTab", () => {
     expect(screen.queryByRole("button", { name: "Edit server" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Remove server" })).toBeNull();
     expect(
-      screen.getByText(/Only workspace owners and admins/),
+      screen.getByText(/Only space owners and admins/),
     ).toBeInTheDocument();
   });
 

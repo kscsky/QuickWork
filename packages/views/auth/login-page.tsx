@@ -492,7 +492,7 @@ function LoginShell({
             <h1 className="max-w-[11ch] text-[42px] font-semibold leading-[1.08] tracking-[-0.03em] text-[#f4f7fa]">
               {t(($) => $.signin.brand_title)}
             </h1>
-            <p className="max-w-[41ch] text-[12.5px] leading-[1.85] text-white/60">
+            <p className="max-w-[41ch] text-[13px] leading-[1.85] text-white/60">
               {t(($) => $.signin.brand_line)}
             </p>
           </div>

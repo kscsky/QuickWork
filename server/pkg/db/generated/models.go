@@ -814,6 +814,8 @@ type IssueChainStep struct {
 	Plan           string             `json:"plan"`
 	HandoffSummary string             `json:"handoff_summary"`
 	HandoffFiles   []byte             `json:"handoff_files"`
+	HandoffPackage []byte             `json:"handoff_package"`
+	ParkedReason   string             `json:"parked_reason"`
 }
 
 type IssueDependency struct {

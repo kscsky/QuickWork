@@ -98,9 +98,16 @@ const decodeSrgb = (c: number) =>
  * actually paints, not on the unrounded float behind it.
  */
 function oklchToRgb(value: string): Rgb {
+  const hex = /^#([0-9a-f]{6})$/i.exec(value);
+  if (hex?.[1]) {
+    return [0, 2, 4].map((offset) =>
+      Number.parseInt(hex[1]!.slice(offset, offset + 2), 16),
+    ) as Rgb;
+  }
+
   const match = /^oklch\(\s*([\d.]+)\s+([\d.]+)\s+([\d.]+)\s*\)$/.exec(value);
   if (!match?.[1] || !match[2] || !match[3]) {
-    throw new Error(`expected an alpha-free oklch() colour, got "${value}"`);
+    throw new Error(`expected an alpha-free oklch() or #rrggbb colour, got "${value}"`);
   }
 
   const lightness = Number(match[1]);
@@ -434,9 +441,10 @@ describe("text contrast", () => {
   it.each(["--muted-foreground", "--faint-foreground"])(
     "keeps the landing-light copy of %s in sync with the light token",
     (tone) => {
-      expect(resolveToken(readBlock(landingCss(), ".landing-light"), tone)).toBe(
-        resolveToken(readBlock(tokensCss(), ":root"), tone),
-      );
+      expect(
+        oklchToRgb(resolveToken(readBlock(landingCss(), ".landing-light"), tone)),
+        `${tone} drifted between the landing-light copy and the source token`,
+      ).toEqual(oklchToRgb(resolveToken(readBlock(tokensCss(), ":root"), tone)));
     },
   );
 

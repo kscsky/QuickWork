@@ -15,6 +15,7 @@
     "./types/*": "./types/*.ts",
     "./attachments": "./attachments/index.ts",
     "./attachments/image-sequence": "./attachments/image-sequence.ts",
+    "./activity/queries": "./activity/queries.ts",
     "./api": "./api/index.ts",
     "./api/client": "./api/client.ts",
     "./api/schema": "./api/schema.ts",

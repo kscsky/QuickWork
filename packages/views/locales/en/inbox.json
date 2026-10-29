@@ -81,7 +81,8 @@
     "quick_create_failed": "Create with agent failed",
     "quick_create_unconfirmed": "Create with agent unconfirmed",
     "flow_handoff": "Flow hand-off",
-    "squad_message": "Squad message"
+    "squad_message": "Squad message",
+    "relay_turn": "Relay turn"
   },
   "labels": {
     "set_status_to": "Set status to",

@@ -60,6 +60,7 @@ vi.mock("@quickwork/core/auth", () => ({
 vi.mock("@quickwork/core/workspace/hooks", () => ({
   useActorName: () => ({
     getMemberName: (id: string) => (id === "user-1" ? "Test User" : "Unknown"),
+    getSquadName: (id: string) => (id === "squad-1" ? "Dev Squad" : "Unknown Squad"),
     getAgentName: (id: string) => (id === "agent-1" ? "Claude Agent" : "Unknown Agent"),
     getActorName: (type: string, id: string) => {
       if (type === "member" && id === "user-1") return "Test User";
@@ -84,6 +85,15 @@ vi.mock("@quickwork/core/workspace/queries", () => ({
   squadListOptions: () => ({
     queryKey: ["workspaces", "ws-1", "squads"],
     queryFn: () => Promise.resolve([]),
+  }),
+  squadMemberListOptions: (_wsId: string, squadId: string) => ({
+    queryKey: ["workspaces", "ws-1", "squads", squadId, "members"],
+    queryFn: () =>
+      Promise.resolve([
+        { member_type: "member", member_id: "user-2", agent_id: null },
+        { member_type: "member", member_id: "user-3", agent_id: "agent-1" },
+      ]),
+    enabled: false,
   }),
   assigneeFrequencyOptions: () => ({
     queryKey: ["workspaces", "ws-1", "assignee-frequency"],
@@ -321,6 +331,9 @@ const mockApiObj = vi.hoisted(() => ({
   listAgents: vi.fn().mockResolvedValue([]),
   getProject: vi.fn(),
   listProjects: vi.fn().mockResolvedValue({ projects: [] }),
+  getIssueChain: vi.fn().mockResolvedValue(null),
+  skipIssueChainStep: vi.fn(),
+  reassignIssueChainStep: vi.fn(),
 }));
 
 vi.mock("@quickwork/core/api", () => ({
@@ -689,6 +702,7 @@ describe("IssueDetail refresh archive", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockApiObj.getIssue.mockResolvedValue(mockIssue);
+    mockApiObj.getIssueChain.mockResolvedValue(null);
     mockApiObj.listTimeline.mockResolvedValue(mockTimeline);
     mockApiObj.listIssueReactions.mockResolvedValue([]);
     mockApiObj.listIssueSubscribers.mockResolvedValue([]);
@@ -703,6 +717,45 @@ describe("IssueDetail refresh archive", () => {
     expect(container.querySelector(".rd-rail")).not.toBeNull();
     expect(container.querySelector(".qw-solo-page")).toBeNull();
   });
+
+  it("names a parked leg in the rail and offers the fixes", async () => {
+    // The production route only mounts the refresh layout; the parked reason
+    // and its actions used to exist only in the legacy leg page, so a parked
+    // relay showed a disabled button with no explanation and no way out.
+    mockApiObj.getIssue.mockResolvedValue({
+      ...mockIssue,
+      assignee_type: "squad",
+      assignee_id: "squad-1",
+    });
+    mockApiObj.getIssueChain.mockResolvedValue({
+      issue_id: "issue-1",
+      steps: [
+        {
+          id: "step-1",
+          position: 0,
+          holder_user_id: "user-2",
+          state: "parked",
+          parked_reason: "no_agent",
+          title: "Deliver",
+        },
+      ],
+    });
+    renderIssueDetail("issue-1", "refresh");
+
+    expect(
+      await screen.findByText(/has not bound an agent/i),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/Relay halted \/ HALT/)).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Skip this leg" }),
+    ).toBeInTheDocument();
+    // The viewer is a workspace admin: the fallback is the decision column.
+    expect(screen.getByText("Next / DECIDE")).toBeInTheDocument();
+    expect(screen.getByText("Agent bound")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /Hand to/ }),
+    ).toBeInTheDocument();
+  });
 });
 
 describe("IssueDetail (shared)", () => {
@@ -712,6 +765,7 @@ describe("IssueDetail (shared)", () => {
     mockViewport.isMobile = false;
     // Default: issue loads successfully
     mockApiObj.getIssue.mockResolvedValue(mockIssue);
+    mockApiObj.getIssueChain.mockResolvedValue(null);
     // /timeline returns the entries flat in chronological order (oldest first).
     mockApiObj.listTimeline.mockResolvedValue(mockTimeline);
     mockApiObj.listIssueReactions.mockResolvedValue([]);

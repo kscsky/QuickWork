@@ -40,6 +40,10 @@ function workspaceScoped(slug: string) {
     projectDetail: (id: string) => `${ws}/projects/${encode(id)}`,
     autopilots: () => `${ws}/autopilots`,
     autopilotDetail: (id: string) => `${ws}/autopilots/${encode(id)}`,
+    // The relay's decision log: approve / return / reassign / skip. It takes
+    // over the sidebar slot notifications used to occupy — "what needs me" is
+    // the log's top band, not a separate inbox page.
+    activity: () => `${ws}/activity`,
     agents: () => `${ws}/agents`,
     newAgent: () => `${ws}/agents/new`,
     // The two creation methods behind the chooser. Each is a real route so a

@@ -38,3 +38,35 @@ export interface TimelineEntry {
   /** Set by frontend coalescing when consecutive identical activities are merged. */
   coalesced_count?: number;
 }
+
+/**
+ * One key relay decision on the workspace activity page.
+ *
+ * Only the four moves that change where the baton goes or whether a leg
+ * counts are recorded: approve, return, reassign, skip. Runs, comments,
+ * parking and recovery stay on the issue.
+ */
+export type RelayActivityAction =
+  | "relay_approved"
+  | "relay_returned"
+  | "relay_reassigned"
+  | "relay_skipped";
+
+export interface RelayActivityEvent {
+  id: string;
+  issue_id: string;
+  /** Workspace-prefixed issue identifier, e.g. KSCS-36. */
+  identifier: string;
+  issue_title: string;
+  actor_id: string;
+  /** A known action, or a newer one this client does not render yet. */
+  action: RelayActivityAction | (string & {});
+  /** 1-based leg position the decision touched. */
+  leg: number;
+  from_user_id: string | null;
+  to_user_id: string | null;
+  reason: string;
+  /** True when the actor used owner/admin reach (reassign, skip). */
+  admin: boolean;
+  created_at: string;
+}

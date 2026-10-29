@@ -105,7 +105,7 @@ export function WelcomeSignal() {
                 <span className="text-caption text-muted-foreground">
                   {t(($) => $.welcome.waybill.agent)}
                 </span>
-                <span className="text-caption text-muted-foreground/60">·</span>
+                <span className="text-caption text-faint-foreground">·</span>
                 <span className="text-caption text-muted-foreground">
                   {t(($) => $.welcome.waybill.sandbox)}
                 </span>

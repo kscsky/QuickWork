@@ -61,6 +61,15 @@ vi.mock("@quickwork/core/autopilots/mutations", () => ({
   useUpdateAutopilotTrigger: () => ({ mutateAsync: vi.fn() }),
 }));
 
+vi.mock("@quickwork/core/permissions", () => ({
+  useCurrentMember: () => ({
+    userId: "user-1",
+    role: "owner",
+    member: null,
+    isLoading: false,
+  }),
+}));
+
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 vi.mock("../../editor", () => ({

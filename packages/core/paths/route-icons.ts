@@ -21,6 +21,7 @@
 /** Every icon name a nav page or a tab type-icon can resolve to. */
 export type RouteIconName =
   | "Inbox"
+  | "History"
   | "MessageSquare"
   | "CircleUser"
   | "Gauge"
@@ -50,6 +51,7 @@ export type RouteIconName =
 /** i18n label key (under the `layout.nav` namespace) for a page. */
 export type NavLabelKey =
   | "inbox"
+  | "activity"
   | "dispatch"
   | "tasks"
   | "my_issues"
@@ -68,11 +70,13 @@ export type NavLabelKey =
   | "tokens"
   | "account"
   | "workspace_settings"
+  | "members"
   | "settings";
 
 /** Stable identifier for each workspace navigation page. */
 export type WorkspacePageKey =
   | "inbox"
+  | "activity"
   | "dispatch"
   | "tasks"
   | "myIssues"
@@ -90,7 +94,9 @@ export type WorkspacePageKey =
   | "integrations"
   | "tokens"
   | "account"
-  | "workspaceSettings";
+  | "workspaceSettings"
+  | "members"
+  | "settings";
 
 export interface WorkspacePage {
   /** Route segment at index 1 of `/{slug}/{segment}/...`. */
@@ -107,6 +113,9 @@ export interface WorkspacePage {
  */
 export const WORKSPACE_PAGES: Record<WorkspacePageKey, WorkspacePage> = {
   inbox: { segment: "inbox", icon: "Inbox", navKey: "inbox" },
+  // The relay's decision log. Replaces the notification inbox as the sidebar
+  // entry: pending work is this page's top band, the rest is the audit trail.
+  activity: { segment: "activity", icon: "History", navKey: "activity" },
   dispatch: { segment: "dispatch", icon: "Gauge", navKey: "dispatch" },
   // The relay feed: every task with its chain, who holds it right now, and
   // where it has stopped. A page of its own rather than the issues list
@@ -136,6 +145,8 @@ export const WORKSPACE_PAGES: Record<WorkspacePageKey, WorkspacePage> = {
     icon: "Settings",
     navKey: "workspace_settings",
   },
+  members: { segment: "members", icon: "Users", navKey: "members" },
+  settings: { segment: "settings", icon: "Settings", navKey: "settings" },
 };
 
 /** Reverse lookup: route segment → page key. */

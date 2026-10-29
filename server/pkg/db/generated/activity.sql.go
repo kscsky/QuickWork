@@ -204,3 +204,67 @@ func (q *Queries) ListActivitiesForIssue(ctx context.Context, arg ListActivities
 	}
 	return items, nil
 }
+
+const listRelayActivityEvents = `-- name: ListRelayActivityEvents :many
+SELECT ae.id, ae.workspace_id, ae.issue_id, ae.actor_type, ae.actor_id, ae.action, ae.details, ae.created_at,
+       i.number AS issue_number,
+       i.title AS issue_title
+FROM activity_log ae
+JOIN issue i ON i.id = ae.issue_id
+WHERE ae.workspace_id = $1
+  AND ae.action IN ('relay_approved', 'relay_returned', 'relay_reassigned', 'relay_skipped')
+ORDER BY ae.created_at DESC, ae.id DESC
+LIMIT $2
+`
+
+type ListRelayActivityEventsParams struct {
+	WorkspaceID pgtype.UUID `json:"workspace_id"`
+	Limit       int32       `json:"limit"`
+}
+
+type ListRelayActivityEventsRow struct {
+	ID          pgtype.UUID        `json:"id"`
+	WorkspaceID pgtype.UUID        `json:"workspace_id"`
+	IssueID     pgtype.UUID        `json:"issue_id"`
+	ActorType   pgtype.Text        `json:"actor_type"`
+	ActorID     pgtype.UUID        `json:"actor_id"`
+	Action      string             `json:"action"`
+	Details     []byte             `json:"details"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	IssueNumber int32              `json:"issue_number"`
+	IssueTitle  string             `json:"issue_title"`
+}
+
+// The workspace activity page: only the decisions that change the relay
+// (approve / return / reassign / skip). Runs, comments and parking stay on the
+// issue, so this list stays short enough to read.
+func (q *Queries) ListRelayActivityEvents(ctx context.Context, arg ListRelayActivityEventsParams) ([]ListRelayActivityEventsRow, error) {
+	rows, err := q.db.Query(ctx, listRelayActivityEvents, arg.WorkspaceID, arg.Limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListRelayActivityEventsRow{}
+	for rows.Next() {
+		var i ListRelayActivityEventsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.WorkspaceID,
+			&i.IssueID,
+			&i.ActorType,
+			&i.ActorID,
+			&i.Action,
+			&i.Details,
+			&i.CreatedAt,
+			&i.IssueNumber,
+			&i.IssueTitle,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}

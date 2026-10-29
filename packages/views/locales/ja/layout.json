@@ -1,6 +1,7 @@
 {
   "nav": {
     "inbox": "通知",
+    "activity": "アクティビティ",
     "dispatch": "スクワッドタスク",
     "chat": "チャット",
     "tasks": "タスクリスト",

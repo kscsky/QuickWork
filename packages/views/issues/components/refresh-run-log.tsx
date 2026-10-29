@@ -9,13 +9,6 @@ import { useLocale, useT } from "../../i18n";
 import { RunLogDialog } from "./run-log-dialog";
 import { useNow } from "./use-now";
 
-const ACTIVE_STATUSES = new Set([
-  "queued",
-  "dispatched",
-  "running",
-  "waiting_local_directory",
-]);
-
 function taskOutput(task: AgentTask): string {
   const result = task.result as { output?: unknown } | null;
   const output = typeof result?.output === "string" ? result.output.trim() : "";
@@ -32,13 +25,22 @@ export function RefreshRunLogCard({
   const { t } = useT("issues");
   const locale = useLocale();
   const [logOpen, setLogOpen] = useState(false);
-  const active = ACTIVE_STATUSES.has(task.status);
+  // Queued is not running: no process has picked the task up yet. Dispatched
+  // is the claim handshake and reads as preparing; only `running` is a live
+  // run with a process behind it.
+  const queued =
+    task.status === "queued" || task.status === "waiting_local_directory";
+  const preparing = task.status === "dispatched";
+  const running = task.status === "running";
+  const live = running || preparing;
   const failed = task.status === "failed" || task.status === "cancelled";
-  const now = useNow(active);
-  const started = task.started_at ?? task.dispatched_at ?? task.created_at;
-  const duration = started
-    ? formatDuration(started, task.completed_at ? Date.parse(task.completed_at) : now)
-    : "";
+  const now = useNow(live);
+  const started = task.started_at ?? (queued ? task.created_at : task.dispatched_at ?? task.created_at);
+  const duration = queued
+    ? ""
+    : started
+      ? formatDuration(started, task.completed_at ? Date.parse(task.completed_at) : now)
+      : "";
   const startedLabel = started
     ? new Intl.DateTimeFormat(locale, {
         month: "short",
@@ -53,9 +55,13 @@ export function RefreshRunLogCard({
     ? t(($) => $.room.state_interrupted)
     : task.status === "completed"
       ? t(($) => $.room.state_done)
-      : active
-        ? t(($) => $.room.chat_running)
-        : t(($) => $.room.state_waiting);
+      : queued
+        ? t(($) => $.room.state_waiting)
+        : preparing
+          ? t(($) => $.room.run_preparing)
+          : running
+            ? t(($) => $.room.chat_running)
+            : t(($) => $.room.state_waiting);
 
   return (
     <>
@@ -78,13 +84,20 @@ export function RefreshRunLogCard({
               {duration ? ` · ${duration}` : ""}
             </div>
           </div>
-          <span className="rd-runlog-state" data-live={active ? "" : undefined}>
+          <span className="rd-runlog-state" data-live={live ? "" : undefined}>
             <i />
             {status}
           </span>
         </div>
         <div className="rd-runlog-body">
-          <p>{output || t(($) => $.detail.execution_no_result)}</p>
+          <p>
+            {output ||
+              (queued
+                ? t(($) => $.room.run_queued_waiting)
+                : live
+                  ? t(($) => $.room.run_live_waiting)
+                  : t(($) => $.detail.execution_no_result))}
+          </p>
           <div className="rd-runlog-meta">
             {model ? <span>{model}</span> : null}
             {duration ? <span>{duration}</span> : null}

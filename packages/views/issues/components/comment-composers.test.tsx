@@ -200,6 +200,17 @@ vi.mock("../../editor", async () => ({
   }),
 }));
 
+vi.mock("@quickwork/core/auth", () => {
+  const user = { id: "user-1", name: "Test User", email: "test@example.com" };
+  return {
+    useAuthStore: Object.assign(
+      (selector?: (s: { user: typeof user }) => unknown) =>
+        selector ? selector({ user }) : { user },
+      { getState: () => ({ user }) },
+    ),
+  };
+});
+
 function renderWithProviders(ui: ReactNode) {
   const queryClient = new QueryClient({
     defaultOptions: {

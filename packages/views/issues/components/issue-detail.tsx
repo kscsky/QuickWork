@@ -14,7 +14,6 @@ import { Virtuoso, type VirtuosoHandle } from "react-virtuoso";
 import { AppLink, useBackOrReplace } from "../../navigation";
 import {
   Archive,
-  ArrowUpRight,
   Calendar,
   CalendarClock,
   CalendarDays,
@@ -63,13 +62,29 @@ import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, Command
 import { AvatarGroup, AvatarGroupCount } from "@quickwork/ui/components/ui/avatar";
 import { ActorAvatar } from "../../common/actor-avatar";
 import { PropertyIcon } from "../../common/property-icon";
-import type { Attachment, Issue, IssueProperty, IssueStatus, IssueStatusCategory, IssuePriority, TimelineEntry, UpdateIssueRequest } from "@quickwork/core/types";
+import type {
+  Attachment,
+  Issue,
+  IssueChainHandoffAcceptance,
+  IssueChainHandoffInput,
+  IssueProperty,
+  IssueStatus,
+  IssueStatusCategory,
+  IssuePriority,
+  TimelineEntry,
+  UpdateIssueRequest,
+} from "@quickwork/core/types";
 import { contentReferencesAttachment } from "@quickwork/core/types";
 import { STATUS_CONFIG } from "@quickwork/core/issues/config";
 import { formatDateOnly, isPastDateOnly } from "@quickwork/core/issues/date";
 import {
   useApproveChainStep,
   useGenerateChainLegOutput,
+  useCancelChainStep,
+  useExtractChainHandoff,
+  useReassignChainStep,
+  useReturnChainStep,
+  useRetryChainStep,
   useSetChainStepPlan,
   useSkipChainStep,
   useUpdateIssue,
@@ -94,7 +109,7 @@ import { IssueAgentActivityIndicator } from "./issue-agent-activity-indicator";
 import { SubIssuesAgentWorkingChip } from "./sub-issues-agent-working-chip";
 import { LocalDirectoryHint } from "../../projects/components/local-directory-hint";
 import { CommentCard } from "./comment-card";
-import { ChainParkedBar, ChainStateTag, LockedLegBlock, RoomMessage } from "./squad-room";
+import { ChainAdminBar, ChainHaltBar, ChainParkedBar, ChainStateTag, LockedLegBlock, RoomMessage } from "./squad-room";
 import { chainStateKey, latestLegRun, legRunTasks, selectProducedLegComment, stepRunState } from "./chain-run-state";
 import { LegRunLive } from "./leg-run-live";
 import { deriveRelayView } from "./chain-run-state";
@@ -113,6 +128,11 @@ import {
   type HandoffCandidate,
   type HandoffDraft,
 } from "./relay-leg-rail";
+import {
+  HandoffPackageCard,
+  LegBriefCard,
+  PreviousHandoffCard,
+} from "./handoff-package";
 import { SourceContextBadge } from "./source-context-viewer";
 import { RevisionConflictCompare } from "./revision-conflict-compare";
 import { CommentInput } from "./comment-input";
@@ -137,7 +157,8 @@ import { issueKeys, issueListOptions, issueDetailOptions, childIssuesOptions, ch
 import { projectDetailOptions } from "@quickwork/core/projects/queries";
 import { ProjectIcon } from "../../projects/components/project-icon";
 import { propertyListOptions } from "@quickwork/core/properties";
-import { memberListOptions, agentListOptions } from "@quickwork/core/workspace/queries";
+import { memberListOptions, agentListOptions, squadMemberListOptions } from "@quickwork/core/workspace/queries";
+import { useCurrentMember } from "@quickwork/core/permissions";
 import { agentTaskSnapshotOptions } from "@quickwork/core/agents/queries";
 import {
   selectExpandedResolved,
@@ -363,6 +384,23 @@ function formatActivity(
       return t(($) => $.activity.task_completed, { count: entry.coalesced_count ?? 1 });
     case "task_failed":
       return t(($) => $.activity.task_failed, { count: entry.coalesced_count ?? 1 });
+    case "relay_approved": {
+      return t(($) => $.activity.relay_approved, { leg: details.leg ?? "?" });
+    }
+    case "relay_returned": {
+      return t(($) => $.activity.relay_returned, { leg: details.leg ?? "?" });
+    }
+    case "relay_reassigned": {
+      const toName = details.to_user_id && resolveActorName
+        ? resolveActorName("member", details.to_user_id)
+        : null;
+      return toName
+        ? t(($) => $.activity.relay_reassigned, { leg: details.leg ?? "?", name: toName })
+        : t(($) => $.activity.relay_reassigned_unknown, { leg: details.leg ?? "?" });
+    }
+    case "relay_skipped": {
+      return t(($) => $.activity.relay_skipped, { leg: details.leg ?? "?" });
+    }
     case "squad_leader_evaluated": {
       const reason = details.reason?.trim();
       switch (details.outcome) {
@@ -1140,6 +1178,7 @@ export function IssueDetail({ issueId, layout = "legacy", onDelete, onDone, high
 
   // Issue navigation — read from TQ list cache
   const wsId = useWorkspaceId();
+  const { role: myWorkspaceRole } = useCurrentMember(wsId);
   const { data: members = [] } = useQuery(memberListOptions(wsId));
   const { data: agents = [] } = useQuery(agentListOptions(wsId));
   // Workspace owners and admins moderate any comment authored by anyone
@@ -1167,6 +1206,11 @@ export function IssueDetail({ issueId, layout = "legacy", onDelete, onDone, high
     [chain, user?.id],
   );
   const approveChainStep = useApproveChainStep(id);
+  const returnChainStep = useReturnChainStep(id);
+  const retryChainStep = useRetryChainStep(id);
+  const cancelChainStep = useCancelChainStep(id);
+  const extractChainHandoff = useExtractChainHandoff(id);
+  const reassignChainStep = useReassignChainStep(id);
   const setChainStepPlan = useSetChainStepPlan(id);
   // ── The subtask page (B 式重构) ───────────────────────────────────────
   // One squad task = a parent + one subtask per person, in a fixed order.
@@ -1200,6 +1244,55 @@ export function IssueDetail({ issueId, layout = "legacy", onDelete, onDone, high
   const openLegLatestRun = openLegStep
     ? latestLegRun(id, openLegStep, issueTasks)
     : null;
+  // The leg's run was interrupted (watchdog, stalled stream, explicit cancel):
+  // its holder may restart the leg without moving the chain. The server
+  // enforces the same holder-only rule and re-runs through the admission gate.
+  const openLegRetryable =
+    openLegIsMine &&
+    !!openLegStep &&
+    chainStateKey(openLegStep.state) === "doing" &&
+    (openLegLatestRun?.status === "failed" ||
+      openLegLatestRun?.status === "cancelled");
+  const handleRetryLeg = () => {
+    retryChainStep.mutate(undefined, {
+      onError: () => toast.error(t(($) => $.room.run_retry_failed)),
+    });
+  };
+  // Re-read the leg's single output document into the handoff package. The
+  // response is authoritative, so the draft is replaced with it directly
+  // rather than waiting for a refetch.
+  const handleExtractHandoff = () => {
+    extractChainHandoff.mutate(undefined, {
+      onSuccess: (chain) => {
+        const step =
+          chain.steps.find(
+            (item) => item.state === "reviewing" && item.holder_user_id === user?.id,
+          ) ?? chain.steps.find((item) => item.state === "reviewing");
+        const extracted = step?.handoff;
+        if (!extracted) {
+          toast.error(t(($) => $.room.handoff_extract_no_block));
+          return;
+        }
+        setHandoffSummary(extracted.summary ?? "");
+        setHandoffAcceptance(extracted.acceptance ?? []);
+        setHandoffOpenQuestions((extracted.open_questions ?? []).join("\n"));
+        setHandoffNextBrief((extracted.next_brief ?? []).join("\n"));
+        toast.success(t(($) => $.room.handoff_extract_success));
+      },
+      onError: (err) =>
+        handoffMutationError(err, t(($) => $.room.handoff_extract_failed)),
+    });
+  };
+  const openLegRunning =
+    !!openLegLatestRun &&
+    ["queued", "dispatched", "running", "waiting_local_directory"].includes(
+      openLegLatestRun.status,
+    );
+  const handleCancelLeg = () => {
+    cancelChainStep.mutate(undefined, {
+      onError: () => toast.error(t(($) => $.room.run_cancel_failed)),
+    });
+  };
   const openLegHolding =
     openLegIsMine &&
     !!openLegStep &&
@@ -1388,6 +1481,28 @@ export function IssueDetail({ issueId, layout = "legacy", onDelete, onDone, high
       return cached?.description != null ? cached : undefined;
     },
   });
+  // Owners/admins have one fallback the holder cannot give themselves: move a
+  // stuck leg to someone else. The roster is the issue's own squad, and only
+  // loads for viewers who can actually act on it.
+  const canAdministerChain =
+    myWorkspaceRole === "owner" || myWorkspaceRole === "admin";
+  const squadIdForAdmin =
+    issue?.assignee_type === "squad" ? (issue.assignee_id ?? "") : "";
+  const { data: adminSquadMembers = [] } = useQuery({
+    ...squadMemberListOptions(wsId, squadIdForAdmin),
+    enabled: canAdministerChain && !!squadIdForAdmin,
+  });
+  const adminSquadPeople = useMemo(
+    () =>
+      adminSquadMembers
+        .filter((member) => member.member_type === "member")
+        .map((member) => ({
+          userId: member.member_id,
+          name: playerNames.nameOf(member.member_id),
+          hasAgent: !!member.agent_id,
+        })),
+    [adminSquadMembers, playerNames],
+  );
   const openCommentSubIssue = useCallback((commentId: string) => {
     if (!issue) return;
     openModal("quick-create-issue", {
@@ -1516,7 +1631,13 @@ export function IssueDetail({ issueId, layout = "legacy", onDelete, onDone, high
     // - squad_leader_evaluated: never coalesce; outcome/reason are audit data
     const COALESCE_MS = 2 * 60 * 1000;
     const NO_TIME_LIMIT_ACTIONS = new Set(["task_completed", "task_failed"]);
-    const NEVER_COALESCE_ACTIONS = new Set(["squad_leader_evaluated"]);
+    const NEVER_COALESCE_ACTIONS = new Set([
+      "squad_leader_evaluated",
+      "relay_approved",
+      "relay_returned",
+      "relay_reassigned",
+      "relay_skipped",
+    ]);
     const coalesced: TimelineEntry[] = [];
     for (const entry of topLevel) {
       if (entry.type === "activity") {
@@ -1955,6 +2076,17 @@ export function IssueDetail({ issueId, layout = "legacy", onDelete, onDone, high
     () => new Set(),
   );
   const [handoffSummary, setHandoffSummary] = useState("");
+  // The rest of the structured package. Summary/files above are the parts the
+  // old room layout already edited; these give the refresh layout's review
+  // artifact its acceptance ledger, open questions and next-leg brief.
+  const [handoffAcceptance, setHandoffAcceptance] = useState<
+    IssueChainHandoffAcceptance[]
+  >([]);
+  const [handoffOpenQuestions, setHandoffOpenQuestions] = useState("");
+  const [handoffNextBrief, setHandoffNextBrief] = useState("");
+  const [returnOpen, setReturnOpen] = useState(false);
+  const [sharedContextOpen, setSharedContextOpen] = useState(false);
+  const handoffSectionRef = useRef<HTMLElement | null>(null);
   // The output (产出 md) flow: the holder asks their leg's agent to summarize
   // this leg into the handoff document. `outputAsked` marks that the ask ran,
   // so an approve click with an empty summary asks exactly once.
@@ -1970,23 +2102,91 @@ export function IssueDetail({ issueId, layout = "legacy", onDelete, onDone, high
   // Whether the current summary text came from a lift (safe to replace on a
   // regenerate) rather than from the holder's own typing (never replaced).
   const [outputSummaryFromLift, setOutputSummaryFromLift] = useState(false);
-  const reviewingStepId = reviewingStep?.id ?? null;
-  // A new review round starts with nothing ticked and no summary…
+  // A review round starts with the package the leg already carries (a returned
+  // leg preserved its round), or with a seeded package on the first round.
+  // `returned.at` distinguishes the rounds of one step, whose id stays put.
+  // The package fingerprint is part of the round key: when the completion hook
+  // extracts a handoff from the leg's output document while this page is open,
+  // the draft re-hydrates with the extracted fields.
+  const packageFingerprint = reviewingStep?.handoff
+    ? `${reviewingStep.handoff.summary?.length ?? 0}:${reviewingStep.handoff.acceptance?.length ?? 0}:${reviewingStep.handoff.open_questions?.length ?? 0}:${reviewingStep.handoff.next_brief?.length ?? 0}`
+    : "none";
+  const reviewRoundKey = reviewingStep
+    ? `${reviewingStep.id}:${reviewingStep.handoff?.returned?.at ?? "first"}:${packageFingerprint}`
+    : "";
+  const reviewRoundRef = useRef<string | null>(null);
   useEffect(() => {
-    setHandoffPicked(new Set());
-    setHandoffSummary("");
+    if (!reviewRoundKey || reviewRoundRef.current === reviewRoundKey) return;
+    reviewRoundRef.current = reviewRoundKey;
+    const stored = reviewingStep?.handoff;
+    const storedPicked = new Set<string>();
+    for (const file of stored?.files ?? []) {
+      if (file.attachment_id) {
+        storedPicked.add(`att:${file.attachment_id}`);
+        continue;
+      }
+      if (file.kind === "branch") {
+        const candidate = handoffCandidates.find(
+          (item) => item.kind === "branch" && item.name === file.name,
+        );
+        if (candidate) storedPicked.add(candidate.id);
+      }
+    }
+    setHandoffPicked(storedPicked);
+    setHandoffSummary(stored?.summary ?? "");
+    setHandoffOpenQuestions((stored?.open_questions ?? []).join("\n"));
+    setHandoffNextBrief((stored?.next_brief ?? []).join("\n"));
+    if (stored?.acceptance?.length) {
+      setHandoffAcceptance(stored.acceptance);
+    } else {
+      const planLine = (reviewingStep?.plan ?? "")
+        .split("\n")
+        .map((line) => line.replace(/^[\s>*#\-\d.]+/, "").trim())
+        .find(Boolean);
+      const nextCount = stored?.next_brief?.length ?? 0;
+      setHandoffAcceptance([
+        {
+          label: t(($) => $.room.handoff_default_plan),
+          requirement: planLine || t(($) => $.room.handoff_default_plan_req),
+          delivered: t(($) => $.room.handoff_default_done),
+          state: "pass",
+        },
+        {
+          label: t(($) => $.room.handoff_default_delivery),
+          requirement: t(($) => $.room.handoff_default_delivery_req),
+          delivered:
+            handoffCandidates.length > 0
+              ? t(($) => $.room.handoff_files_count, {
+                  count: handoffCandidates.length,
+                })
+              : t(($) => $.room.handoff_default_not_written),
+          state: handoffCandidates.length > 0 ? "pass" : "warn",
+        },
+        {
+          label: t(($) => $.room.handoff_default_next),
+          requirement: t(($) => $.room.handoff_default_next_req),
+          delivered:
+            nextCount > 0
+              ? t(($) => $.room.handoff_items_count, { count: nextCount })
+              : t(($) => $.room.handoff_default_not_written),
+          state: nextCount > 0 ? "pass" : "warn",
+        },
+      ]);
+    }
     setOutputProducing(false);
     setOutputAsked(false);
     setOutputBaselineId(null);
     outputLiftedRef.current = new Set();
     setOutputSummaryFromLift(false);
     setOutputCandidates([]);
-  }, [reviewingStepId]);
-  // …then everything the collector found arrives already ticked ("自动收集").
-  // Only additions: a file the holder un-ticked is not re-ticked by the next
-  // refetch, but a candidate that lands mid-review still joins the package.
+    setReturnOpen(false);
+  }, [reviewRoundKey, reviewingStep, handoffCandidates, t]);
+  // On a first review the collector's findings arrive already ticked ("自动
+  // 收集"). A returned leg keeps the curated set instead: the reason was about
+  // what the holder chose to hand over, not an invitation to re-tick the world.
   useEffect(() => {
-    if (handoffCandidates.length === 0) return;
+    if (!reviewRoundKey || handoffCandidates.length === 0) return;
+    if ((reviewingStep?.handoff?.files?.length ?? 0) > 0) return;
     setHandoffPicked((prev) => {
       let changed = false;
       const next = new Set(prev);
@@ -1998,7 +2198,7 @@ export function IssueDetail({ issueId, layout = "legacy", onDelete, onDone, high
       }
       return changed ? next : prev;
     });
-  }, [handoffCandidates]);
+  }, [reviewRoundKey, handoffCandidates, reviewingStep?.handoff?.files?.length]);
   const handoffDraft = useMemo<HandoffDraft | undefined>(() => {
     if (!relayView?.canApprove) return undefined;
     return {
@@ -2013,23 +2213,129 @@ export function IssueDetail({ issueId, layout = "legacy", onDelete, onDone, high
         }),
       summary: handoffSummary,
       onSummaryChange: setHandoffSummary,
+      acceptance: handoffAcceptance,
+      onAcceptanceChange: setHandoffAcceptance,
+      openQuestions: handoffOpenQuestions,
+      onOpenQuestionsChange: setHandoffOpenQuestions,
+      nextBrief: handoffNextBrief,
+      onNextBriefChange: setHandoffNextBrief,
     };
-  }, [relayView?.canApprove, handoffCandidates, handoffPicked, handoffSummary]);
+  }, [
+    relayView?.canApprove,
+    handoffCandidates,
+    handoffPicked,
+    handoffSummary,
+    handoffAcceptance,
+    handoffOpenQuestions,
+    handoffNextBrief,
+  ]);
+  const buildHandoffInput = (): IssueChainHandoffInput => ({
+    summary: handoffSummary.trim(),
+    files: handoffCandidates
+      .filter((candidate) => handoffPicked.has(candidate.id))
+      .map((candidate) => ({
+        name: candidate.name,
+        size: candidate.size,
+        kind: candidate.kind,
+        attachment_id: candidate.attachment_id,
+      })),
+    acceptance: handoffAcceptance
+      .map((row) => ({
+        ...row,
+        label: row.label.trim(),
+        requirement: row.requirement.trim(),
+        delivered: row.delivered.trim(),
+        state: row.state === "warn" ? "warn" : "pass",
+      }))
+      .filter((row) => row.label || row.requirement || row.delivered),
+    open_questions: handoffOpenQuestions
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean),
+    next_brief: handoffNextBrief
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean),
+  });
+  const handoffMutationError = (err: unknown, fallback: string) => {
+    if (err instanceof Error && /still being generated/i.test(err.message)) {
+      toast.error(t(($) => $.room.handoff_output_running));
+      return;
+    }
+    if (err instanceof Error && /summary is too long/i.test(err.message)) {
+      toast.error(t(($) => $.room.handoff_summary_too_long));
+      return;
+    }
+    // The review gate's refusals name the missing part. Turning them into a
+    // generic "approval failed" left the holder with no way to know what to
+    // fill in — the 2026-10-29 KSCS-34 dead end.
+    if (err instanceof Error && /acceptance item/i.test(err.message)) {
+      toast.error(t(($) => $.room.handoff_need_acceptance));
+      return;
+    }
+    if (err instanceof Error && /handoff summary/i.test(err.message)) {
+      toast.error(t(($) => $.room.handoff_need_summary));
+      return;
+    }
+    if (err instanceof Error && /brief for the next leg/i.test(err.message)) {
+      toast.error(t(($) => $.room.handoff_need_next_brief));
+      return;
+    }
+    if (err instanceof Error && /no handoff block/i.test(err.message)) {
+      toast.error(t(($) => $.room.handoff_extract_no_block));
+      return;
+    }
+    if (err instanceof Error && /no completed output document/i.test(err.message)) {
+      toast.error(t(($) => $.room.handoff_extract_no_document));
+      return;
+    }
+    toast.error(fallback);
+  };
+  // The gate's first missing piece, said in the holder's words. Used when the
+  // button is clicked while the package is incomplete, so the click explains
+  // itself instead of being a disabled dead end.
+  const handoffGateToast = () => {
+    if (!handoffSummary.trim()) {
+      toast.error(t(($) => $.room.handoff_need_summary));
+      return;
+    }
+    if (handoffAcceptance.length === 0) {
+      toast.error(t(($) => $.room.handoff_need_acceptance));
+      return;
+    }
+    toast.error(t(($) => $.room.handoff_need_next_brief));
+  };
   const approveWithHandoff = () =>
-    approveChainStep.mutate(
+    approveChainStep.mutate(buildHandoffInput(), {
+      // The baton moved: drop any pinned leg so the page follows the relay to
+      // the new active one instead of staying on the chapter just delivered.
+      onSuccess: () => setOpenLeg(null),
+      onError: (err) => handoffMutationError(err, t(($) => $.room.approve_failed)),
+    });
+  const returnWithHandoff = (reason: string) => {
+    returnChainStep.mutate(
+      { ...buildHandoffInput(), reason },
       {
-        summary: handoffSummary.trim(),
-        files: handoffCandidates
-          .filter((candidate) => handoffPicked.has(candidate.id))
-          .map((candidate) => ({
-            name: candidate.name,
-            size: candidate.size,
-            kind: candidate.kind,
-            attachment_id: candidate.attachment_id,
-          })),
+        onSuccess: () => {
+          setReturnOpen(false);
+          toast.success(t(($) => $.room.handoff_return_success));
+        },
+        onError: (err) =>
+          handoffMutationError(err, t(($) => $.room.handoff_return_failed)),
       },
-      { onError: () => toast.error(t(($) => $.room.approve_failed)) },
     );
+  };
+  const openReturnPanel = () => {
+    setReturnOpen(true);
+    requestAnimationFrame(() => {
+      handoffSectionRef.current?.scrollIntoView({
+        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
+          ? "auto"
+          : "smooth",
+        block: "center",
+      });
+    });
+  };
 
   // The leg's output: one summary per finished leg, written by the leg's own
   // agent — not one document per question. The ask queues a run; the document
@@ -2037,7 +2343,13 @@ export function IssueDetail({ issueId, layout = "legacy", onDelete, onDone, high
   // the handoff summary and carries it as a .md file, so the delivered output
   // previews/edits/downloads like every other handoff file.
   const startLegOutput = () => {
-    if (outputProducing || !relayView?.canApprove) return;
+    if (
+      outputProducing ||
+      reviewingStep?.output_task_id ||
+      !relayView?.canApprove
+    ) {
+      return;
+    }
     // Baseline: the leg's latest agent comment BEFORE the ask. Anything after
     // it in the leg is the output — clock-skew-proof where a timestamp
     // compare is not.
@@ -2068,6 +2380,64 @@ export function IssueDetail({ issueId, layout = "legacy", onDelete, onDone, high
       },
     });
   };
+  const liftLegOutput = useCallback(
+    (commentId: string, markdown: string) => {
+      if (outputLiftedRef.current.has(commentId)) return;
+      outputLiftedRef.current.add(commentId);
+      setOutputProducing(false);
+      setHandoffSummary((prev) => (prev.trim() === "" ? markdown : prev));
+      setOutputSummaryFromLift(true);
+      const seq = (reviewingStep?.position ?? 0) + 1;
+      const baseName = t(($) => $.room.output_file_name, { seq });
+      const dot = baseName.lastIndexOf(".");
+      // The comment id in the name makes the upload idempotent across reloads:
+      // the same summary comment always maps to the same attachment, so a
+      // second mount reuses it instead of uploading another identical .md.
+      const fileName =
+        dot > 0
+          ? `${baseName.slice(0, dot)}-${commentId.slice(0, 8)}${baseName.slice(dot)}`
+          : `${baseName}-${commentId.slice(0, 8)}`;
+      const addCandidate = (file: {
+        id: string;
+        filename: string;
+        size_bytes: number;
+      }) => {
+        setOutputCandidates((prev) =>
+          prev.some((candidate) => candidate.attachment_id === file.id)
+            ? prev
+            : [
+                ...prev,
+                {
+                  id: `att:${file.id}`,
+                  name: file.filename,
+                  size: file.size_bytes,
+                  kind: "attachment",
+                  attachment_id: file.id,
+                },
+              ],
+        );
+      };
+      const existing = issueAttachments?.find(
+        (attachment) => attachment.filename === fileName,
+      );
+      if (existing) {
+        addCandidate(existing);
+        return;
+      }
+      void (async () => {
+        const uploaded = await uploadLegOutputFile(
+          new File([markdown], fileName, { type: "text/markdown" }),
+          { issueId: id },
+        );
+        // The summary above still carries the document; the file is what makes
+        // it renderable/editable/downloadable downstream, so a failed upload
+        // only costs the attachment, never the text.
+        if (!uploaded) return;
+        addCandidate(uploaded);
+      })();
+    },
+    [reviewingStep?.position, id, uploadLegOutputFile, issueAttachments, t],
+  );
   // Keyed on the ASK, not on the producing flag: a real run can outlast any
   // progress timer, and a late-landing document must still be lifted. The
   // holder's own words always win over an auto-fill.
@@ -2082,42 +2452,8 @@ export function IssueDetail({ issueId, layout = "legacy", onDelete, onDone, high
       reviewingStep?.id ?? null,
     );
     if (!produced?.content) return;
-    if (outputLiftedRef.current.has(produced.id)) return;
-    outputLiftedRef.current.add(produced.id);
-    setOutputProducing(false);
-    const markdown = produced.content;
-    setHandoffSummary((prev) => (prev.trim() === "" ? markdown : prev));
-    setOutputSummaryFromLift(true);
-    const seq = (reviewingStep?.position ?? 0) + 1;
-    void (async () => {
-      const uploaded = await uploadLegOutputFile(
-        new File(
-          [markdown],
-          t(($) => $.room.output_file_name, { seq }),
-          { type: "text/markdown" },
-        ),
-        { issueId: id },
-      );
-      // The summary above still carries the document; the file is what makes
-      // it renderable/editable/downloadable downstream, so a failed upload
-      // only costs the attachment, never the text.
-      if (!uploaded) return;
-      setOutputCandidates((prev) =>
-        prev.some((candidate) => candidate.attachment_id === uploaded.id)
-          ? prev
-          : [
-              ...prev,
-              {
-                id: `att:${uploaded.id}`,
-                name: uploaded.filename,
-                size: uploaded.size_bytes,
-                kind: "attachment",
-                attachment_id: uploaded.id,
-              },
-            ],
-      );
-    })();
-  }, [outputAsked, outputBaselineId, timeline, reviewingStep, id, uploadLegOutputFile, t]);
+    liftLegOutput(produced.id, produced.content);
+  }, [outputAsked, outputBaselineId, timeline, reviewingStep?.id, liftLegOutput]);
   // A run that never reports back must not leave the button frozen. Generous
   // on purpose — real legs run for minutes, and the late-lift above still
   // catches a document that lands after this fires.
@@ -2556,9 +2892,50 @@ export function IssueDetail({ issueId, layout = "legacy", onDelete, onDone, high
     !!refreshStep &&
     refreshStepIsMine &&
     chainStateKey(refreshStep.state) === "reviewing";
+  // The server's answer, not just this tab's: an output run survives a reload,
+  // and the review gate must survive it too.
+  const refreshOutputRunning = !!refreshStep?.output_task_id;
+  const refreshOutputTaskAt = refreshStep?.output_task_at ?? null;
+  const refreshOutputBusy = outputProducing || refreshOutputRunning;
+  const refreshOutputAsked = outputAsked || !!refreshOutputTaskAt;
+  // The same lift as the local one, reconstructed from the server after a
+  // reload: the chain remembers when the newest leg-output run started, so a
+  // summary that lands while the page is closed is still picked up when the
+  // run and comment refetches arrive. While the run is active we wait; once it
+  // is gone, the first agent comment in this leg after the run's creation is
+  // the document.
+  useEffect(() => {
+    if (!reviewingStep?.id || !refreshOutputTaskAt || refreshOutputRunning) {
+      return;
+    }
+    if (handoffSummary.trim()) return;
+    const baseline = Date.parse(refreshOutputTaskAt);
+    if (Number.isNaN(baseline)) return;
+    const produced = timeline.find(
+      (entry) =>
+        entry.actor_type === "agent" &&
+        entry.chain_step_id === reviewingStep.id &&
+        !!entry.content &&
+        !!entry.created_at &&
+        Date.parse(entry.created_at) >= baseline,
+    );
+    if (!produced?.content) return;
+    liftLegOutput(produced.id, produced.content);
+  }, [
+    reviewingStep?.id,
+    refreshOutputTaskAt,
+    refreshOutputRunning,
+    handoffSummary,
+    timeline,
+    liftLegOutput,
+  ]);
   const refreshNextStep =
     refreshStep && chain
       ? chain.steps[refreshStep.position + 1] ?? null
+      : null;
+  const refreshPrevStep =
+    refreshStep && chain && refreshStep.position > 0
+      ? chain.steps[refreshStep.position - 1] ?? null
       : null;
   const refreshStepAgentName =
     refreshStep?.agent_id
@@ -2583,19 +2960,6 @@ export function IssueDetail({ issueId, layout = "legacy", onDelete, onDone, high
     [items, refreshStep],
   );
   const refreshDiscussionItems = refreshStep ? refreshLegItems : discussionItems;
-  const refreshLegDelivery = useMemo(() => {
-    if (!refreshStep) return null;
-    for (let i = timeline.length - 1; i >= 0; i--) {
-      const entry = timeline[i];
-      if (
-        entry?.chain_step_id === refreshStep.id &&
-        (entry.attachments?.length ?? 0) > 0
-      ) {
-        return entry;
-      }
-    }
-    return null;
-  }, [timeline, refreshStep]);
 
   const soloAccepted = issue ? issueBehavesAs(issue, "done") : false;
   const soloCancelled = issue ? issueBehavesAs(issue, "cancelled") : false;
@@ -3022,8 +3386,32 @@ export function IssueDetail({ issueId, layout = "legacy", onDelete, onDone, high
     : paths.tasks();
   const handleSkipParkedStep = () =>
     skipChainStep.mutate(undefined, {
+      onSuccess: () => setOpenLeg(null),
       onError: () => toast.error(t(($) => $.room.skip_failed)),
     });
+  // Owner/admin fallback: hand the stuck leg to someone else in the squad.
+  // The server validates membership and decides where the baton lands.
+  const handleAdminReassign = (holderUserId: string) =>
+    reassignChainStep.mutate(holderUserId, {
+      onSuccess: () => toast.success(t(($) => $.room.admin_reassign_success)),
+      onError: () => toast.error(t(($) => $.room.admin_reassign_failed)),
+    });
+  const handleAdminSkipReview = () =>
+    skipChainStep.mutate(undefined, {
+      onSuccess: () => {
+        setOpenLeg(null);
+        toast.success(t(($) => $.room.admin_skip_success));
+      },
+      onError: () => toast.error(t(($) => $.room.admin_skip_failed)),
+    });
+  // The review gate is a package, not a nod. The server refuses a bare 通过;
+  // the UI says which part is missing before the round trip.
+  const needsNextBrief = !!relayView?.nextStep;
+  const handoffGateOpen =
+    !!handoffSummary.trim() &&
+    handoffAcceptance.length > 0 &&
+    (!needsNextBrief || !!handoffNextBrief.trim());
+  const needsGeneration = !handoffSummary.trim() && !outputAsked;
   const roomDecide = chain && relayView ? (
     <div className="overflow-hidden rounded-lg border border-surface-border bg-surface shadow-[var(--shadow-surface)]">
       {nextAgentlessStep ? (
@@ -3054,6 +3442,12 @@ export function IssueDetail({ issueId, layout = "legacy", onDelete, onDone, high
               // 产出落地后摘要自动填好，再点一次交棒。
               if (!handoffSummary.trim() && !outputAsked) {
                 startLegOutput();
+                return;
+              }
+              // The gate is a package, not a nod. Say which part is missing
+              // instead of sending a request the server will refuse.
+              if (!handoffGateOpen) {
+                handoffGateToast();
                 return;
               }
               approveWithHandoff();
@@ -3089,11 +3483,13 @@ export function IssueDetail({ issueId, layout = "legacy", onDelete, onDone, high
         <span className="min-w-0 text-caption text-muted-foreground">
           {outputProducing
             ? t(($) => $.room.output_waiting)
-            : relayView.nextAfterMineStep
-              ? t(($) => $.room.approve_hint, {
-                  name: playerNames.nameOf(relayView.nextAfterMineStep.holder_user_id),
-                })
-              : t(($) => $.room.approve_hint_last)}
+            : !needsGeneration && !handoffGateOpen
+              ? t(($) => $.room.handoff_gate_hint)
+              : relayView.nextAfterMineStep
+                ? t(($) => $.room.approve_hint, {
+                    name: playerNames.nameOf(relayView.nextAfterMineStep.holder_user_id),
+                  })
+                : t(($) => $.room.approve_hint_last)}
         </span>
       </div>
     </div>
@@ -3210,7 +3606,7 @@ export function IssueDetail({ issueId, layout = "legacy", onDelete, onDone, high
                   ) : null}
                 </span>
               ) : null}
-              <ChainStateTag state={step.state} runState={openLegRunState} />
+              <ChainStateTag state={step.state} runState={openLegRunState} legStatus={step.leg_status} />
             </header>
             <div className="px-1 pb-2 pt-1">
               {openLegIsMine ? (
@@ -3284,6 +3680,10 @@ export function IssueDetail({ issueId, layout = "legacy", onDelete, onDone, high
                   seq: openLegStep.position + 1,
                   total: chain.steps.length,
                 })}
+                onRetry={openLegRetryable ? handleRetryLeg : undefined}
+                retryPending={retryChainStep.isPending}
+                onCancel={openLegIsMine && openLegRunning ? handleCancelLeg : undefined}
+                cancelPending={cancelChainStep.isPending}
               />
             ) : null}
             {openLegIsMine ? roomPlan : null}
@@ -3301,7 +3701,20 @@ export function IssueDetail({ issueId, layout = "legacy", onDelete, onDone, high
                 step={step}
                 nameOf={playerNames.nameOf}
                 bindHref={roomBindHref}
+                machineHref={paths.runtimes()}
                 onSkip={handleSkipParkedStep}
+                skipPending={skipChainStep.isPending}
+              />
+            ) : null}
+            {!openLegIsMine &&
+            canAdministerChain &&
+            (key === "reviewing" || key === "parked") ? (
+              <ChainAdminBar
+                step={step}
+                people={adminSquadPeople}
+                onReassign={handleAdminReassign}
+                reassignPending={reassignChainStep.isPending}
+                onSkipReview={key === "reviewing" ? handleAdminSkipReview : undefined}
                 skipPending={skipChainStep.isPending}
               />
             ) : null}
@@ -3632,7 +4045,7 @@ export function IssueDetail({ issueId, layout = "legacy", onDelete, onDone, high
     <Button
       type="button"
       size="sm"
-      className="h-[31px] px-3 text-[12.5px]"
+      className="h-[31px] px-3 text-[13px]"
       onClick={acceptDelivery}
       disabled={soloAccepted}
     >
@@ -3766,7 +4179,7 @@ export function IssueDetail({ issueId, layout = "legacy", onDelete, onDone, high
       <span className="font-mono text-[11px] text-faint-foreground">
         {issue.identifier}
       </span>
-      <span className="min-w-0 truncate text-[12.5px] font-semibold">
+      <span className="min-w-0 truncate text-[13px] font-semibold">
         {issue.title}
       </span>
       <span className="qw-solo-spacer" />
@@ -4048,29 +4461,6 @@ export function IssueDetail({ issueId, layout = "legacy", onDelete, onDone, high
     : null;
   const refreshRunActive =
     !!refreshRunTask && SOLO_ACTIVE_TASK_STATUSES.has(refreshRunTask.status);
-  const refreshDeliveryFile = refreshStep?.handoff?.files?.[0] ?? null;
-  const refreshDeliveryAttachment = refreshLegDelivery?.attachments?.[0] ?? null;
-  const refreshDeliverySummary =
-    refreshStep?.handoff?.summary ?? refreshLegDelivery?.content ?? "";
-  const refreshHasDeliverable = !!(
-    refreshDeliveryFile ||
-    refreshDeliveryAttachment ||
-    (refreshStep && refreshDeliverySummary)
-  );
-  const refreshDeliveryName =
-    refreshDeliveryFile?.name ??
-    refreshDeliveryAttachment?.filename ??
-    (refreshStep?.title || t(($) => $.detail.refresh_output));
-  const refreshDeliveryMeta = refreshDeliveryAttachment
-    ? `${refreshDeliveryAttachment.content_type} · ${Math.max(1, Math.round(refreshDeliveryAttachment.size_bytes / 1024))} KB`
-    : refreshDeliveryFile
-      ? `${refreshDeliveryFile.kind ?? "file"}`
-      : "";
-  const refreshDownloadDeliverable = () => {
-    const attachmentId =
-      refreshDeliveryFile?.attachment_id ?? refreshDeliveryAttachment?.id;
-    if (attachmentId) void downloadAttachment(attachmentId);
-  };
   const refreshAllAttachments = soloDeliveredAttachments;
   const refreshDownloadAll = () => {
     refreshAllAttachments.forEach((attachment) => {
@@ -4078,9 +4468,19 @@ export function IssueDetail({ issueId, layout = "legacy", onDelete, onDone, high
     });
   };
   const refreshPrimarySquadAction = () => {
-    if (!refreshCanApprove) return;
-    if (!handoffSummary.trim() && !outputAsked) {
+    // The package, not the agent run, is what gets handed over. An empty
+    // summary is not a package: the holder writes one or asks the leg's agent
+    // to write it, then approves. Never auto-approve around a live/empty
+    // summary — that was the 2026-10-28 KSCS-25 leak.
+    if (!refreshCanApprove || refreshOutputBusy) {
+      return;
+    }
+    if (!handoffSummary.trim() && !refreshOutputAsked) {
       startLegOutput();
+      return;
+    }
+    if (!handoffGateOpen) {
+      handoffGateToast();
       return;
     }
     approveWithHandoff();
@@ -4201,12 +4601,49 @@ export function IssueDetail({ issueId, layout = "legacy", onDelete, onDone, high
     </header>
   );
 
-  const refreshBrief = (
+  const refreshPrevious =
+    refreshStep && refreshPrevStep?.handoff ? (
+      <PreviousHandoffCard
+        step={refreshPrevStep}
+        seq={refreshPrevStep.position + 1}
+        nameOf={playerNames.nameOf}
+        attachmentOf={attachmentOf}
+        onOpen={() => refreshSelectStep(refreshPrevStep)}
+      />
+    ) : null;
+
+  const refreshPlanEditable =
+    !!refreshStep &&
+    refreshStepIsMine &&
+    chainStateKey(refreshStep.state) !== "done" &&
+    chainStateKey(refreshStep.state) !== "skipped";
+  const refreshBrief = refreshStep ? (
     <section className="rd-section">
       <div className="rd-section-head">
-        <span>{refreshStep
-          ? t(($) => $.detail.refresh_this_leg)
-          : t(($) => $.detail.refresh_brief)}</span>
+        <span>{t(($) => $.detail.refresh_this_leg)}</span>
+        <i />
+      </div>
+      <LegBriefCard
+        plan={refreshStep.plan ?? ""}
+        editable={refreshPlanEditable}
+        pending={setChainStepPlan.isPending}
+        facts={[
+          { label: t(($) => $.detail.prop_project), value: refreshProjectName },
+          { label: t(($) => $.detail.prop_priority), value: refreshPriority },
+          { label: t(($) => $.detail.prop_due_date), value: refreshDueLabel },
+        ]}
+        onSave={(plan) =>
+          setChainStepPlan.mutate(plan, {
+            onSuccess: () => toast.success(t(($) => $.room.leg_plan_saved)),
+            onError: () => toast.error(t(($) => $.room.leg_plan_save_failed)),
+          })
+        }
+      />
+    </section>
+  ) : (
+    <section className="rd-section">
+      <div className="rd-section-head">
+        <span>{t(($) => $.detail.refresh_brief)}</span>
         <i />
       </div>
       <div
@@ -4232,6 +4669,42 @@ export function IssueDetail({ issueId, layout = "legacy", onDelete, onDone, high
     </section>
   );
 
+  const refreshSharedContext = refreshStep ? (
+    <section className="rd-section">
+      <button
+        type="button"
+        className="rd-ho-shared-toggle"
+        aria-expanded={sharedContextOpen}
+        onClick={() => setSharedContextOpen((value) => !value)}
+      >
+        <span>{t(($) => $.room.handoff_shared_context)}</span>
+        <ChevronDown
+          className={cn(
+            "size-3 transition-transform",
+            sharedContextOpen && "rotate-180",
+          )}
+        />
+      </button>
+      {sharedContextOpen ? (
+        <div
+          {...descDropZoneProps}
+          className="rd-brief rd-ho-shared-body"
+          onFocusCapture={() => {
+            if (!descriptionEditingRef.current) descriptionEditingRef.current = true;
+          }}
+          onBlurCapture={(event) => {
+            if (!event.currentTarget.contains(event.relatedTarget)) {
+              descriptionEditingRef.current = false;
+            }
+          }}
+        >
+          {descriptionEditorBlock}
+          {descDragOver && <FileDropOverlay />}
+        </div>
+      ) : null}
+    </section>
+  ) : null;
+
   const refreshRunSection = (
     <section className="rd-section">
       <div className="rd-section-head">
@@ -4255,34 +4728,43 @@ export function IssueDetail({ issueId, layout = "legacy", onDelete, onDone, high
     </section>
   );
 
-  const refreshDeliverable = refreshHasDeliverable ? (
-    <section className="rd-section">
-      <div className="rd-section-head">
-        <span>{t(($) => $.detail.refresh_output)}</span>
-        <i />
-      </div>
-      <div className="rd-deliverable">
-        <span className="rd-file-ico">
-          {(refreshDeliveryFile?.name.split(".").pop() ??
-            refreshDeliveryAttachment?.filename.split(".").pop() ??
-            "MD").slice(0, 4).toUpperCase()}
-        </span>
-        <div className="rd-deliverable-main">
-          <div className="rd-deliverable-name">{refreshDeliveryName}</div>
-          {refreshDeliveryMeta ? <div className="rd-deliverable-meta">{refreshDeliveryMeta}</div> : null}
-          {refreshDeliverySummary ? (
-            <div className="rd-deliverable-desc">{refreshDeliverySummary}</div>
-          ) : null}
-        </div>
-        {refreshDeliveryFile?.attachment_id || refreshDeliveryAttachment ? (
-          <button type="button" className="rd-deliverable-open" onClick={refreshDownloadDeliverable}>
-            {t(($) => $.detail.delivery_download)}
-            <ArrowUpRight className="size-3" />
-          </button>
-        ) : null}
-      </div>
-    </section>
-  ) : null;
+  const refreshHandoffVisible =
+    !!refreshStep &&
+    (chainStateKey(refreshStep.state) === "reviewing" ||
+      chainStateKey(refreshStep.state) === "done" ||
+      !!refreshStep.handoff);
+  const refreshHandoff =
+    refreshHandoffVisible && refreshStep ? (
+      <HandoffPackageCard
+        step={refreshStep}
+        nextStep={refreshNextStep}
+        identifier={issue.identifier}
+        seq={refreshSeq ?? 1}
+        timeLabel={
+          refreshLatestRun?.completed_at
+            ? timeAgo(refreshLatestRun.completed_at)
+            : refreshTime
+        }
+        agentName={refreshStepAgentName ?? undefined}
+        nameOf={playerNames.nameOf}
+        attachmentOf={attachmentOf}
+        draft={refreshCanApprove ? handoffDraft : undefined}
+        canApprove={refreshCanApprove}
+        approvePending={approveChainStep.isPending}
+        returnPending={returnChainStep.isPending}
+        outputRunning={refreshOutputBusy}
+        onApprove={refreshPrimarySquadAction}
+        onReturn={returnWithHandoff}
+        onOpenNext={
+          refreshNextStep
+            ? () => refreshSelectStep(refreshNextStep)
+            : undefined
+        }
+        returnOpen={returnOpen}
+        onReturnOpenChange={setReturnOpen}
+        sectionRef={handoffSectionRef}
+      />
+    ) : null;
 
   const refreshOutputSection = !refreshStep && soloHasDelivery ? (
     <section className="rd-section rd-output">
@@ -4436,16 +4918,18 @@ export function IssueDetail({ issueId, layout = "legacy", onDelete, onDone, high
           disabled={
             !refreshCanApprove ||
             approveChainStep.isPending ||
-            outputProducing
+            refreshOutputBusy
           }
           onClick={refreshPrimarySquadAction}
         >
           {refreshCanApprove
-            ? outputProducing
+            ? refreshOutputBusy
               ? t(($) => $.room.output_producing)
-              : refreshNextStep
-                ? t(($) => $.detail.refresh_pass)
-                : t(($) => $.detail.refresh_pass_finish)
+              : !handoffSummary.trim()
+                ? t(($) => $.room.handoff_write_summary)
+                : refreshNextStep
+                  ? t(($) => $.detail.refresh_pass)
+                  : t(($) => $.detail.refresh_pass_finish)
             : refreshStep.state === "done"
               ? t(($) => $.detail.refresh_delivered)
               : refreshStep.state === "pending"
@@ -4463,13 +4947,37 @@ export function IssueDetail({ issueId, layout = "legacy", onDelete, onDone, high
         {refreshCanApprove ? (
           <button
             type="button"
+            className="rd-secondary rd-return"
+            disabled={refreshOutputBusy || returnChainStep.isPending}
+            onClick={openReturnPanel}
+          >
+            {t(($) => $.room.handoff_return)}
+          </button>
+        ) : null}
+        {refreshCanApprove ? (
+          <button
+            type="button"
             className="rd-secondary"
-            disabled={outputProducing}
+            disabled={refreshOutputBusy}
             onClick={startLegOutput}
           >
-            {outputAsked
-              ? t(($) => $.detail.refresh_regenerate)
-              : t(($) => $.room.output_generate)}
+            {refreshOutputBusy
+              ? t(($) => $.room.output_producing)
+              : refreshOutputAsked
+                ? t(($) => $.detail.refresh_regenerate)
+                : t(($) => $.room.output_generate)}
+          </button>
+        ) : null}
+        {refreshCanApprove ? (
+          <button
+            type="button"
+            className="rd-secondary"
+            disabled={refreshOutputBusy || extractChainHandoff.isPending}
+            onClick={handleExtractHandoff}
+          >
+            {extractChainHandoff.isPending
+              ? t(($) => $.room.handoff_extracting)
+              : t(($) => $.room.handoff_extract)}
           </button>
         ) : null}
         <button
@@ -4601,16 +5109,53 @@ export function IssueDetail({ issueId, layout = "legacy", onDelete, onDone, high
     </>
   );
 
+  // A relay that cannot move says so across the page, not inside the rail.
+  // A parked leg always gets the band; a reviewing leg gets it only when the
+  // holder is someone else and the viewer can actually move it (owner/admin).
+  const refreshHalt =
+    refreshIsSquad &&
+    refreshStep &&
+    chain &&
+    relayView &&
+    (chainStateKey(refreshStep.state) === "parked" ||
+      (chainStateKey(refreshStep.state) === "reviewing" &&
+        !refreshStepIsMine &&
+        canAdministerChain)) ? (
+      <ChainHaltBar
+        step={refreshStep}
+        seq={refreshSeq ?? 1}
+        total={chain.steps.length}
+        nameOf={playerNames.nameOf}
+        bindHref={roomBindHref}
+        machineHref={paths.runtimes()}
+        reviewing={chainStateKey(refreshStep.state) === "reviewing"}
+        canAdminister={canAdministerChain}
+        people={adminSquadPeople}
+        onReassign={handleAdminReassign}
+        reassignPending={reassignChainStep.isPending}
+        onSkip={handleSkipParkedStep}
+        skipPending={skipChainStep.isPending}
+        onSkipReview={
+          chainStateKey(refreshStep.state) === "reviewing"
+            ? handleAdminSkipReview
+            : undefined
+        }
+      />
+    ) : null;
+
   const refreshBody = (
     <div className="rd-enter" key={`${id}:${refreshStep?.id ?? "solo"}`}>
       {refreshHeader}
       <div className="rd-body">
         <div className="rd-canvas">
+          {refreshPrevious}
           {refreshBrief}
-          {refreshDeliverable}
+          {refreshHandoff}
+          {refreshSharedContext}
           {refreshRunSection}
           {refreshOutputSection}
           {refreshDiscussion}
+          {refreshHalt}
         </div>
         <aside className="rd-rail">
           {refreshStep ? refreshSquadRail : refreshSoloRail}

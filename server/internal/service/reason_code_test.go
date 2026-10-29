@@ -88,6 +88,44 @@ func TestAgentReadinessVerdict(t *testing.T) {
 	}
 }
 
+// A private machine only executes its owner's agents. This is the fence the
+// relay legs were silently dying behind: the task queued forever because the
+// claimer refused it while no dispatch path checked. Each pair below mirrors a
+// branch of ClaimAgentTask's EXISTS predicate; drift here means the relay parks
+// for a different reason than the claimer enforces.
+func TestRuntimeOwnershipVerdict(t *testing.T) {
+	ownerA := pgtype.UUID{Bytes: [16]byte{1}, Valid: true}
+	ownerB := pgtype.UUID{Bytes: [16]byte{2}, Valid: true}
+	none := pgtype.UUID{}
+
+	cases := []struct {
+		name         string
+		agentOwner   pgtype.UUID
+		runtimeOwner pgtype.UUID
+		visibility   string
+		wantBlocked  bool
+	}{
+		{"private runtime, another owner", ownerA, ownerB, "private", true},
+		{"private runtime, same owner", ownerA, ownerA, "private", false},
+		{"public runtime, another owner", ownerA, ownerB, "public", false},
+		{"private runtime but ownerless runtime", ownerA, none, "private", false},
+		{"private runtime but ownerless agent", none, ownerB, "private", false},
+	}
+	for _, tc := range cases {
+		got := runtimeOwnershipVerdict(
+			db.Agent{OwnerID: tc.agentOwner},
+			db.AgentRuntime{OwnerID: tc.runtimeOwner, Visibility: tc.visibility},
+		)
+		if got.Blocked() != tc.wantBlocked {
+			t.Errorf("%s: got %+v, want blocked=%v", tc.name, got, tc.wantBlocked)
+			continue
+		}
+		if tc.wantBlocked && got.Reason != dispatch.ReasonRuntimePrivateForeign {
+			t.Errorf("%s: reason = %q, want %q", tc.name, got.Reason, dispatch.ReasonRuntimePrivateForeign)
+		}
+	}
+}
+
 // The notice is the only thing a user sees when an assignment or an
 // agent-authored mention is refused, so it has to carry the repair command when
 // there is one and stay actionable when there is not.

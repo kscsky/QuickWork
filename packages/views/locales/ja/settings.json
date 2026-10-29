@@ -790,13 +790,9 @@
     "projects_remove_action": "削除",
     "projects_removing": "削除中…",
     "projects_picker_description": "インポートするリポジトリを選択してください。選択したリポジトリごとに QuickWork プロジェクトを作成して紐づけます。",
-    "projects_selected_one": "{{count}} 件のリポジトリを選択",
     "projects_selected_other": "{{count}} 件のリポジトリを選択",
-    "projects_import_action_one": "{{count}} 件をインポート",
     "projects_import_action_other": "{{count}} 件をインポート",
-    "projects_imported_one": "{{count}} 件の GitHub プロジェクトをインポートしました",
     "projects_imported_other": "{{count}} 件の GitHub プロジェクトをインポートしました",
-    "projects_import_failed_one": "{{count}} 件のリポジトリをインポートできませんでした",
     "projects_import_failed_other": "{{count}} 件のリポジトリをインポートできませんでした",
     "toast_failed": "GitHub 設定を更新できませんでした"
   },

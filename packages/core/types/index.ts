@@ -121,6 +121,7 @@ export type {
   PluginTokenIssue,
 } from "./plugin";
 export type { InboxItem, InboxSeverity, InboxItemType, InboxWorkspaceUnread } from "./inbox";
+export type { RelayActivityAction, RelayActivityEvent } from "./activity";
 export type { NotificationGroupKey, NotificationGroupValue, NotificationPreferences, NotificationPreferenceResponse } from "./notification-preference";
 export type { Comment, CommentType, CommentAuthorType, CommentTriggerPreview, CommentTriggerPreviewAgent, CommentTriggerSource, CommentTriggerOutcome, CommentTriggerStatus, Reaction } from "./comment";
 export type { Label, LabelResourceType, CreateLabelRequest, UpdateLabelRequest, ListLabelsResponse, IssueLabelsResponse, ResourceLabelsResponse } from "./label";
@@ -320,9 +321,14 @@ export type {
   IssueChainStepState,
   IssueChainStep,
   IssueChain,
+  IssueChainRetryResult,
+  IssueChainCancelResult,
   IssueChainForIssue,
   IssueChainHandoff,
   IssueChainHandoffFile,
+  IssueChainHandoffAcceptance,
+  IssueChainHandoffReturn,
+  IssueChainHandoffInput,
   ChainLegOutputResponse,
   PlaybookStep,
   SquadPlaybook,

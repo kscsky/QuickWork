@@ -35,7 +35,7 @@ import type {
   MoveIssueRequest,
   UpdateIssueRequest,
 } from "../types";
-import type { TimelineEntry, IssueSubscriber, Reaction, IssueChainHandoffFile } from "../types";
+import type { TimelineEntry, IssueSubscriber, Reaction, IssueChainHandoffInput } from "../types";
 import { sortTimelineEntriesAsc } from "./timeline-sort";
 import {
   onIssueAuxiliaryRevision,
@@ -76,8 +76,8 @@ export type UpdateIssueMutationInput = {
 // Issue CRUD
 // ---------------------------------------------------------------------------
 
-function useIssueCreateMutation<TVariables>(
-  mutationFn: (variables: TVariables) => Promise<Issue>,
+function useIssueCreateMutation<TVariables, TData extends Issue>(
+  mutationFn: (variables: TVariables) => Promise<TData>,
 ) {
   const qc = useQueryClient();
   const wsId = useWorkspaceId();
@@ -138,10 +138,86 @@ export function useSkipChainStep(issueId: string) {
 export function useApproveChainStep(issueId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (handoff?: { summary: string; files: IssueChainHandoffFile[] }) =>
+    mutationFn: (handoff?: IssueChainHandoffInput) =>
       api.approveIssueChainStep(issueId, handoff),
     onSuccess: (chain) => {
       qc.setQueryData(issueKeys.chain(issueId), chain);
+    },
+  });
+}
+
+/**
+ * The holder's 退回修改: preserve the package they were reviewing, record the
+ * reason, and put the leg back in doing with a revision run for its agent. The
+ * response is the chain as it now stands.
+ */
+export function useReturnChainStep(issueId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: IssueChainHandoffInput & { reason: string }) =>
+      api.returnIssueChainStep(issueId, payload),
+    onSuccess: (chain) => {
+      qc.setQueryData(issueKeys.chain(issueId), chain);
+    },
+  });
+}
+
+/**
+ * The holder restarts their own leg after its run was interrupted. The chain
+ * does not move, so the cached chain is only refreshed; the issue's task list
+ * is invalidated because the leg's newest run becomes the queued retry.
+ */
+export function useRetryChainStep(issueId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.retryIssueChainStep(issueId),
+    onSuccess: (result) => {
+      qc.setQueryData(issueKeys.chain(issueId), result);
+      qc.invalidateQueries({ queryKey: issueKeys.tasks(issueId) });
+    },
+  });
+}
+
+/**
+ * Owner/admin fallback: move a waiting leg to another squad member when its
+ * holder is unreachable. The response is the chain as it now stands.
+ */
+export function useReassignChainStep(issueId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (holderUserId: string) =>
+      api.reassignIssueChainStep(issueId, holderUserId),
+    onSuccess: (chain) => {
+      qc.setQueryData(issueKeys.chain(issueId), chain);
+    },
+  });
+}
+
+/**
+ * The holder re-reads the leg's output document into the structured handoff
+ * package. The response is the chain as it now stands.
+ */
+export function useExtractChainHandoff(issueId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.extractIssueChainHandoff(issueId),
+    onSuccess: (chain) => {
+      qc.setQueryData(issueKeys.chain(issueId), chain);
+    },
+  });
+}
+
+/**
+ * The holder stops a stalled leg's in-flight run. The chain does not move; the
+ * cancelled run is what makes the retry action available.
+ */
+export function useCancelChainStep(issueId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.cancelIssueChainStep(issueId),
+    onSuccess: (result) => {
+      qc.setQueryData(issueKeys.chain(issueId), result);
+      qc.invalidateQueries({ queryKey: issueKeys.tasks(issueId) });
     },
   });
 }

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, render } from "@testing-library/react";
+import { act, render, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { I18nProvider } from "@quickwork/core/i18n/react";
 import { chatKeys } from "@quickwork/core/chat/queries";
@@ -733,15 +733,17 @@ describe("ChatMessageList auto-scroll", () => {
 
   // `followOutput` is `atBottom && isFollowing()`: a released follow must turn
   // it off even while Virtuoso still reports the reader at the bottom.
-  it("turns followOutput off while released, even when Virtuoso reports atBottom", () => {
+  it("turns followOutput off while released, even when Virtuoso reports atBottom", async () => {
     const { scroll, streamChunk, followsAtBottom } = renderStreamingChat();
 
     expect(followsAtBottom()).toBe("auto");
 
     scroll.readerScrollsTo(900);
+    renderFrame();
     streamChunk(1);
+    renderFrame();
 
-    expect(followsAtBottom()).toBe("false");
+    await waitFor(() => expect(followsAtBottom()).toBe("false"));
   });
 
   it("stops measuring once the list unmounts", () => {

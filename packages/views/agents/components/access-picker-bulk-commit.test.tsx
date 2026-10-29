@@ -49,7 +49,7 @@ describe("AccessPicker bulk mode (hideFooter)", () => {
     const readyFn = vi.fn();
     render(<Harness onReadyChange={readyFn} />);
     const workspaceRadio = screen.getByRole("radio", {
-      name: /Entire workspace/,
+      name: /Entire space/,
     });
     fireEvent.click(workspaceRadio);
     expect(readyFn).toHaveBeenCalledWith(true, expect.objectContaining({
@@ -75,7 +75,7 @@ describe("AccessPicker bulk mode (hideFooter)", () => {
   it("does not re-notify the parent when re-rendered with a stable callback", () => {
     const readyFn = vi.fn();
     const { rerender } = render(<Harness onReadyChange={readyFn} />);
-    fireEvent.click(screen.getByRole("radio", { name: /Entire workspace/ }));
+    fireEvent.click(screen.getByRole("radio", { name: /Entire space/ }));
 
     const callsAfterSelect = readyFn.mock.calls.length;
     const changeAfterSelect = readyFn.mock.calls.at(-1)?.[1];

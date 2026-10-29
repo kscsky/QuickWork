@@ -174,7 +174,7 @@ describe("WorkspaceTab — automatic updates", () => {
         context: "",
       });
       expect(mockToastSuccess).toHaveBeenCalledWith(
-        "Workspace settings saved",
+        "Space settings saved",
         { id: "settings-auto-save" },
       );
     });
@@ -206,7 +206,7 @@ describe("WorkspaceTab — automatic updates", () => {
       queryKey: ["issues", "workspace-1"],
     });
     expect(mockToastSuccess).toHaveBeenCalledWith(
-      "Workspace settings saved",
+      "Space settings saved",
       { id: "settings-auto-save" },
     );
   });

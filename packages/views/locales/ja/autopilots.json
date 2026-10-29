@@ -501,7 +501,6 @@
     "offline": "オフライン",
     "working": "実行中",
     "idle": "待機中",
-    "subscribers_count_one": "{{count}} 名",
     "subscribers_count_other": "{{count}} 名",
     "runs": "最近の実行 / RUNS",
     "empty": "このフィルターに自動化はありません",

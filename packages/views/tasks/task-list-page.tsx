@@ -438,10 +438,10 @@ export function TaskListPage() {
                 </span>
               </Button>
             </div>
-            <p className="mt-[8px] flex flex-wrap items-center gap-[8px] text-[11.5px] text-secondary-foreground">
+            <p className="mt-[8px] flex flex-wrap items-center gap-[8px] text-[12px] text-secondary-foreground">
               <span className="flex items-center gap-1.5">
                 <span className="relative size-[5px] shrink-0 rounded-[1px] bg-inflight" />
-                <b className="font-mono text-[11.5px] font-semibold tabular-nums text-foreground">
+                <b className="font-mono text-[12px] font-semibold tabular-nums text-foreground">
                   {liveCounts.running}
                 </b>
                 {liveText("running")}
@@ -451,7 +451,7 @@ export function TaskListPage() {
               </span>
               <span className="flex items-center gap-[8px]">
                 <span className="size-[5px] shrink-0 rounded-[1px] bg-review" />
-                <b className="font-mono text-[11.5px] font-semibold tabular-nums text-foreground">
+                <b className="font-mono text-[12px] font-semibold tabular-nums text-foreground">
                   {liveCounts.review}
                 </b>
                 {liveText("review")}
@@ -460,7 +460,7 @@ export function TaskListPage() {
                 ·
               </span>
               <span className="flex items-center gap-[8px] text-muted-foreground">
-                <b className="font-mono text-[11.5px] font-semibold tabular-nums">
+                <b className="font-mono text-[12px] font-semibold tabular-nums">
                   {liveCounts.quiet}
                 </b>
                 {liveText("quiet")}
@@ -475,7 +475,7 @@ export function TaskListPage() {
                 </button>
                 <span
                   role="tooltip"
-                  className="pointer-events-none absolute left-[-6px] top-[calc(100%+8px)] z-30 w-[270px] rounded-[5px] border border-input bg-popover px-[11px] py-[9px] text-[11.5px] leading-[18px] text-secondary-foreground opacity-0 shadow-[var(--menu-shadow)] transition-opacity group-focus-within:opacity-100 group-hover:opacity-100"
+                  className="pointer-events-none absolute left-[-6px] top-[calc(100%+8px)] z-30 w-[270px] rounded-[5px] border border-input bg-popover px-[11px] py-[9px] text-[12px] leading-[18px] text-secondary-foreground opacity-0 shadow-[var(--menu-shadow)] transition-opacity group-focus-within:opacity-100 group-hover:opacity-100"
                 >
                   {t(($) => $.mast.info)}
                 </span>
@@ -484,14 +484,14 @@ export function TaskListPage() {
           </div>
         </div>
         <div className="hidden shrink-0 pt-[6px] text-right md:block">
-          <span className="inline-flex items-center gap-[7px] font-mono text-[8.5px] font-medium uppercase tracking-[0.12em] text-faint-foreground">
+          <span className="inline-flex items-center gap-[7px] font-mono text-[9px] font-medium uppercase tracking-[0.12em] text-faint-foreground">
             <span className="size-[5px] rounded-full bg-success" />
             SYNCED
           </span>
           <span className="mt-[5px] block font-mono text-[10px] tabular-nums tracking-[0.04em] text-muted-foreground">
             {clock}
           </span>
-          <span className="mt-[6px] block text-[10.5px] text-faint-foreground">
+          <span className="mt-[6px] block text-[11px] text-faint-foreground">
             {t(($) => $.mast.sync_hint)}
           </span>
         </div>
@@ -579,7 +579,7 @@ export function TaskListPage() {
                 {filterName(key)}{" "}
                 <em
                   className={cn(
-                    "font-mono text-[9.5px] not-italic",
+                    "font-mono text-[10px] not-italic",
                     filter === key ? "text-brand" : "text-faint-foreground",
                   )}
                 >
@@ -596,7 +596,7 @@ export function TaskListPage() {
             setOrder((current) => (current === "recent" ? "oldest" : "recent"));
             setPage(1);
           }}
-          className="ml-auto inline-flex h-[28px] shrink-0 items-center gap-[6px] rounded-[4px] px-[7px] text-[10.5px] text-muted-foreground transition-colors hover:border hover:border-border hover:bg-surface hover:text-foreground"
+          className="ml-auto inline-flex h-[28px] shrink-0 items-center gap-[6px] rounded-[4px] px-[7px] text-[11px] text-muted-foreground transition-colors hover:border hover:border-border hover:bg-surface hover:text-foreground"
         >
           <ArrowUpDown
             aria-hidden="true"
@@ -630,7 +630,7 @@ export function TaskListPage() {
               type="button"
               disabled={allPageSelected}
               onClick={selectPage}
-              className="inline-flex h-[30px] items-center gap-[5px] rounded-[4px] px-[9px] text-[10.5px] font-medium transition-colors hover:bg-background/10 disabled:opacity-40"
+              className="inline-flex h-[30px] items-center gap-[5px] rounded-[4px] px-[9px] text-[11px] font-medium transition-colors hover:bg-background/10 disabled:opacity-40"
             >
               <Check aria-hidden="true" className="size-3" />
               {t(($) => $.bulk.select_page)}
@@ -639,7 +639,7 @@ export function TaskListPage() {
               type="button"
               disabled={batchDelete.isPending}
               onClick={() => setDeleteOpen(true)}
-              className="inline-flex h-[30px] items-center gap-[5px] rounded-[4px] px-[9px] text-[10.5px] font-medium text-[color-mix(in_oklab,var(--destructive)_52%,white)] transition-colors hover:bg-destructive/20 disabled:opacity-40"
+              className="inline-flex h-[30px] items-center gap-[5px] rounded-[4px] px-[9px] text-[11px] font-medium text-[color-mix(in_oklab,var(--destructive)_52%,white)] transition-colors hover:bg-destructive/20 disabled:opacity-40"
             >
               <Trash2 aria-hidden="true" className="size-3" />
               {t(($) => $.bulk.delete)}
@@ -683,7 +683,7 @@ export function TaskListPage() {
             <>
               <div
                 className={cn(
-                  "sticky top-0 z-20 h-[34px] border-b bg-[color-mix(in_oklab,var(--background)_90%,transparent)] px-[6px] font-mono text-[8.5px] font-medium uppercase tracking-[0.14em] text-faint-foreground backdrop-blur",
+                  "sticky top-0 z-20 h-[34px] border-b bg-[color-mix(in_oklab,var(--background)_90%,transparent)] px-[6px] font-mono text-[9px] font-medium uppercase tracking-[0.14em] text-faint-foreground backdrop-blur",
                   ROW_GRID,
                 )}
               >
@@ -800,7 +800,7 @@ export function TaskListPage() {
 }
 
 const PAGER_BUTTON_CLASS =
-  "inline-flex h-[26px] items-center justify-center rounded-[3px] border border-transparent px-[5px] font-mono text-[9.5px] text-muted-foreground transition-colors " +
+  "inline-flex h-[26px] items-center justify-center rounded-[3px] border border-transparent px-[5px] font-mono text-[10px] text-muted-foreground transition-colors " +
   "hover:border-border hover:bg-muted hover:text-foreground";
 
 type NameResolver = {
@@ -954,7 +954,7 @@ const TaskRow = memo(function TaskRow({
               tone === "running" && "animate-pulse",
             )}
           />
-          <span className="whitespace-nowrap font-mono text-[10.5px] font-medium tracking-[0.015em] text-muted-foreground">
+          <span className="whitespace-nowrap font-mono text-[11px] font-medium tracking-[0.015em] text-muted-foreground">
             {displayId}
           </span>
         </span>
@@ -979,7 +979,7 @@ const TaskRow = memo(function TaskRow({
                   {t(($) => $.row.leg_parent)}
                 </span>
                 <span className="min-w-0 truncate">{issue.title}</span>
-                <span className="shrink-0 font-mono text-[9.5px] text-faint-foreground">
+                <span className="shrink-0 font-mono text-[10px] text-faint-foreground">
                   {t(($) => $.row.leg_seq, {
                     seq: legStep.position + 1,
                     total: chain.steps.length,
@@ -1014,7 +1014,7 @@ const TaskRow = memo(function TaskRow({
               </span>
             ) : null}
           </div>
-          <div className="mt-[2px] truncate font-mono text-[9.5px] leading-[13px] text-faint-foreground">
+          <div className="mt-[2px] truncate font-mono text-[10px] leading-[13px] text-faint-foreground">
             {sub}
           </div>
         </div>
@@ -1038,7 +1038,7 @@ const TaskRow = memo(function TaskRow({
             onClick={() => onDelete(issue)}
             aria-label={`${t(($) => $.row.delete_task)} ${issue.identifier}`}
             title={t(($) => $.row.delete_task)}
-            className="grid size-[24px] place-items-center rounded-[3px] text-faint-foreground opacity-60 transition-colors hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100 focus-visible:opacity-100"
+            className="grid size-[24px] place-items-center rounded-[3px] text-faint-foreground transition-colors hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100 focus-visible:opacity-100"
           >
             <Trash2 className="size-3" />
           </button>
@@ -1138,7 +1138,6 @@ function RelayMiniStrip({
               profileLink={false}
               className={cn(
                 "shrink-0 transition-transform duration-[170ms] ease-[cubic-bezier(0.23,1,0.32,1)] group-hover:-translate-y-px motion-reduce:transition-none",
-                stateWord === "done" && "opacity-55",
                 activeRing,
               )}
             />
@@ -1146,7 +1145,7 @@ function RelayMiniStrip({
               title={stateWord}
               className={cn(
                 "max-w-[66px] truncate text-[11px] text-muted-foreground",
-                stateWord === "done" && "opacity-55",
+                stateWord === "done" && "text-faint-foreground",
                 (stateWord === "doing" || stateWord === "reviewing") &&
                   "font-semibold text-foreground",
                 stateWord === "parked" && "text-warning",
@@ -1158,7 +1157,7 @@ function RelayMiniStrip({
         );
       })}
       {hidden > 0 ? (
-            <span className="font-mono text-[9.5px] text-faint-foreground">+{hidden}</span>
+            <span className="font-mono text-[10px] text-faint-foreground">+{hidden}</span>
       ) : null}
     </span>
   );

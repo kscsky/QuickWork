@@ -86,6 +86,13 @@ type IssueCreateParams struct {
 	// Its immutable snapshot and cloned attachment rows commit in the same
 	// transaction as the new issue.
 	SourceContext *SourceContextCapture
+	// ChainRequested writes the squad relay in this same transaction. The
+	// chain must exist before the leader task can be claimed, or the first run
+	// starts without the leg frame; doing it here is what makes "create a
+	// relay" atomic. ChainSteps is the route after the leader, already
+	// validated by the caller.
+	ChainRequested bool
+	ChainSteps     []ChainStepSpec
 }
 
 // IssueCreateOpts groups optional knobs for IssueService.Create. Most
@@ -161,6 +168,12 @@ var ErrIssueLabelNotFound = errors.New("issue label not found in this workspace"
 // it arrived, so retrying against the refreshed catalog is the remedy.
 var ErrIssueStatusUnavailable = errors.New("issue status is no longer available")
 
+// ErrChainRequiresSquad signals that a create asked for a relay but is not
+// assigned to a squad. A relay is a squad's route; there is nobody to hand
+// the baton to without one, so the whole create is rejected rather than
+// writing half a relay.
+var ErrChainRequiresSquad = errors.New("a relay can only be created for a squad-assigned issue")
+
 var ErrSourceContextAlreadyAttached = errors.New("source context is already attached")
 
 // IssueCreateResult is the typed return from IssueService.Create.
@@ -182,6 +195,9 @@ type IssueCreateResult struct {
 	// understood label_ids (see the create handler's compatibility contract).
 	Labels         []db.IssueLabel
 	DuplicateIssue *db.Issue
+	// ChainSteps is the relay written for a ChainRequested create, in
+	// position order. Empty for an ordinary create.
+	ChainSteps []db.IssueChainStep
 }
 
 // Create runs the full issue-creation pipeline atomically end-to-end:
@@ -451,6 +467,42 @@ func (s *IssueService) Create(ctx context.Context, p IssueCreateParams, opts Iss
 		}
 	}
 
+	// The relay is written before this transaction commits, so the leader
+	// task the post-commit dispatch enqueues can never be claimed before its
+	// chain exists. The head's state is decided from the same readiness
+	// predicate dispatch uses: a leader that cannot claim starts the chain
+	// parked with the machine's own reason instead of pretending to run.
+	var chainSteps []db.IssueChainStep
+	if p.ChainRequested {
+		if !issue.AssigneeType.Valid || issue.AssigneeType.String != "squad" || !issue.AssigneeID.Valid {
+			return IssueCreateResult{}, ErrChainRequiresSquad
+		}
+		squad, err := qtx.GetSquadInWorkspace(ctx, db.GetSquadInWorkspaceParams{
+			ID:          issue.AssigneeID,
+			WorkspaceID: issue.WorkspaceID,
+		})
+		if err != nil {
+			return IssueCreateResult{}, fmt.Errorf("load squad for relay: %w", err)
+		}
+		leaderState, leaderReason := ChainStateDoing, ""
+		if issuestatus.Effective(ctx, qtx, issue.WorkspaceID, issue.Status) != "backlog" {
+			if holder, leaderAgent := s.TaskService.leadingMember(ctx, qtx, squad); holder.Valid && leaderAgent.Valid {
+				if leader, aerr := qtx.GetAgent(ctx, leaderAgent); aerr == nil {
+					if verdict, verr := AgentReadiness(ctx, s.runtimeLookup(qtx), leader); verr == nil && verdict.Blocked() {
+						leaderState = ChainStateParked
+						leaderReason = string(verdict.Reason)
+					}
+				}
+			}
+		}
+		chainSteps, err = s.TaskService.InstantiateChainWithLeaderState(
+			ctx, qtx, issue, squad, p.ChainSteps, leaderState, leaderReason, false,
+		)
+		if err != nil {
+			return IssueCreateResult{}, fmt.Errorf("instantiate relay: %w", err)
+		}
+	}
+
 	if !opts.AssignedAgentRunFireAt.IsZero() && s.shouldEnqueueAgentTaskWithQueries(ctx, qtx, issue) {
 		// The issue must never become visible without its media-gated assigned
 		// task. Inserting both rows through qtx makes the unique-index winner
@@ -464,6 +516,17 @@ func (s *IssueService) Create(ctx context.Context, p IssueCreateParams, opts Iss
 
 	if err := tx.Commit(ctx); err != nil {
 		return IssueCreateResult{}, fmt.Errorf("commit: %w", err)
+	}
+
+	if p.ChainRequested {
+		// Project the relay onto the issue's status now that the chain is
+		// committed, and hand the create response the row as it really stands
+		// (in_progress, or blocked when the leader parked).
+		s.TaskService.syncRelayStatus(ctx, s.Queries, issue.ID)
+		if refreshed, rerr := s.Queries.GetIssue(ctx, issue.ID); rerr == nil {
+			issue = refreshed
+		}
+		s.TaskService.NotifyParkedChainSteps(ctx, issue, chainSteps)
 	}
 
 	attachments := s.linkAttachments(ctx, issue, p.AttachmentIDs)
@@ -500,7 +563,13 @@ func (s *IssueService) Create(ctx context.Context, p IssueCreateParams, opts Iss
 		assignedTaskID = s.maybeEnqueueOnAssign(ctx, issue, p.CreatorType, actorID, opts.AssignedAgentRunFireAt)
 	}
 
-	return IssueCreateResult{Issue: issue, Attachments: attachments, Labels: labels, AssignedTaskID: assignedTaskID}, nil
+	return IssueCreateResult{
+		Issue:          issue,
+		Attachments:    attachments,
+		Labels:         labels,
+		AssignedTaskID: assignedTaskID,
+		ChainSteps:     chainSteps,
+	}, nil
 }
 
 // validateIssueLabels checks that every requested label exists in the
@@ -827,7 +896,11 @@ func (s *IssueService) isSquadLeaderReady(ctx context.Context, issue db.Issue) b
 	if err != nil {
 		return false
 	}
-	return verdict.Ready()
+	// An offline machine is a wait, not a refusal: the leader task queues and
+	// runs when the machine returns, exactly like an agent assignee. Only a
+	// BLOCKED leader (archived, unbound, foreign-private, unusable CLI) means
+	// no task will ever be claimed, and that is the case the chain parks on.
+	return !verdict.Blocked()
 }
 
 func (s *IssueService) enqueueSquadLeaderTask(ctx context.Context, issue db.Issue, triggerCommentID pgtype.UUID, authorType, authorID string) {

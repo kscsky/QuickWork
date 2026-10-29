@@ -93,6 +93,38 @@ func buildRelayLegBriefing(ctx context.Context, q *db.Queries, issue db.Issue, s
 		if files := relayHandoffFileNames(prev.HandoffFiles); len(files) > 0 {
 			fmt.Fprintf(&sb, "  > files: %s (attachments on this issue)\n", strings.Join(files, ", "))
 		}
+		// The structured package is the holder's curated handover. The summary
+		// above is prose; these fields are the parts the next leg must ACT on,
+		// so they are carried explicitly instead of hoping the agent infers
+		// them from comment history.
+		if pkg, ok := relayHandoffPackage(prev.HandoffPackage); ok {
+			if len(pkg.NextBrief) > 0 {
+				sb.WriteString("  > next leg's brief:\n")
+				for _, item := range pkg.NextBrief {
+					if item = strings.TrimSpace(item); item != "" {
+						fmt.Fprintf(&sb, "  >   - %s\n", item)
+					}
+				}
+			}
+			if len(pkg.OpenQuestions) > 0 {
+				sb.WriteString("  > open questions carried over (resolve or account for them):\n")
+				for _, question := range pkg.OpenQuestions {
+					if question = strings.TrimSpace(question); question != "" {
+						fmt.Fprintf(&sb, "  >   - %s\n", question)
+					}
+				}
+			}
+			if len(pkg.Acceptance) > 0 {
+				sb.WriteString("  > acceptance ledger from the previous leg:\n")
+				for _, row := range pkg.Acceptance {
+					fmt.Fprintf(&sb, "  >   - [%s] %s — %s", row.State, row.Label, row.Requirement)
+					if delivered := strings.TrimSpace(row.Delivered); delivered != "" {
+						fmt.Fprintf(&sb, " → %s", delivered)
+					}
+					sb.WriteString("\n")
+				}
+			}
+		}
 	} else {
 		sb.WriteString("- This is the first leg — nothing has been handed over.\n")
 	}
@@ -103,6 +135,20 @@ func buildRelayLegBriefing(ctx context.Context, q *db.Queries, issue db.Issue, s
 		sb.WriteString("- This is the final leg: once your holder approves, the relay is complete.\n")
 	}
 	return sb.String(), true
+}
+
+// relayHandoffPackage parses the structured part of the previous leg's
+// handoff. A malformed blob degrades to "no structured package", never to a
+// briefing that fails to render.
+func relayHandoffPackage(raw []byte) (service.ChainHandoffPackage, bool) {
+	if len(raw) == 0 {
+		return service.ChainHandoffPackage{}, false
+	}
+	var pkg service.ChainHandoffPackage
+	if err := json.Unmarshal(raw, &pkg); err != nil {
+		return service.ChainHandoffPackage{}, false
+	}
+	return pkg, true
 }
 
 // relayHandoffFileNames names the previous leg's handoff files for the

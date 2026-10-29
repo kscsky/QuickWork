@@ -54,6 +54,9 @@ const sourceExtensions = [".ts", ".tsx", ".css"];
  * relative-unit rule is lifted for them.
  */
 const marketingPaths = ["apps/web/app/(landing)", "apps/web/features/landing"];
+
+/** Internal visual showcase, not shipped product UI. */
+const demoPaths = ["apps/web/app/styledemo", "apps/web/app/layoutdemo"];
 const isMarketing = (rel: string) => marketingPaths.some((p) => rel.startsWith(p));
 
 /**
@@ -65,9 +68,9 @@ const replacedDefaults = ["xs", "sm", "base", "lg", "xl", "2xl", "3xl"];
 
 const bannedPatterns = [
   {
-    label: "arbitrary pixel size",
-    regex: /\btext-\[\d+(?:\.\d+)?px\]/g,
-    hint: "use a scale step (text-micro … text-display)",
+    label: "fractional pixel size",
+    regex: /\btext-\[\d+\.\d+px\]/g,
+    hint: "round to a whole pixel; fractional sizes blur at 1x",
     appliesTo: () => true,
   },
   {
@@ -95,9 +98,9 @@ const bannedPatterns = [
     // itself. Written as `\s*(?!var\()` the engine simply backtracks `\s*` to
     // zero width, the lookahead then sees a space rather than `var(`, and every
     // tokenised declaration matches as a violation.
-    label: "raw CSS font-size",
-    regex: /font-size:(?!\s*var\()\s*[^;}]+/g,
-    hint: "use var(--text-micro) … var(--text-display)",
+    label: "raw CSS font-size outside whole pixels",
+    regex: /font-size:(?!\s*var\(|\s*(?:inherit|initial|unset|revert|revert-layer)\b|\s*[0-9]+px\b)\s*[^;}]+/g,
+    hint: "use a whole-pixel size or var(--text-*)",
     appliesTo: (rel: string) => rel.endsWith(".css") && !isMarketing(rel),
   },
 ];
@@ -178,7 +181,7 @@ describe("type scale", () => {
     }
   });
 
-  it("product UI writes no font size outside the scale", () => {
+  it("product UI uses whole-pixel font sizes", () => {
     const violations: string[] = [];
 
     for (const root of scanRoots) {
@@ -187,6 +190,7 @@ describe("type scale", () => {
         // written as a repo-relative posix path, and Windows' "\" would never
         // match it.
         const rel = relative(repoRoot, path).replace(/\\/g, "/");
+        if (demoPaths.some((p) => rel.startsWith(p))) continue;
         const lines = stripComments(readFileSync(path, "utf8")).split("\n");
         lines.forEach((line, index) => {
           for (const { label, regex, hint, appliesTo } of bannedPatterns) {

@@ -804,3 +804,12 @@ FROM comment c
 JOIN ancestor_ids path ON path.id = c.id
 ORDER BY c.id
 FOR UPDATE OF c;
+
+-- name: GetLatestCommentBySourceTask :one
+-- The comment a specific run posted. The leg-output extraction reads exactly
+-- this row: source_task_id is the run that produced the document, so no
+-- heuristic over authors or timestamps is involved.
+SELECT * FROM comment
+WHERE source_task_id = $1
+ORDER BY created_at DESC
+LIMIT 1;

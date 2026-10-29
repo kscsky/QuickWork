@@ -10,6 +10,7 @@ import { clearWorkspaceStorage } from "../platform/storage-cleanup";
 import { defaultStorage } from "../platform/storage";
 import { getCurrentWsId, getCurrentSlug } from "../platform/workspace-storage";
 import { issueKeys } from "../issues/queries";
+import { activityKeys } from "../activity/queries";
 import { projectKeys } from "../projects/queries";
 import { pinKeys } from "../pins/queries";
 import { autopilotKeys } from "../autopilots/queries";
@@ -814,6 +815,14 @@ export function useRealtimeSync(
       // per step would be the expensive way to say the same thing.
       issue_chain: () => {
         qc.invalidateQueries({ queryKey: issueKeys.chainAll() });
+        // The activity log and the "needs you" band are projections of the
+        // same relay move; refreshing only the chain would leave an open log
+        // page stale until it is reopened.
+        const wsId = getCurrentWsId();
+        if (wsId) {
+          qc.invalidateQueries({ queryKey: activityKeys.all(wsId) });
+          qc.invalidateQueries({ queryKey: inboxKeys.list(wsId) });
+        }
       },
       label: () => {
         // Label catalogs are independently scoped to issues, agents, and

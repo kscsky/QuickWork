@@ -1031,7 +1031,6 @@
     "col_capacity": "容量",
     "col_activity": "活动 7D",
     "col_actions": "操作",
-    "group_count_one": "{{count}} 智能体 · {{running}} 在跑",
     "group_count_other": "{{count}} 智能体 · {{running}} 在跑",
     "open_agent": "打开 {{name}}",
     "running_no_task": "正在启动…",
@@ -1047,7 +1046,6 @@
     "stop_aria": "停止 {{name}} 的任务",
     "no_filter_title": "这个筛选下没有智能体",
     "no_filter_hint": "换个状态或运行时。",
-    "footer_summary_one": "{{agents}} 个智能体 · {{runtimes}} 个运行时 · {{queued}} 个任务排队",
     "footer_summary_other": "{{agents}} 个智能体 · {{runtimes}} 个运行时 · {{queued}} 个任务排队",
     "footer_hint": "选择运行时收窄名单 · 点击任务进入详情",
     "toggle_group": "展开或收起 {{name}}"

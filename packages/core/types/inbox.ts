@@ -32,7 +32,10 @@ export type InboxItemType =
   // A human posted in a squad room the recipient belongs to. The notification
   // links to the squad room rather than an issue; `details.squad_id` carries
   // the destination.
-  | "squad_message";
+  | "squad_message"
+  // The relay baton reached this recipient: their leg is reviewing, or it
+  // parked waiting on their setup. `details.state` carries which one.
+  | "relay_turn";
 
 /**
  * One workspace's unread inbox count in the cross-workspace summary

@@ -23,7 +23,7 @@ function MachineTag({ runtime }: { runtime: AgentRuntime | null }) {
   const label = machineShortLabel(runtime ?? { name: "", custom_name: null });
   const machine = runtime ? machineIdOf(runtime) : "";
   return (
-    <span className="qw-tag-hue inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-[3px] px-1.5 py-px font-mono text-[10.5px] leading-4">
+    <span className="qw-tag-hue inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-[3px] px-1.5 py-px font-mono text-[11px] leading-4">
       {runtime ? (
         <ProviderLogo provider={runtime.provider} className="size-3 shrink-0" />
       ) : null}
@@ -254,7 +254,7 @@ export function AgentCard({
         <MachineTag runtime={runtime} />
         <span className="flex-1" />
         {queued > 0 && (
-          <span className="qw-shimmer qw-st-none inline-flex shrink-0 items-center rounded-[3px] bg-warning/15 px-[7px] py-px text-[10.5px] leading-4 tabular-nums">
+          <span className="qw-shimmer qw-st-none inline-flex shrink-0 items-center rounded-[3px] bg-warning/15 px-[7px] py-px text-[11px] leading-4 tabular-nums">
             {t(($) => $.row.task_count, { count: queued })}
           </span>
         )}

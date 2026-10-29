@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/kscsky/quickwork/server/internal/dispatch"
+	"github.com/kscsky/quickwork/server/internal/util"
 	db "github.com/kscsky/quickwork/server/pkg/db/generated"
 )
 
@@ -121,7 +122,40 @@ func AgentReadiness(ctx context.Context, lookup RuntimeLookup, agent db.Agent) (
 	if err != nil {
 		return AgentVerdict{}, err
 	}
+	// Ownership is a hard fence, so it is decided before the machine's own
+	// health: an offline private machine owned by someone else will not become
+	// usable when it wakes, and reporting runtime_offline would send the user
+	// to the wrong fix. This mirrors ClaimAgentTask's predicate exactly.
+	if verdict := runtimeOwnershipVerdict(agent, rt); verdict.Blocked() {
+		return verdict, nil
+	}
 	return runtimeVerdict(rt), nil
+}
+
+// runtimeOwnershipVerdict mirrors the claim fence for private runtimes: a
+// private machine only executes its owner's agents. Ownerless rows stay
+// claimable on purpose (the handler settles them explicitly before delivery),
+// and a public runtime is shareable across agent owners.
+//
+// Kept beside AgentReadiness rather than inside runtimeVerdict because the
+// verdict depends on the agent as well as the runtime. When ClaimAgentTask's
+// predicate changes, change this in the same commit — otherwise the relay
+// parks (or, worse, queues) for a different reason than the claimer enforces.
+func runtimeOwnershipVerdict(agent db.Agent, rt db.AgentRuntime) AgentVerdict {
+	if rt.Visibility == "public" {
+		return AgentVerdict{Availability: AgentAvailable}
+	}
+	if !rt.OwnerID.Valid || !agent.OwnerID.Valid {
+		return AgentVerdict{Availability: AgentAvailable}
+	}
+	if util.UUIDToString(rt.OwnerID) == util.UUIDToString(agent.OwnerID) {
+		return AgentVerdict{Availability: AgentAvailable}
+	}
+	return AgentVerdict{
+		Availability: AgentBlocked,
+		Reason:       dispatch.ReasonRuntimePrivateForeign,
+		Detail:       "the agent's runtime is private to another member",
+	}
 }
 
 // runtimeVerdict is the half of the decision that depends only on the runtime

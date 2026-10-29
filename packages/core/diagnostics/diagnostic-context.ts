@@ -67,6 +67,7 @@ const WORKSPACE_ROUTES: readonly RoutePattern[] = [
   ["agents", "new", "ai"],
   ["agents", "new", "ai", ":sessionId"],
   ["agents", ":id"],
+  ["members"],
   ["members", ":id"],
   ["squads"],
   ["squads", ":id"],
@@ -81,6 +82,14 @@ const WORKSPACE_ROUTES: readonly RoutePattern[] = [
   ["skills"],
   ["skills", ":id"],
   ["settings"],
+  ["config"],
+  ["models"],
+  ["mcp"],
+  ["github"],
+  ["integrations"],
+  ["tokens"],
+  ["account"],
+  ["workspace-settings"],
   ["attachments", ":id", "preview"],
 ];
 

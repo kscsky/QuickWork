@@ -7,6 +7,7 @@ import { projectResourcesOptions } from "@quickwork/core/projects";
 import { useWorkspaceId } from "@quickwork/core/hooks";
 import type {
   Attachment,
+  IssueChainHandoffAcceptance,
   IssueChainHandoffFile,
   IssueChainStep,
   LocalDirectoryResourceRef,
@@ -179,6 +180,12 @@ export interface HandoffDraft {
   onToggle: (id: string) => void;
   summary: string;
   onSummaryChange: (value: string) => void;
+  acceptance: IssueChainHandoffAcceptance[];
+  onAcceptanceChange: (rows: IssueChainHandoffAcceptance[]) => void;
+  openQuestions: string;
+  onOpenQuestionsChange: (value: string) => void;
+  nextBrief: string;
+  onNextBriefChange: (value: string) => void;
 }
 
 /**
@@ -325,7 +332,7 @@ export function LegPlanSection({
             value={handoff.summary}
             onChange={(event) => handoff.onSummaryChange(event.target.value)}
             rows={3}
-            maxLength={2000}
+            maxLength={50000}
             placeholder={t(($) => $.room.leg_summary_placeholder)}
             className="mt-1 w-full resize-none rounded-md border border-border bg-brand/5 px-2.5 py-1.5 text-caption leading-relaxed outline-none placeholder:text-faint-foreground focus-visible:ring-1 focus-visible:ring-ring"
           />

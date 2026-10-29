@@ -47,6 +47,19 @@ const (
 	// collapse the two send the user looking for an offline computer that does
 	// not exist.
 	ReasonAgentRuntimeRequired ReasonCode = "agent_runtime_required"
+	// ReasonRuntimePrivateForeign: the target is bound to another member's
+	// PRIVATE runtime. Claim refuses it (the agent's owner must equal the
+	// runtime's owner unless the runtime is public), so no amount of waiting
+	// will run the work. Distinct from runtime_offline because bringing the
+	// machine back changes nothing: it is on, it just will not execute someone
+	// else's agent. Fix on the runtime owner (share the machine) or the agent
+	// owner (bind a runtime they own).
+	ReasonRuntimePrivateForeign ReasonCode = "runtime_private_foreign"
+	// ReasonNoAgent: a relay leg reached a holder who has not bound an agent.
+	// Chain-specific: unlike a mention there is no target to name, and the fix
+	// is the holder binding one. Kept in the shared vocabulary so a parked
+	// leg's reason speaks the same language as every other admission outcome.
+	ReasonNoAgent ReasonCode = "no_agent"
 	// ReasonAttributionBlocked: a fail-closed workspace could not resolve a
 	// responsible human for the run, so it was refused.
 	ReasonAttributionBlocked ReasonCode = "attribution_blocked"

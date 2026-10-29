@@ -69,14 +69,14 @@ describe("AccessCell", () => {
     expect(screen.getByText("Owner only")).toBeInTheDocument();
   });
 
-  it("renders 'Workspace' for a public_to agent with a workspace target", () => {
+  it("renders 'Space' for a public_to agent with a workspace target", () => {
     renderCell(
       makeRow({
         permission_mode: "public_to",
         invocation_targets: [{ target_type: "workspace", target_id: "" }],
       }),
     );
-    expect(screen.getByText("Workspace")).toBeInTheDocument();
+    expect(screen.getByText("Space")).toBeInTheDocument();
   });
 
   it("renders 'Specific people' for a public_to agent with a member target", () => {
@@ -89,10 +89,10 @@ describe("AccessCell", () => {
       }),
     );
     expect(screen.getByText("Specific people")).toBeInTheDocument();
-    expect(screen.queryByText("Workspace")).not.toBeInTheDocument();
+    expect(screen.queryByText("Space")).not.toBeInTheDocument();
   });
 
-  it("prefers 'Workspace' when a workspace target sits alongside member targets", () => {
+  it("prefers 'Space' when a workspace target sits alongside member targets", () => {
     renderCell(
       makeRow({
         permission_mode: "public_to",
@@ -102,7 +102,7 @@ describe("AccessCell", () => {
         ],
       }),
     );
-    expect(screen.getByText("Workspace")).toBeInTheDocument();
+    expect(screen.getByText("Space")).toBeInTheDocument();
   });
 
   it("renders 'Specific people' for a public_to agent with no targets", () => {

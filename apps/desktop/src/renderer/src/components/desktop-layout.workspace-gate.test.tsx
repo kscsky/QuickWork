@@ -78,6 +78,7 @@ vi.mock("@quickwork/views/layout", () => ({
   AppSidebar: () => <div data-testid="app-sidebar" />,
   GlobalShortcuts: () => <div data-testid="global-shortcuts" />,
   NavigationProgress: () => <div data-testid="navigation-progress" />,
+  CanvasBackdrop: () => null,
 }));
 
 vi.mock("@quickwork/views/modals/registry", () => ({

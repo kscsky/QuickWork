@@ -91,6 +91,7 @@ import { useSearchStore } from "./search-store";
 // keywords are filled in.
 const PAGE_KEYWORDS: Record<WorkspacePageKey, string[]> = {
   inbox: ["inbox", "notifications", "收件箱", "通知"],
+  activity: ["activity", "log", "audit", "history", "活动", "日志", "审计"],
   dispatch: ["dispatch", "tower", "orchestrate", "queue", "调度", "编排", "派发"],
   tasks: ["tasks", "relay", "chain", "handoff", "任务", "链路", "交接"],
   myIssues: ["my", "issues", "assigned", "mine", "我的", "任务"],
@@ -109,6 +110,8 @@ const PAGE_KEYWORDS: Record<WorkspacePageKey, string[]> = {
   tokens: ["tokens", "api tokens", "pat", "令牌"],
   account: ["account", "profile", "账号", "个人资料"],
   workspaceSettings: ["workspace", "settings", "空间", "设置"],
+  members: ["members", "people", "directory", "成员", "成员目录"],
+  settings: ["settings", "configuration", "设置", "配置"],
 };
 
 const NAV_PAGE_KEYS = Object.keys(WORKSPACE_PAGES) as WorkspacePageKey[];
