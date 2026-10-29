@@ -966,6 +966,35 @@ type IssueViewPreference struct {
 	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
 }
 
+type KnowledgeEmbedding struct {
+	EntryID     pgtype.UUID        `json:"entry_id"`
+	Model       string             `json:"model"`
+	Dims        int32              `json:"dims"`
+	Embedding   string             `json:"embedding"`
+	ContentHash string             `json:"content_hash"`
+	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
+}
+
+type KnowledgeEntry struct {
+	ID            pgtype.UUID        `json:"id"`
+	WorkspaceID   pgtype.UUID        `json:"workspace_id"`
+	SquadID       pgtype.UUID        `json:"squad_id"`
+	Kind          string             `json:"kind"`
+	Title         string             `json:"title"`
+	Body          string             `json:"body"`
+	Tags          []byte             `json:"tags"`
+	Status        string             `json:"status"`
+	SourceIssueID pgtype.UUID        `json:"source_issue_id"`
+	SourceLeg     pgtype.Int4        `json:"source_leg"`
+	SourceKind    string             `json:"source_kind"`
+	CreatedBy     pgtype.UUID        `json:"created_by"`
+	PublishedBy   pgtype.UUID        `json:"published_by"`
+	PublishedAt   pgtype.Timestamptz `json:"published_at"`
+	UsageCount    int32              `json:"usage_count"`
+	CreatedAt     pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
+}
+
 type LarkBindingToken struct {
 	TokenHash      string             `json:"token_hash"`
 	WorkspaceID    pgtype.UUID        `json:"workspace_id"`

@@ -42,6 +42,10 @@ import type {
   UpdateRuntimeProfileRequest,
   ModelPoolCatalog,
   InboxItem,
+  KnowledgeEntry,
+  KnowledgeListResponse,
+  KnowledgePreview,
+  KnowledgeSearchResponse,
   RelayActivityEvent,
   InboxWorkspaceUnread,
   IssueSubscriber,
@@ -230,6 +234,7 @@ import type {
 import { type Logger, noopLogger } from "../logger";
 import { createRequestId, createSafeId } from "../utils";
 import { getCurrentSlug } from "../platform/workspace-storage";
+import { z } from "zod";
 import { parseWithFallback } from "./schema";
 import {
   AgentTaskListSchema,
@@ -371,6 +376,13 @@ import {
   EMPTY_INBOX_ITEMS,
   RelayActivityListSchema,
   EMPTY_RELAY_ACTIVITY,
+  KnowledgeListSchema,
+  KnowledgeSearchSchema,
+  KnowledgePreviewSchema,
+  KnowledgeEntrySchema,
+  EMPTY_KNOWLEDGE_LIST,
+  EMPTY_KNOWLEDGE_SEARCH,
+  EMPTY_KNOWLEDGE_PREVIEW,
   NotificationPreferenceResponseSchema,
   EMPTY_NOTIFICATION_PREFERENCE_RESPONSE,
   LabelSchema,
@@ -2240,6 +2252,63 @@ export class ApiClient {
     return parseWithFallback(raw, RelayActivityListSchema, EMPTY_RELAY_ACTIVITY, {
       endpoint: "GET /api/activity",
     });
+  }
+
+  /** The workspace knowledge base: entries, corpus counts, embedding status. */
+  async listKnowledge(): Promise<KnowledgeListResponse> {
+    const raw = await this.fetch<unknown>("/api/knowledge");
+    return parseWithFallback(raw, KnowledgeListSchema, EMPTY_KNOWLEDGE_LIST, {
+      endpoint: "GET /api/knowledge",
+    });
+  }
+
+  async searchKnowledge(query: string, limit = 5): Promise<KnowledgeSearchResponse> {
+    const raw = await this.fetch<unknown>(
+      `/api/knowledge/search?q=${encodeURIComponent(query)}&limit=${limit}`,
+    );
+    return parseWithFallback(raw, KnowledgeSearchSchema, EMPTY_KNOWLEDGE_SEARCH, {
+      endpoint: "GET /api/knowledge/search",
+    });
+  }
+
+  /** Compose the summary document + FAQ drafts for a finished relay. */
+  async previewIssueKnowledge(issueId: string): Promise<KnowledgePreview> {
+    const raw = await this.fetch<unknown>(`/api/issues/${issueId}/knowledge/preview`, {
+      method: "POST",
+    });
+    return parseWithFallback(raw, KnowledgePreviewSchema, EMPTY_KNOWLEDGE_PREVIEW, {
+      endpoint: "POST /api/issues/:id/knowledge/preview",
+    });
+  }
+
+  async depositIssueKnowledge(
+    issueId: string,
+    keys: string[],
+    publish: boolean,
+  ): Promise<KnowledgeEntry[]> {
+    const raw = await this.fetch<unknown>(`/api/issues/${issueId}/knowledge/deposit`, {
+      method: "POST",
+      body: JSON.stringify({ keys, publish }),
+    });
+    const parsed = parseWithFallback(
+      raw,
+      z.array(KnowledgeEntrySchema),
+      [],
+      { endpoint: "POST /api/issues/:id/knowledge/deposit" },
+    );
+    return Array.isArray(parsed) ? parsed : [];
+  }
+
+  async publishKnowledgeEntry(entryId: string): Promise<KnowledgeEntry> {
+    return this.fetch(`/api/knowledge/${entryId}/publish`, { method: "POST" });
+  }
+
+  async archiveKnowledgeEntry(entryId: string): Promise<KnowledgeEntry> {
+    return this.fetch(`/api/knowledge/${entryId}/archive`, { method: "POST" });
+  }
+
+  async reindexKnowledge(): Promise<{ embedded: number }> {
+    return this.fetch(`/api/knowledge/reindex`, { method: "POST" });
   }
 
   async markInboxRead(id: string): Promise<InboxItem> {

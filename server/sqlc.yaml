@@ -10,3 +10,10 @@ sql:
         sql_package: "pgx/v5"
         emit_json_tags: true
         emit_empty_slices: true
+        overrides:
+          # The knowledge base stores embeddings as pgvector values, but the
+          # API moves them as text literals ('[0.1,0.2,...]'::vector). Keeping
+          # the generated type as string avoids pulling a pgvector Go client
+          # into the server just to read a column the SQL never returns raw.
+          - db_type: "vector"
+            go_type: "string"

@@ -1304,6 +1304,7 @@
     "handoff_summary_running": "正在写交接摘要…",
     "handoff_summary_too_long": "交接摘要太长，请控制在 50,000 字以内。",
     "run_preparing": "准备中…",
-    "run_queued_waiting": "等待智能体接手这一棒…"
+    "run_queued_waiting": "等待智能体接手这一棒…",
+    "deposit_knowledge": "沉淀到知识库"
   }
 }

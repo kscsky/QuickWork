@@ -1340,6 +1340,7 @@
     "handoff_summary_running": "Writing the handoff summary…",
     "handoff_summary_too_long": "The handoff summary is too long — keep it under 50,000 characters.",
     "run_preparing": "Starting…",
-    "run_queued_waiting": "Waiting for the agent to pick this leg up…"
+    "run_queued_waiting": "Waiting for the agent to pick this leg up…",
+    "deposit_knowledge": "Save to knowledge"
   }
 }

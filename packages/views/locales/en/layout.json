@@ -2,6 +2,7 @@
   "nav": {
     "inbox": "Notifications",
     "activity": "Activity log",
+    "knowledge": "Knowledge",
     "dispatch": "Squad tasks",
     "chat": "Chat",
     "tasks": "Task list",

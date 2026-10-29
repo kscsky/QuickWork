@@ -122,6 +122,17 @@ export type {
 } from "./plugin";
 export type { InboxItem, InboxSeverity, InboxItemType, InboxWorkspaceUnread } from "./inbox";
 export type { RelayActivityAction, RelayActivityEvent } from "./activity";
+export type {
+  KnowledgeEntry,
+  KnowledgeEmbeddingStatus,
+  KnowledgeHit,
+  KnowledgeKind,
+  KnowledgeListResponse,
+  KnowledgePreview,
+  KnowledgePreviewEntry,
+  KnowledgeSearchResponse,
+  KnowledgeStatus,
+} from "./knowledge";
 export type { NotificationGroupKey, NotificationGroupValue, NotificationPreferences, NotificationPreferenceResponse } from "./notification-preference";
 export type { Comment, CommentType, CommentAuthorType, CommentTriggerPreview, CommentTriggerPreviewAgent, CommentTriggerSource, CommentTriggerOutcome, CommentTriggerStatus, Reaction } from "./comment";
 export type { Label, LabelResourceType, CreateLabelRequest, UpdateLabelRequest, ListLabelsResponse, IssueLabelsResponse, ResourceLabelsResponse } from "./label";

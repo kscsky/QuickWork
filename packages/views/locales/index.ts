@@ -26,6 +26,7 @@ import enSquads from "./en/squads.json";
 import enHome from "./en/home.json";
 import enTasks from "./en/tasks.json";
 import enActivity from "./en/activity.json";
+import enKnowledge from "./en/knowledge.json";
 import zhHansCommon from "./zh-Hans/common.json";
 import zhHansAuth from "./zh-Hans/auth.json";
 import zhHansSettings from "./zh-Hans/settings.json";
@@ -53,6 +54,7 @@ import zhHansSquads from "./zh-Hans/squads.json";
 import zhHansHome from "./zh-Hans/home.json";
 import zhHansTasks from "./zh-Hans/tasks.json";
 import zhHansActivity from "./zh-Hans/activity.json";
+import zhHansKnowledge from "./zh-Hans/knowledge.json";
 import koCommon from "./ko/common.json";
 import koAuth from "./ko/auth.json";
 import koSettings from "./ko/settings.json";
@@ -80,6 +82,7 @@ import koSquads from "./ko/squads.json";
 import koHome from "./ko/home.json";
 import koTasks from "./ko/tasks.json";
 import koActivity from "./ko/activity.json";
+import koKnowledge from "./ko/knowledge.json";
 import jaCommon from "./ja/common.json";
 import jaAuth from "./ja/auth.json";
 import jaSettings from "./ja/settings.json";
@@ -107,6 +110,7 @@ import jaSquads from "./ja/squads.json";
 import jaHome from "./ja/home.json";
 import jaTasks from "./ja/tasks.json";
 import jaActivity from "./ja/activity.json";
+import jaKnowledge from "./ja/knowledge.json";
 
 // Single source of truth for the resource bundle. Both apps (web layout +
 // desktop App.tsx) import from here so adding a locale or namespace happens
@@ -140,6 +144,7 @@ export const RESOURCES: Record<SupportedLocale, LocaleResources> = {
     home: enHome,
     tasks: enTasks,
     activity: enActivity,
+    knowledge: enKnowledge,
   },
   "zh-Hans": {
     common: zhHansCommon,
@@ -169,6 +174,7 @@ export const RESOURCES: Record<SupportedLocale, LocaleResources> = {
     home: zhHansHome,
     tasks: zhHansTasks,
     activity: zhHansActivity,
+    knowledge: zhHansKnowledge,
   },
   ko: {
     common: koCommon,
@@ -198,6 +204,7 @@ export const RESOURCES: Record<SupportedLocale, LocaleResources> = {
     home: koHome,
     tasks: koTasks,
     activity: koActivity,
+    knowledge: koKnowledge,
   },
   ja: {
     common: jaCommon,
@@ -227,5 +234,6 @@ export const RESOURCES: Record<SupportedLocale, LocaleResources> = {
     home: jaHome,
     tasks: jaTasks,
     activity: jaActivity,
+    knowledge: jaKnowledge,
   },
 };

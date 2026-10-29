@@ -1304,6 +1304,7 @@
     "handoff_summary_running": "인수인계 요약 작성 중…",
     "handoff_summary_too_long": "인수인계 요약이 너무 깁니다. 50,000자 이내로 줄여 주세요.",
     "run_preparing": "준비 중…",
-    "run_queued_waiting": "에이전트가 이번 릴레이를 맡기를 기다리는 중…"
+    "run_queued_waiting": "에이전트가 이번 릴레이를 맡기를 기다리는 중…",
+    "deposit_knowledge": "지식에 저장"
   }
 }

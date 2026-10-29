@@ -92,6 +92,7 @@ import { useSearchStore } from "./search-store";
 const PAGE_KEYWORDS: Record<WorkspacePageKey, string[]> = {
   inbox: ["inbox", "notifications", "收件箱", "通知"],
   activity: ["activity", "log", "audit", "history", "活动", "日志", "审计"],
+  knowledge: ["knowledge", "faq", "memory", "search", "知识库", "记忆", "问答"],
   dispatch: ["dispatch", "tower", "orchestrate", "queue", "调度", "编排", "派发"],
   tasks: ["tasks", "relay", "chain", "handoff", "任务", "链路", "交接"],
   myIssues: ["my", "issues", "assigned", "mine", "我的", "任务"],

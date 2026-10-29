@@ -32,6 +32,7 @@ import (
 	"github.com/kscsky/quickwork/server/internal/integrations/slack"
 	"github.com/kscsky/quickwork/server/internal/integrations/telegram"
 	"github.com/kscsky/quickwork/server/internal/integrations/wecom"
+	"github.com/kscsky/quickwork/server/internal/knowledge"
 	obsmetrics "github.com/kscsky/quickwork/server/internal/metrics"
 	"github.com/kscsky/quickwork/server/internal/middleware"
 	"github.com/kscsky/quickwork/server/internal/realtime"
@@ -417,6 +418,7 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 		ServerVersion:            normalizeServerVersion(version),
 	}
 	h := handler.New(queries, pool, hub, bus, emailSvc, store, cfSigner, analyticsClient, signupConfig, daemonHub)
+	h.Knowledge = service.NewKnowledgeService(queries, knowledge.EmbedderFromEnv())
 	invitationRateLimits := handler.DefaultInvitationRateLimits()
 	invitationRateLimits.Actor.Limit = envNonNegativeInt("RATE_LIMIT_INVITATION_ACTOR_10M", invitationRateLimits.Actor.Limit)
 	invitationRateLimits.Workspace.Limit = envNonNegativeInt("RATE_LIMIT_INVITATION_WORKSPACE_24H", invitationRateLimits.Workspace.Limit)
@@ -1815,6 +1817,9 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 					// The finished leg's output: the holder asks their leg's
 					// agent to write the handoff document (产出 md).
 					r.Post("/chain/output", h.GenerateIssueChainLegOutput)
+					// Distil a finished relay into the workspace knowledge base.
+					r.Post("/knowledge/preview", h.PreviewIssueKnowledge)
+					r.Post("/knowledge/deposit", h.DepositIssueKnowledge)
 					r.Get("/usage", h.GetIssueUsage)
 					r.Post("/reactions", h.AddIssueReaction)
 					r.Delete("/reactions", h.RemoveIssueReaction)
@@ -2210,6 +2215,13 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 			// Activity page: the relay's key decisions (approve / return /
 			// reassign / skip) across the workspace, newest first.
 			r.Get("/api/activity", h.ListActivityEvents)
+
+			// Knowledge base: the squad's distilled memory.
+			r.Get("/api/knowledge", h.ListKnowledge)
+			r.Get("/api/knowledge/search", h.SearchKnowledge)
+			r.Post("/api/knowledge/reindex", h.ReindexKnowledge)
+			r.Post("/api/knowledge/{id}/publish", h.PublishKnowledgeEntry)
+			r.Post("/api/knowledge/{id}/archive", h.ArchiveKnowledgeEntry)
 
 			// Inbox
 			r.Route("/api/inbox", func(r chi.Router) {

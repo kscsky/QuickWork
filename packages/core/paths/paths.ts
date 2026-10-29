@@ -44,6 +44,9 @@ function workspaceScoped(slug: string) {
     // over the sidebar slot notifications used to occupy — "what needs me" is
     // the log's top band, not a separate inbox page.
     activity: () => `${ws}/activity`,
+    // The squad's distilled memory: a finished relay can deposit its summary
+    // document and FAQ drafts here.
+    knowledge: () => `${ws}/knowledge`,
     agents: () => `${ws}/agents`,
     newAgent: () => `${ws}/agents/new`,
     // The two creation methods behind the chooser. Each is a real route so a

@@ -1,0 +1,1 @@
+-- Shared extension: leave it in place.

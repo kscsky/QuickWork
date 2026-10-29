@@ -2,6 +2,7 @@
   "nav": {
     "inbox": "알림",
     "activity": "활동 로그",
+    "knowledge": "지식 베이스",
     "dispatch": "스쿼드 태스크",
     "chat": "채팅",
     "tasks": "작업 목록",

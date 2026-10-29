@@ -1304,6 +1304,7 @@
     "handoff_summary_running": "引き継ぎ概要を作成中…",
     "handoff_summary_too_long": "引き継ぎ概要が長すぎます。50,000文字以内にしてください。",
     "run_preparing": "起動中…",
-    "run_queued_waiting": "エージェントがこのレグを引き受けるのを待っています…"
+    "run_queued_waiting": "エージェントがこのレグを引き受けるのを待っています…",
+    "deposit_knowledge": "ナレッジに保存"
   }
 }

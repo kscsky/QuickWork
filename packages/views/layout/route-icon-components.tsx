@@ -1,6 +1,7 @@
 import {
   Inbox,
   History,
+  LibraryBig,
   MessageSquare,
   CircleUser,
   Gauge,
@@ -40,6 +41,7 @@ import { resolveRouteIconName, type RouteIconName } from "@quickwork/core/paths"
 export const ROUTE_ICON_COMPONENTS: Record<RouteIconName, LucideIcon> = {
   Inbox,
   History,
+  LibraryBig,
   MessageSquare,
   CircleUser,
   Gauge,

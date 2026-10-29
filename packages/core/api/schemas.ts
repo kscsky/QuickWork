@@ -30,6 +30,9 @@ import type {
   GitHubPullRequest,
   InboxItem,
   InboxWorkspaceUnread,
+  KnowledgeListResponse,
+  KnowledgePreview,
+  KnowledgeSearchResponse,
   RelayActivityEvent,
   Label,
   MemberWithUser,
@@ -2775,6 +2778,95 @@ export const RelayActivityEventSchema = z
 export const RelayActivityListSchema = z.array(RelayActivityEventSchema);
 
 export const EMPTY_RELAY_ACTIVITY: RelayActivityEvent[] = [];
+
+// ---------------------------------------------------------------------------
+// Workspace knowledge base (`/api/knowledge`). Entries are lenient so a newer
+// kind/status still renders; the summary document and FAQ drafts share one
+// shape. A malformed list/search returns empty instead of blanking the page.
+// ---------------------------------------------------------------------------
+
+export const KnowledgeEntrySchema = z
+  .object({
+    id: z.string(),
+    workspace_id: z.string(),
+    squad_id: z.string().nullish(),
+    kind: z.string(),
+    title: z.string(),
+    body: z.string().default(""),
+    tags: z.array(z.string()).default([]),
+    status: z.string(),
+    source_issue_id: z.string().nullish(),
+    source_leg: z.number().nullish(),
+    source_kind: z.string().default(""),
+    created_by: z.string(),
+    published_by: z.string().nullish(),
+    published_at: z.string().nullish(),
+    usage_count: z.number().default(0),
+    created_at: z.string(),
+    updated_at: z.string(),
+  })
+  .loose();
+
+export const KnowledgeListSchema = z
+  .object({
+    entries: z.array(KnowledgeEntrySchema).default([]),
+    stats: z.record(z.string(), z.number()).default({}),
+    embedding: z
+      .object({
+        enabled: z.boolean().default(false),
+        model: z.string().default(""),
+        dims: z.number().default(0),
+      })
+      .default({ enabled: false, model: "", dims: 0 }),
+  })
+  .loose();
+
+export const KnowledgeSearchSchema = z
+  .object({
+    mode: z.string().default("keyword"),
+    hits: z
+      .array(z.object({ entry: KnowledgeEntrySchema, score: z.number() }).loose())
+      .default([]),
+  })
+  .loose();
+
+export const KnowledgePreviewSchema = z
+  .object({
+    summary: z.string().default(""),
+    entries: z
+      .array(
+        z
+          .object({
+            key: z.string(),
+            kind: z.string(),
+            title: z.string(),
+            body: z.string().default(""),
+            tags: z.array(z.string()).default([]),
+            source_leg: z.number().default(0),
+            source_kind: z.string().default(""),
+          })
+          .loose(),
+      )
+      .default([]),
+    embedding_enabled: z.boolean().default(false),
+    embedding_model: z.string().default(""),
+    embedding_dims: z.number().default(0),
+  })
+  .loose();
+
+export const EMPTY_KNOWLEDGE_LIST: KnowledgeListResponse = {
+  entries: [],
+  stats: {},
+  embedding: { enabled: false, model: "", dims: 0 },
+};
+export const EMPTY_KNOWLEDGE_SEARCH: KnowledgeSearchResponse = { mode: "keyword", hits: [] };
+export const EMPTY_KNOWLEDGE_PREVIEW: KnowledgePreview = {
+  summary: "",
+  entries: [],
+  embedding_enabled: false,
+  embedding_model: "",
+  embedding_dims: 0,
+};
 // ---------------------------------------------------------------------------
 // Runtime model discovery (`POST /api/runtimes/:id/models`,
 // `GET /api/runtimes/:id/models/:requestId`). Both endpoints return the same

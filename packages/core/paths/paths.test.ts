@@ -19,6 +19,7 @@ describe("paths.workspace(slug)", () => {
     expect(ws.memberDetail("u1")).toBe("/acme/members/u1");
     expect(ws.inbox()).toBe("/acme/inbox");
     expect(ws.activity()).toBe("/acme/activity");
+    expect(ws.knowledge()).toBe("/acme/knowledge");
     expect(ws.chatWithAgent("agent one")).toBe(
       "/acme/chat?agent=agent%20one",
     );

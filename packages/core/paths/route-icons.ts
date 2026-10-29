@@ -34,6 +34,7 @@ export type RouteIconName =
   | "Monitor"
   | "Server"
   | "BookOpenText"
+  | "LibraryBig"
   | "Settings"
   | "Github"
   | "Plug"
@@ -52,6 +53,7 @@ export type RouteIconName =
 export type NavLabelKey =
   | "inbox"
   | "activity"
+  | "knowledge"
   | "dispatch"
   | "tasks"
   | "my_issues"
@@ -77,6 +79,7 @@ export type NavLabelKey =
 export type WorkspacePageKey =
   | "inbox"
   | "activity"
+  | "knowledge"
   | "dispatch"
   | "tasks"
   | "myIssues"
@@ -116,6 +119,9 @@ export const WORKSPACE_PAGES: Record<WorkspacePageKey, WorkspacePage> = {
   // The relay's decision log. Replaces the notification inbox as the sidebar
   // entry: pending work is this page's top band, the rest is the audit trail.
   activity: { segment: "activity", icon: "History", navKey: "activity" },
+  // The squad's memory: summary documents and FAQs distilled from finished
+  // relays, searchable semantically once an embedding provider is configured.
+  knowledge: { segment: "knowledge", icon: "LibraryBig", navKey: "knowledge" },
   dispatch: { segment: "dispatch", icon: "Gauge", navKey: "dispatch" },
   // The relay feed: every task with its chain, who holds it right now, and
   // where it has stopped. A page of its own rather than the issues list

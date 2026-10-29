@@ -31,6 +31,7 @@ import {
 import { SquadsPage, SquadDetailPage as SquadDetailPageView } from "@quickwork/views/squads/components";
 import { InboxPage } from "@quickwork/views/inbox";
 import { ActivityPage } from "@quickwork/views/activity";
+import { KnowledgePage } from "@quickwork/views/knowledge";
 import {
   AccountSettingsPage,
   ConfigOverviewPage,
@@ -232,6 +233,7 @@ export const appRoutes: RouteObject[] = [
           },
           { path: "inbox", element: <InboxPage />, handle: { title: "Notifications" } },
           { path: "activity", element: <ActivityPage />, handle: { title: "Activity" } },
+          { path: "knowledge", element: <KnowledgePage />, handle: { title: "Knowledge" } },
           {
             path: "attachments/:id/preview",
             element: <AttachmentPreviewRoute />,

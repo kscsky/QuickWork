@@ -132,6 +132,7 @@ vi.mock("@quickwork/core/paths", async (importOriginal) => ({
   useWorkspacePaths: () => ({
     inbox: () => "/acme/inbox",
     activity: () => "/acme/activity",
+    knowledge: () => "/acme/knowledge",
     chat: () => "/acme/chat",
     myIssues: () => "/acme/my-issues",
     tasks: () => "/acme/tasks",

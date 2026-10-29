@@ -28,6 +28,7 @@
     "./members": "./members/index.ts",
     "./inbox": "./inbox/index.ts",
     "./activity": "./activity/index.ts",
+    "./knowledge": "./knowledge/index.ts",
     "./runtimes": "./runtimes/index.ts",
     "./models": "./models/index.ts",
     "./dashboard": "./dashboard/index.ts",
