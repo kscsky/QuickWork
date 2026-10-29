@@ -11,8 +11,9 @@
 **让工作像接力一样流转。**
 
 QuickWork 是一个开源工作区：人和 AI 智能体以「接力」的方式共同推进工作。每个任务是一条链路——每一
-步属于一个人或一个智能体，每一次交接都发生在看板上。轮到还没绑定智能体的人，任务就停在那一步等人
-——不跳过，也不算失败。可自部署，支持 26 种智能体 CLI，不绑定任何厂商。
+步属于一个人或一个智能体，每一次交接都发生在看板上。每一棒只交出一份交付文档，服务端把它解析成可审
+核的交接包；轮到跑不了的一棒（没绑定智能体、机器起不来 CLI），它就带着原因和出口停下（改派、跳过、
+修机器），每一次决定都记进活动日志。可自部署，支持 26 种智能体 CLI，不绑定任何厂商。
 
 [![Release](https://img.shields.io/github/v/release/kscsky/QuickWork?style=flat)](https://github.com/kscsky/QuickWork/releases)
 [![GitHub stars](https://img.shields.io/github/stars/kscsky/QuickWork?style=flat)](https://github.com/kscsky/QuickWork/stargazers)
@@ -25,15 +26,15 @@ QuickWork 是一个开源工作区：人和 AI 智能体以「接力」的方式
 </div>
 
 <p align="center">
-  <img src="docs/assets/screens/task-relay.png" alt="QuickWork 任务 NW-101 停在 Kai 这一棒，因为还没绑定智能体" width="100%">
+  <img src="docs/assets/screens/task-relay.png" alt="QuickWork 任务 NW-107 停在 Kai 这一棒，页面底部是决策卡" width="100%">
 </p>
 
 <p align="center">
-  <sub><em>Nova 在 Northstar Studio 的 NW-101 停在 Kai 这一棒。这是等待，不是失败——绑定智能体后，同一个任务会从这里继续。</em></sub>
+  <sub><em>Nova 在 Northstar Studio 的 NW-107 停在 Kai 这一棒。这是等待，不是失败——卡片写清楚为什么停，以及下一步能做什么。</em></sub>
 </p>
 
 <p align="center">
-  <a href="apps/web/public/videos/quickwork-demo.mp4">▶ 观看 75 秒演示视频</a>
+  <a href="apps/web/public/videos/quickwork-demo.mp4">▶ 观看 2.5 分钟演示视频</a>
 </p>
 
 ---
@@ -52,11 +53,12 @@ QuickWork 把这些智能体和你的队友放进同一个工作区，并让「�
 
 演示用的是一个新账号，不是维护者自己的号：
 
-- **Nova** 在 **Northstar Studio** 里推进 **NW-101 · 发布秋季护肤内容包**——3 篇笔记、9 张图，再加一个发布包。
-- 路线：**Nova（Quill）→ Lin（Writer Agent）→ Kai（发布）→ Mira（Review Agent）**。
-- Kai 还没绑定智能体，所以接力**停在 Kai 这一棒**。它不会被跳过，也不会被记成失败；绑定智能体后，同一个任务从这一步继续。
+- **Nova** 在 **Northstar Studio** 里推进 **NW-107 · 发布「秋日的第一支精华」内容包**——3 篇笔记、9 张图，再加一个发布包。
+- 路线：**Nova（Quill）→ Kai（发布）→ Mira（Review Agent）**。
+- Kai 还没绑定智能体，所以接力**以 `no_agent` 停在 Kai 这一棒**。它不会被跳过，也不会被记成失败；owner 把这一棒改派给 **Lin**，Lin 的 Writer Agent 接手，接力继续走到 Mira——不需要重开任务。
+- 通过和改派都会进**活动日志**：通过带着交接包留档，改派带 **ADMIN** 标记。
 
-一眼就能看明白：任务不是一段提示词，而是一条能穿过交接、继续往前走的路线。
+一眼就能看明白：任务不是一段提示词，而是一条能穿过交接、继续往前走的路线——每次停下都有原因，每次交棒都有包。
 
 ---
 
@@ -72,11 +74,19 @@ QuickWork 把这些智能体和你的队友放进同一个工作区，并让「�
 新建任务时选 **小队 / Squad**，选中内容小队，确认路线，然后发车。每一棒都会记录谁在持有、收到了什么、交出了什么。轮到没绑定智能体的人，看板和房间里都会明确显示 **Stopped · waiting**——不用等谁来追问，状态本身就看得见。
 
 <p align="center">
-  <img src="docs/assets/screens/dispatch-route.png" alt="小队任务发车弹窗：四棒路线，Kai 这一棒停住等人" width="86%">
+  <img src="docs/assets/screens/dispatch-route.png" alt="小队任务发车弹窗：保存的路线与「Kai 这一棒会停下等待」的提示" width="86%">
 </p>
 
 <p align="center">
-  <sub><em>路线就是任务本身。Nova 带 Quill 先拆解，Lin 成稿，Kai 发布，Mira 终审——Kai 这一棒在绑定智能体前会一直停住。</em></sub>
+  <img src="docs/assets/screens/activity-log.png" alt="活动日志：接力关键决定按时间排开，管理员操作单独标记" width="100%">
+</p>
+
+<p align="center">
+  <sub><em>活动日志只记决定：谁通过、谁退回、谁改派、谁跳过了一棒——用了管理员权限的单独标出来。</em></sub>
+</p>
+
+<p align="center">
+  <sub><em>路线就是任务本身。发车之前，弹窗已经标出哪一棒会停下——停在哪里是提前知道的，不是事后才发现的。</em></sub>
 </p>
 
 ---
@@ -106,8 +116,8 @@ QuickWork 把这些智能体和你的队友放进同一个工作区，并让「�
 
 - **[执行日志](https://quickwork.ai/docs/tasks) →** 每次工具调用、命令和报错都带时间戳，可以完整回放。
 - **Token 用量 →** 每次运行花了多少，按智能体、按任务都看得到。
-- **[人来验收](https://quickwork.ai/docs/issues) →** 活先进入审核中，不直接进 main。上不上线你说了算。
-- **[收件箱](https://quickwork.ai/docs/inbox) →** 只在智能体需要你拍板时提醒你，而不是每一步都来烦你。
+- **[人来验收](https://quickwork.ai/docs/issues) →** 活先进入审核中，不直接进 main——通过还要有交接包：摘要、至少一条验收，非末棒还要下一棒交办。
+- **[活动日志](https://quickwork.ai/docs/tasks) →** 通过、退回、改派、跳过汇成一条可追溯的记录；越权动作标 ADMIN，等你的棒次浮在最上面。
 - **[重试与超时](https://quickwork.ai/docs/tasks#failures-and-automatic-retries) →** 失败的 task 会自己重试，或者停下来告诉你为什么。
 
 ## 整套都归你

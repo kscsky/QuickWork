@@ -12,8 +12,10 @@
 
 QuickWork is the open-source workspace where people and AI agents run work as a relay. Every task
 is a chain of steps — each one owned by a person or an agent, every handoff visible on the board.
-When a step lands on someone who has not bound an agent yet, the task stops at their step and
-waits — not skipped, and not a failure. Self-hostable, works with 26 agent CLIs, no lock-in.
+Each leg hands over one delivered document, parsed into a reviewable package. When a leg cannot
+run — no agent bound, or a machine whose CLI cannot start — it stops with the reason and the way
+out (reassign, skip, or fix the machine), and every decision lands in the workspace activity log.
+Self-hostable, works with 26 agent CLIs, no lock-in.
 
 [![Release](https://img.shields.io/github/v/release/kscsky/QuickWork?style=flat)](https://github.com/kscsky/QuickWork/releases)
 [![GitHub stars](https://img.shields.io/github/stars/kscsky/QuickWork?style=flat)](https://github.com/kscsky/QuickWork/stargazers)
@@ -26,15 +28,15 @@ waits — not skipped, and not a failure. Self-hostable, works with 26 agent CLI
 </div>
 
 <p align="center">
-  <img src="docs/assets/screens/task-relay.png" alt="QuickWork task NW-101 stopped on Kai's leg with no agent bound" width="100%">
+  <img src="docs/assets/screens/task-relay.png" alt="QuickWork task NW-107 stopped on Kai's leg with no agent bound, and the decision card" width="100%">
 </p>
 
 <p align="center">
-  <sub><em>NW-101 in Nova's Northstar Studio is stopped on Kai's leg. The relay is parked, not failed — bind an agent and the same task continues.</em></sub>
+  <sub><em>NW-107 in Nova's Northstar Studio is stopped on Kai's leg. The relay is parked, not failed — the card says why, and offers the next decision.</em></sub>
 </p>
 
 <p align="center">
-  <a href="apps/web/public/videos/quickwork-demo.mp4">▶ Watch the 75-second demo</a>
+  <a href="apps/web/public/videos/quickwork-demo.mp4">▶ Watch the 2.5-minute demo</a>
 </p>
 
 ---
@@ -56,11 +58,12 @@ without a human saying so.
 
 The demo follows a fresh account, not the maintainer's:
 
-- **Nova** in **Northstar Studio**, working on **NW-101 · 发布秋季护肤内容包** — three notes, nine images, and a publish pack.
-- Route: **Nova (Quill) → Lin (Writer Agent) → Kai (publish) → Mira (Review Agent)**.
-- Kai has not bound an agent, so the relay **stops on Kai's leg**. It is not skipped and not marked failed; binding an agent resumes the same task from that step.
+- **Nova** in **Northstar Studio**, working on **NW-107 · 发布「秋日的第一支精华」内容包** — three notes, nine images, and a publish pack.
+- Route: **Nova (Quill) → Kai (publish) → Mira (Review Agent)**.
+- Kai has not bound an agent, so the relay **stops on Kai's leg** with `no_agent`. It is not skipped and not marked failed; the owner hands that leg to **Lin**, whose Writer Agent picks it up, and the relay continues to Mira without recreating the task.
+- The pass and the reassignment both land in the **activity log** — the pass with its handoff package, the reassignment marked **ADMIN**.
 
-That is the product in one view: a task is not a prompt, it is a route that survives the handoff.
+That is the product in one view: a task is not a prompt, it is a route that survives the handoff — with a package at each stop and a reason for each wait.
 
 ---
 
@@ -76,11 +79,19 @@ A relay is four decisions, all made once:
 In the create dialog, choose **Squad**, pick the squad, confirm the route, and dispatch. Every leg records who held it, what they received, and what they handed over. When a leg has no bound agent, the board and the room both say **Stopped · waiting** — the state is visible before anyone has to chase it.
 
 <p align="center">
-  <img src="docs/assets/screens/dispatch-route.png" alt="Squad dispatch dialog with a four-leg route and Kai's parked leg" width="86%">
+  <img src="docs/assets/screens/dispatch-route.png" alt="Squad dispatch dialog with the saved route and the warning that Kai's leg will park" width="86%">
 </p>
 
 <p align="center">
-  <sub><em>The route is the task. Nova leads through Quill, Lin writes, Kai publishes, Mira reviews — and Kai's leg parks until an agent is bound.</em></sub>
+  <img src="docs/assets/screens/activity-log.png" alt="Workspace activity log listing relay decisions, with admin actions marked" width="100%">
+</p>
+
+<p align="center">
+  <sub><em>The activity log keeps only the decisions: who approved, returned, reassigned or skipped a leg — and marks the ones that used admin reach.</em></sub>
+</p>
+
+<p align="center">
+  <sub><em>The route is the task. Before dispatch, the dialog already calls out the leg that will park — the stop is known up front, not discovered later.</em></sub>
 </p>
 
 ---
@@ -100,6 +111,8 @@ In the create dialog, choose **Squad**, pick the squad, confirm the route, and d
 *It starts as three rough sentences in an issue. It ends as a pull request.*
 
 - **[Task relay](https://quickwork.ai/docs/tasks) →** Squads run work as a relay — each step goes to the next person or agent, and a step with no agent bound stops and waits instead of failing.
+- **[Handoff package](https://quickwork.ai/docs/tasks) →** Each leg hands over one delivery document; the server parses its summary, acceptance ledger, open questions and the next leg's brief. Passing requires the package — no bare approvals.
+- **[Reassign and skip](https://quickwork.ai/docs/tasks) →** When a holder is gone or a machine cannot run, an owner or admin moves that leg or skips it; the rest of the route is untouched.
 - **[Assign an issue](https://quickwork.ai/docs/assigning-issues) →** Pick an agent as assignee the way you'd pick a colleague — it takes the work from there.
 - **[Autopilots](https://quickwork.ai/docs/autopilots) →** Run standups, audits, and reports on a cron — nobody to remind.
 - **[Projects](https://quickwork.ai/docs/projects) →** Group work and attach the repos and docs agents need as context.
@@ -110,8 +123,8 @@ In the create dialog, choose **Squad**, pick the squad, confirm the route, and d
 
 - **[Execution log](https://quickwork.ai/docs/tasks) →** Replay every tool call, command, and error, timestamped.
 - **Token usage →** See what each run cost, per agent and per issue.
-- **[Review gates](https://quickwork.ai/docs/issues) →** Work lands in review, not in main. You decide what ships.
-- **[Inbox](https://quickwork.ai/docs/inbox) →** Get pinged when an agent needs a call, not for every step.
+- **[Review gates](https://quickwork.ai/docs/issues) →** Work lands in review, not in main — and passing requires a handoff package: a summary, at least one acceptance item, and the next leg's brief unless it is the final leg.
+- **[Activity log](https://quickwork.ai/docs/tasks) →** Approve, return, reassign and skip in one traceable feed. Privileged moves carry an ADMIN mark, and the legs waiting on you sit at the top.
 - **[Retries and timeouts](https://quickwork.ai/docs/tasks#failures-and-automatic-retries) →** Failed runs retry on their own, or stop and tell you why.
 
 ## Make it yours.
