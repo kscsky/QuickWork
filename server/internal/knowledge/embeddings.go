@@ -23,11 +23,16 @@ import (
 	"time"
 )
 
-// EmbeddingDims is the width of the vector column (migration 472). Every
-// provider must return exactly this many floats; a model with a different
-// native width can still be used when it supports a `dimensions` parameter
-// (OpenAI text-embedding-3-* do).
-const EmbeddingDims = 1024
+// ColumnDims is the physical width of the vector column (migration 478).
+// Embeddings shorter than this are zero-padded, which leaves cosine
+// similarity unchanged; 1536 stays below the HNSW index limit of 2000.
+const (
+	ColumnDims = 1536
+	MaxDims    = ColumnDims
+	// EmbeddingDims is the default width of the legacy environment-level
+	// embedder. Workspace profiles choose their own dims.
+	EmbeddingDims = 1024
+)
 
 // Embedder turns text into normalized vectors. Implementations must return one
 // vector per input, in order.
@@ -84,6 +89,17 @@ type openAIEmbedder struct {
 	client  *http.Client
 }
 
+// NewOpenAIEmbedder builds an embedder from a workspace embedding profile.
+func NewOpenAIEmbedder(baseURL, apiKey, model string, dims int) Embedder {
+	return &openAIEmbedder{
+		baseURL: strings.TrimRight(baseURL, "/"),
+		apiKey:  apiKey,
+		model:   model,
+		dims:    dims,
+		client:  &http.Client{Timeout: 20 * time.Second},
+	}
+}
+
 func (e *openAIEmbedder) Model() string { return e.model }
 func (e *openAIEmbedder) Dims() int     { return e.dims }
 
@@ -114,7 +130,7 @@ func (e *openAIEmbedder) Embed(ctx context.Context, texts []string) ([][]float32
 	// Matryoshka models accept an explicit width. Other models are expected to
 	// return `dims` natively; a mismatch is rejected below with an actionable
 	// error instead of writing a vector the column cannot hold.
-	if strings.HasPrefix(e.model, "text-embedding-3") {
+	if supportsDimensions(e.model) {
 		reqBody.Dimensions = e.dims
 	}
 	payload, err := json.Marshal(reqBody)
@@ -161,11 +177,25 @@ func (e *openAIEmbedder) Embed(ctx context.Context, texts []string) ([][]float32
 		}
 		if len(item.Embedding) != e.dims {
 			return nil, fmt.Errorf(
-				"embedding model %q returned %d dimensions, but the knowledge column is %d; use a model with %d dims or one that accepts a dimensions parameter",
-				e.model, len(item.Embedding), e.dims, e.dims,
+				"embedding model %q returned %d dimensions, but the profile expects %d; pick a dimension the model supports",
+				e.model, len(item.Embedding), e.dims,
 			)
 		}
 		vectors[index] = item.Embedding
 	}
 	return vectors, nil
+}
+
+func supportsDimensions(model string) bool {
+	switch {
+	case strings.HasPrefix(model, "text-embedding-3"):
+		return true
+	case strings.HasPrefix(model, "text-embedding-v3"),
+		strings.HasPrefix(model, "text-embedding-v4"):
+		return true
+	case strings.HasPrefix(model, "qwen3-embedding"):
+		return true
+	default:
+		return false
+	}
 }

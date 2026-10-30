@@ -30,6 +30,7 @@ import type {
   GitHubPullRequest,
   InboxItem,
   InboxWorkspaceUnread,
+  EmbeddingMatchResult,
   KnowledgeListResponse,
   KnowledgePreview,
   KnowledgeSearchResponse,
@@ -2804,6 +2805,45 @@ export const KnowledgeEntrySchema = z
     usage_count: z.number().default(0),
     created_at: z.string(),
     updated_at: z.string(),
+    embedding_profile_id: z.string().nullish(),
+    embedding_model: z.string().nullish(),
+    embedding_dims: z.number().nullish(),
+  })
+  .loose();
+
+export const EmbeddingProfileSchema = z
+  .object({
+    id: z.string(),
+    provider: z.string().default(""),
+    base_url: z.string().default(""),
+    model: z.string().default(""),
+    dims: z.number().default(0),
+    key_hint: z.string().default(""),
+    status: z.string().default("unknown"),
+    last_error: z.string().default(""),
+    is_active: z.boolean().default(false),
+    created_at: z.string().default(""),
+    updated_at: z.string().default(""),
+  })
+  .loose();
+
+export const KnowledgeCorpusSchema = z
+  .object({
+    profile_id: z.string(),
+    provider: z.string().default(""),
+    model: z.string().default(""),
+    dims: z.number().default(0),
+    entries: z.number().default(0),
+    active: z.boolean().default(false),
+  })
+  .loose();
+
+export const KnowledgeProfileRefSchema = z
+  .object({
+    id: z.string().default(""),
+    provider: z.string().default(""),
+    model: z.string().default(""),
+    dims: z.number().default(0),
   })
   .loose();
 
@@ -2814,16 +2854,22 @@ export const KnowledgeListSchema = z
     embedding: z
       .object({
         enabled: z.boolean().default(false),
+        profile_id: z.string().default(""),
+        provider: z.string().default(""),
         model: z.string().default(""),
         dims: z.number().default(0),
       })
-      .default({ enabled: false, model: "", dims: 0 }),
+      .default({ enabled: false, profile_id: "", provider: "", model: "", dims: 0 }),
+    profiles: z.array(EmbeddingProfileSchema).default([]),
+    corpora: z.array(KnowledgeCorpusSchema).default([]),
+    unindexed: z.number().default(0),
   })
   .loose();
 
 export const KnowledgeSearchSchema = z
   .object({
     mode: z.string().default("keyword"),
+    profile: KnowledgeProfileRefSchema.nullish(),
     hits: z
       .array(z.object({ entry: KnowledgeEntrySchema, score: z.number() }).loose())
       .default([]),
@@ -2849,8 +2895,37 @@ export const KnowledgePreviewSchema = z
       )
       .default([]),
     embedding_enabled: z.boolean().default(false),
+    embedding_profile_id: z.string().default(""),
+    embedding_provider: z.string().default(""),
     embedding_model: z.string().default(""),
     embedding_dims: z.number().default(0),
+  })
+  .loose();
+
+export const EmbeddingModelSchema = z
+  .object({
+    name: z.string(),
+    dims: z.array(z.number()).default([]),
+    recommended: z.boolean().default(false),
+  })
+  .loose();
+
+export const EmbeddingProviderSchema = z
+  .object({
+    key: z.string(),
+    label: z.string().default(""),
+    base_url: z.string().default(""),
+    models: z.array(EmbeddingModelSchema).default([]),
+    manual: z.boolean().default(false),
+  })
+  .loose();
+
+export const EmbeddingMatchSchema = z
+  .object({
+    provider: z.string().default(""),
+    base_url: z.string().default(""),
+    models: z.array(EmbeddingModelSchema).default([]),
+    manual: z.boolean().default(false),
   })
   .loose();
 
@@ -2858,6 +2933,9 @@ export const EMPTY_KNOWLEDGE_LIST: KnowledgeListResponse = {
   entries: [],
   stats: {},
   embedding: { enabled: false, model: "", dims: 0 },
+  profiles: [],
+  corpora: [],
+  unindexed: 0,
 };
 export const EMPTY_KNOWLEDGE_SEARCH: KnowledgeSearchResponse = { mode: "keyword", hits: [] };
 export const EMPTY_KNOWLEDGE_PREVIEW: KnowledgePreview = {
@@ -2866,6 +2944,12 @@ export const EMPTY_KNOWLEDGE_PREVIEW: KnowledgePreview = {
   embedding_enabled: false,
   embedding_model: "",
   embedding_dims: 0,
+};
+export const EMPTY_EMBEDDING_MATCH: EmbeddingMatchResult = {
+  provider: "",
+  base_url: "",
+  models: [],
+  manual: false,
 };
 // ---------------------------------------------------------------------------
 // Runtime model discovery (`POST /api/runtimes/:id/models`,

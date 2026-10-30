@@ -42,6 +42,10 @@ import type {
   UpdateRuntimeProfileRequest,
   ModelPoolCatalog,
   InboxItem,
+  EmbeddingMatchResult,
+  EmbeddingProfile,
+  EmbeddingProfileInput,
+  EmbeddingProvider,
   KnowledgeEntry,
   KnowledgeListResponse,
   KnowledgePreview,
@@ -380,9 +384,13 @@ import {
   KnowledgeSearchSchema,
   KnowledgePreviewSchema,
   KnowledgeEntrySchema,
+  EmbeddingProfileSchema,
+  EmbeddingProviderSchema,
+  EmbeddingMatchSchema,
   EMPTY_KNOWLEDGE_LIST,
   EMPTY_KNOWLEDGE_SEARCH,
   EMPTY_KNOWLEDGE_PREVIEW,
+  EMPTY_EMBEDDING_MATCH,
   NotificationPreferenceResponseSchema,
   EMPTY_NOTIFICATION_PREFERENCE_RESPONSE,
   LabelSchema,
@@ -2255,17 +2263,28 @@ export class ApiClient {
   }
 
   /** The workspace knowledge base: entries, corpus counts, embedding status. */
-  async listKnowledge(): Promise<KnowledgeListResponse> {
-    const raw = await this.fetch<unknown>("/api/knowledge");
+  async listKnowledge(params?: {
+    dims?: number | "unindexed";
+    profileId?: string;
+  }): Promise<KnowledgeListResponse> {
+    const qs = new URLSearchParams();
+    if (params?.dims !== undefined) qs.set("dims", String(params.dims));
+    if (params?.profileId) qs.set("profile_id", params.profileId);
+    const query = qs.toString();
+    const raw = await this.fetch<unknown>(`/api/knowledge${query ? `?${query}` : ""}`);
     return parseWithFallback(raw, KnowledgeListSchema, EMPTY_KNOWLEDGE_LIST, {
       endpoint: "GET /api/knowledge",
     });
   }
 
-  async searchKnowledge(query: string, limit = 5): Promise<KnowledgeSearchResponse> {
-    const raw = await this.fetch<unknown>(
-      `/api/knowledge/search?q=${encodeURIComponent(query)}&limit=${limit}`,
-    );
+  async searchKnowledge(
+    query: string,
+    limit = 5,
+    profileId?: string,
+  ): Promise<KnowledgeSearchResponse> {
+    const qs = new URLSearchParams({ q: query, limit: String(limit) });
+    if (profileId) qs.set("profile_id", profileId);
+    const raw = await this.fetch<unknown>(`/api/knowledge/search?${qs.toString()}`);
     return parseWithFallback(raw, KnowledgeSearchSchema, EMPTY_KNOWLEDGE_SEARCH, {
       endpoint: "GET /api/knowledge/search",
     });
@@ -2285,10 +2304,15 @@ export class ApiClient {
     issueId: string,
     keys: string[],
     publish: boolean,
+    profileId?: string,
   ): Promise<KnowledgeEntry[]> {
     const raw = await this.fetch<unknown>(`/api/issues/${issueId}/knowledge/deposit`, {
       method: "POST",
-      body: JSON.stringify({ keys, publish }),
+      body: JSON.stringify({
+        keys,
+        publish,
+        ...(profileId ? { profile_id: profileId } : {}),
+      }),
     });
     const parsed = parseWithFallback(
       raw,
@@ -2307,8 +2331,88 @@ export class ApiClient {
     return this.fetch(`/api/knowledge/${entryId}/archive`, { method: "POST" });
   }
 
-  async reindexKnowledge(): Promise<{ embedded: number }> {
-    return this.fetch(`/api/knowledge/reindex`, { method: "POST" });
+  async reindexKnowledge(profileId?: string): Promise<{ embedded: number }> {
+    const query = profileId ? `?profile_id=${encodeURIComponent(profileId)}` : "";
+    return this.fetch(`/api/knowledge/reindex${query}`, { method: "POST" });
+  }
+
+  /** Embedding provider catalog: presets, their models, and allowed dims. */
+  async listEmbeddingProviders(): Promise<EmbeddingProvider[]> {
+    const raw = await this.fetch<unknown>("/api/knowledge/embedding-providers");
+    const parsed = parseWithFallback(raw, z.array(EmbeddingProviderSchema), [], {
+      endpoint: "GET /api/knowledge/embedding-providers",
+    });
+    return Array.isArray(parsed) ? parsed : [];
+  }
+
+  async listEmbeddingProfiles(): Promise<EmbeddingProfile[]> {
+    const raw = await this.fetch<unknown>("/api/knowledge/profiles");
+    const parsed = parseWithFallback(raw, z.array(EmbeddingProfileSchema), [], {
+      endpoint: "GET /api/knowledge/profiles",
+    });
+    return Array.isArray(parsed) ? parsed : [];
+  }
+
+  /** Verify a provider key and return the embedding models it can use. */
+  async matchEmbeddingModels(input: {
+    provider: string;
+    base_url?: string;
+    model?: string;
+    dims?: number;
+    api_key: string;
+  }): Promise<EmbeddingMatchResult> {
+    const raw = await this.fetch<unknown>("/api/knowledge/profiles/match", {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
+    return parseWithFallback(raw, EmbeddingMatchSchema, EMPTY_EMBEDDING_MATCH, {
+      endpoint: "POST /api/knowledge/profiles/match",
+    });
+  }
+
+  async createEmbeddingProfile(input: EmbeddingProfileInput): Promise<EmbeddingProfile> {
+    const raw = await this.fetch<unknown>("/api/knowledge/profiles", {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
+    const parsed = parseWithFallback(
+      raw,
+      EmbeddingProfileSchema,
+      {
+        id: "",
+        provider: "",
+        base_url: "",
+        model: "",
+        dims: 0,
+        key_hint: "",
+        status: "invalid",
+        last_error: "",
+        is_active: false,
+        created_at: "",
+        updated_at: "",
+      },
+      { endpoint: "POST /api/knowledge/profiles" },
+    );
+    if (!parsed.id) throw new Error("invalid embedding profile response");
+    return parsed;
+  }
+
+  async activateEmbeddingProfile(profileId: string): Promise<void> {
+    const raw = await this.fetch<unknown>(
+      `/api/knowledge/profiles/${profileId}/activate`,
+      { method: "POST" },
+    );
+    const parsed = parseWithFallback(
+      raw,
+      z.object({ ok: z.boolean().default(false) }).loose(),
+      { ok: false },
+      { endpoint: "POST /api/knowledge/profiles/:id/activate" },
+    );
+    if (!parsed.ok) throw new Error("embedding profile was not activated");
+  }
+
+  async deleteEmbeddingProfile(profileId: string): Promise<void> {
+    await this.fetch(`/api/knowledge/profiles/${profileId}`, { method: "DELETE" });
   }
 
   async markInboxRead(id: string): Promise<InboxItem> {

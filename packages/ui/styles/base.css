@@ -3950,6 +3950,110 @@ html[lang|="ko"] .qk-create-dialog {
 }
 .kb-rebuild:hover { color: var(--foreground); border-color: var(--faint-foreground); }
 .kb-note { color: var(--faint-foreground); font-size: 10.5px; line-height: 1.7; padding: 0 2px; }
+
+/* ---------- knowledge corpora: one dimension per entry ---------- */
+.kb-mode-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: -6px 0 16px;
+  color: var(--faint-foreground);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+}
+.kb-mode-line .tag {
+  padding: 2px 6px;
+  border: 1px solid color-mix(in oklab, var(--brand) 30%, var(--border));
+  border-radius: 3px;
+  background: color-mix(in oklab, var(--brand) 7%, transparent);
+  color: var(--brand);
+  letter-spacing: .08em;
+}
+.kb-mode-line em { margin-left: auto; font-style: normal; }
+.kb-mode-line b { color: var(--muted-foreground); font-weight: 650; }
+.kb-tag.dim { color: var(--muted-foreground); border-color: var(--border); background: var(--muted); }
+.kb-em-top { display: flex; align-items: center; gap: 9px; }
+.kb-em-mark {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  flex: none;
+  border-radius: 6px;
+  background: var(--foreground);
+  color: var(--background);
+  font-size: 12px;
+  font-weight: 600;
+}
+.kb-em-mark.sm { width: 20px; height: 20px; border-radius: 4px; font-size: 10px; }
+.kb-em-name { min-width: 0; flex: 1; }
+.kb-em-name b {
+  display: block;
+  overflow: hidden;
+  color: var(--foreground);
+  font-size: 13px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.kb-em-name em {
+  display: block;
+  margin-top: 2px;
+  color: var(--faint-foreground);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-style: normal;
+}
+.kb-em-dot { width: 6px; height: 6px; flex: none; border-radius: 50%; background: var(--done); }
+.kb-em-key {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 11px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--border);
+  color: var(--faint-foreground);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+}
+.kb-em-key code { color: var(--muted-foreground); font-family: var(--font-mono); font-size: 10px; }
+.kb-em-key .ok { margin-left: auto; color: var(--done); }
+.kb-em-cover { margin-top: 10px; }
+.kb-em-cover .row {
+  display: flex;
+  align-items: baseline;
+  color: var(--faint-foreground);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+}
+.kb-em-cover .row b { margin-left: auto; color: var(--muted-foreground); font-family: var(--font-mono); font-size: 11px; font-weight: 600; }
+.kb-em-cover .bar { display: block; height: 3px; margin-top: 6px; overflow: hidden; border-radius: 99px; background: var(--border); }
+.kb-em-cover .bar i { display: block; height: 100%; background: var(--brand); }
+.kb-em-actions { display: flex; gap: 6px; margin-top: 11px; }
+.kb-em-actions .kb-rebuild { margin-left: 0; }
+.kb-em-actions .kb-rebuild:first-child { margin-right: auto; }
+.kb-em-corpus { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 10px; }
+.kb-em-corpus button {
+  height: 24px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: var(--background);
+  color: var(--faint-foreground);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.kb-em-corpus button.on { border-color: var(--foreground); background: var(--foreground); color: var(--background); }
+.kb-em-corpus button em { margin-left: 3px; font-style: normal; opacity: .7; }
+.kb-em-corpus button:disabled { opacity: .45; cursor: default; }
+.kb-corpus-hint { margin-top: 7px; color: var(--faint-foreground); font-size: 10px; line-height: 1.6; }
+
 @media (max-width: 1100px) {
   .kb-body { grid-template-columns: 1fr; }
   .kb-side { order: -1; display: grid; grid-template-columns: 1fr 1fr; }

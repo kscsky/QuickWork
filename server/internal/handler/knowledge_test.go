@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/jackc/pgx/v5/pgtype"
+
 	"github.com/kscsky/quickwork/server/internal/knowledge"
 	"github.com/kscsky/quickwork/server/internal/service"
 	"github.com/kscsky/quickwork/server/internal/testutil"
@@ -212,7 +214,7 @@ func TestKnowledgeVectorSearchRanksByEmbedding(t *testing.T) {
 		t.Fatal(err)
 	}
 	svc := service.NewKnowledgeService(testHandler.Queries, fakeEmbedder{})
-	created, err := svc.DepositTaskKnowledge(context.Background(), issue, actorUUID, []string{"faq-0", "faq-1"}, true)
+	created, err := svc.DepositTaskKnowledge(context.Background(), issue, actorUUID, []string{"faq-0", "faq-1"}, true, pgtype.UUID{})
 	if err != nil {
 		t.Fatalf("deposit: %v", err)
 	}
@@ -220,7 +222,7 @@ func TestKnowledgeVectorSearchRanksByEmbedding(t *testing.T) {
 		t.Fatalf("created = %d, want 2", len(created))
 	}
 
-	result, err := svc.Search(context.Background(), workspaceUUID, "标题怎么写", 5)
+	result, err := svc.Search(context.Background(), workspaceUUID, "标题怎么写", 5, pgtype.UUID{})
 	if err != nil {
 		t.Fatalf("search: %v", err)
 	}
@@ -230,8 +232,8 @@ func TestKnowledgeVectorSearchRanksByEmbedding(t *testing.T) {
 	if len(result.Hits) == 0 {
 		t.Fatal("vector search returned no hits")
 	}
-	if !strings.Contains(result.Hits[0].Entry.Title, "拆解与定方案") {
-		t.Fatalf("top hit = %q, want the leg whose handoff covers 标题", result.Hits[0].Entry.Title)
+	if !strings.Contains(result.Hits[0].Entry.Entry.Title, "拆解与定方案") {
+		t.Fatalf("top hit = %q, want the leg whose handoff covers 标题", result.Hits[0].Entry.Entry.Title)
 	}
 	if result.Hits[0].Score < 0.99 {
 		t.Fatalf("top score = %.3f, want ~1 for an aligned vector", result.Hits[0].Score)

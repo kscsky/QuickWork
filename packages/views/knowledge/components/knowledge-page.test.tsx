@@ -28,6 +28,9 @@ const { LIST, SEARCH } = vi.hoisted(() => {
     source_leg: 0,
     source_kind: "handoff",
     source_issue_id: "i-1",
+    embedding_profile_id: "p-1",
+    embedding_model: "text-embedding-v4",
+    embedding_dims: 1024,
   };
   return {
     LIST: {
@@ -47,13 +50,54 @@ const { LIST, SEARCH } = vi.hoisted(() => {
           title: "「拆解与定方案」这一棒怎么做的？",
           body: "把内容包拆成 3 篇笔记与 9 张图；标题不超过 20 字。",
           status: "draft",
+          embedding_profile_id: null,
+          embedding_model: "",
+          embedding_dims: null,
         },
       ],
       stats: { "summary:published": 1, "faq:published": 0, "faq:draft": 1 },
-      embedding: { enabled: false, model: "", dims: 1024 },
+      embedding: {
+        enabled: true,
+        profile_id: "p-1",
+        provider: "bailian",
+        model: "text-embedding-v4",
+        dims: 1024,
+      },
+      profiles: [
+        {
+          id: "p-1",
+          provider: "bailian",
+          base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+          model: "text-embedding-v4",
+          dims: 1024,
+          key_hint: "9f2c",
+          status: "verified",
+          last_error: "",
+          is_active: true,
+          created_at: now,
+          updated_at: now,
+        },
+      ],
+      corpora: [
+        {
+          profile_id: "p-1",
+          provider: "bailian",
+          model: "text-embedding-v4",
+          dims: 1024,
+          entries: 1,
+          active: true,
+        },
+      ],
+      unindexed: 1,
     },
     SEARCH: {
       mode: "keyword",
+      profile: {
+        id: "p-1",
+        provider: "bailian",
+        model: "text-embedding-v4",
+        dims: 1024,
+      },
       hits: [
         {
           entry: {
@@ -81,20 +125,33 @@ vi.mock("@quickwork/core/permissions", () => ({
   useCurrentMember: () => ({ role: "admin" }),
 }));
 vi.mock("@quickwork/core/knowledge/queries", () => ({
-  knowledgeListOptions: (wsId: string) => ({
-    queryKey: ["knowledge", wsId, "list"],
+  knowledgeListOptions: (wsId: string, dims?: unknown) => ({
+    queryKey: ["knowledge", wsId, "list", dims],
     queryFn: () => Promise.resolve(LIST),
   }),
-  knowledgeSearchOptions: (wsId: string, query: string) => ({
-    queryKey: ["knowledge", wsId, "search", query],
+  knowledgeSearchOptions: (wsId: string, query: string, _limit?: number, profileId?: string) => ({
+    queryKey: ["knowledge", wsId, "search", profileId, query],
     queryFn: () => Promise.resolve(SEARCH),
     enabled: query.trim().length > 0,
+  }),
+  knowledgeProfilesOptions: (wsId: string) => ({
+    queryKey: ["knowledge", wsId, "profiles"],
+    queryFn: () => Promise.resolve(LIST.profiles),
+  }),
+  embeddingProvidersOptions: (wsId: string) => ({
+    queryKey: ["knowledge", wsId, "providers"],
+    queryFn: () => Promise.resolve([]),
+    enabled: false,
   }),
 }));
 vi.mock("@quickwork/core/knowledge/mutations", () => ({
   usePublishKnowledgeEntry: () => ({ mutate: vi.fn(), isPending: false }),
   useArchiveKnowledgeEntry: () => ({ mutate: vi.fn(), isPending: false }),
   useReindexKnowledge: () => ({ mutate: vi.fn(), isPending: false }),
+  useMatchEmbeddingModels: () => ({ mutate: vi.fn(), isPending: false }),
+  useCreateEmbeddingProfile: () => ({ mutate: vi.fn(), isPending: false }),
+  useActivateEmbeddingProfile: () => ({ mutate: vi.fn(), isPending: false }),
+  useDeleteEmbeddingProfile: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
 const adapter: NavigationAdapter = {
@@ -134,9 +191,10 @@ describe("KnowledgePage", () => {
     expect(screen.getAllByText("Draft").length).toBeGreaterThan(0);
     // The draft publishes through the admin action next to it.
     expect(screen.getByRole("button", { name: "Publish" })).toBeInTheDocument();
-    expect(
-      screen.getByText("No embeddings · keyword fallback"),
-    ).toBeInTheDocument();
+    // Every entry is stamped with its corpus; the draft is unindexed.
+    expect(screen.getAllByText("1024 dims").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Unindexed").length).toBeGreaterThan(0);
+    expect(screen.getByText("text-embedding-v4")).toBeInTheDocument();
   });
 
   it("runs a keyword search when no embedding provider is configured", async () => {

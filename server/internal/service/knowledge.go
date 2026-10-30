@@ -24,9 +24,10 @@ import (
 // The knowledge base distils a finished relay into two things: one summary
 // document, and FAQ entries that later legs can retrieve. Composition is
 // deterministic — it reads the handoff packages the holders already approved —
-// so the memory cannot invent facts an agent never handed over. An optional
-// embedding provider turns the entries into vectors; without one the page falls
-// back to trigram search and embeddings stay pending.
+// so the memory cannot invent facts an agent never handed over. An entry is
+// embedded once, under the embedding profile chosen when it was deposited:
+// its model and dimension are part of the entry's identity, and retrieval
+// never compares vectors from different corpora.
 
 const (
 	KnowledgeKindSummary = "summary"
@@ -62,39 +63,135 @@ type KnowledgeEntryPreview struct {
 
 // KnowledgePreview is the composed summary document and its FAQ drafts.
 type KnowledgePreview struct {
-	Summary          string                  `json:"summary"`
-	Entries          []KnowledgeEntryPreview `json:"entries"`
-	EmbeddingEnabled bool                    `json:"embedding_enabled"`
-	EmbeddingModel   string                  `json:"embedding_model"`
-	EmbeddingDims    int                     `json:"embedding_dims"`
+	Summary            string                  `json:"summary"`
+	Entries            []KnowledgeEntryPreview `json:"entries"`
+	EmbeddingEnabled   bool                    `json:"embedding_enabled"`
+	EmbeddingProfileID string                  `json:"embedding_profile_id"`
+	EmbeddingProvider  string                  `json:"embedding_provider"`
+	EmbeddingModel     string                  `json:"embedding_model"`
+	EmbeddingDims      int                     `json:"embedding_dims"`
 }
 
-// KnowledgeHit is one search result with its score (cosine similarity or
-// trigram similarity depending on the mode).
-type KnowledgeHit struct {
+// KnowledgeEntryStamp is the dimension stamp copied from the embedding row.
+// A nil stamp means the entry is published but not indexed (keyword only).
+type KnowledgeEntryStamp struct {
+	ProfileID pgtype.UUID
+	Model     string
+	Dims      int32
+}
+
+type KnowledgeEntryRecord struct {
 	Entry db.KnowledgeEntry
+	Stamp *KnowledgeEntryStamp
+}
+
+type KnowledgeHit struct {
+	Entry KnowledgeEntryRecord
 	Score float64
 }
 
+type KnowledgeProfileRef struct {
+	ID       string `json:"id"`
+	Provider string `json:"provider"`
+	Model    string `json:"model"`
+	Dims     int    `json:"dims"`
+}
+
 type KnowledgeSearch struct {
-	Hits []KnowledgeHit
-	Mode string // "vector" | "keyword"
+	Hits    []KnowledgeHit
+	Mode    string // "vector" | "keyword"
+	Profile *KnowledgeProfileRef
+}
+
+type KnowledgeEmbeddingStatus struct {
+	Enabled   bool
+	ProfileID string
+	Provider  string
+	Model     string
+	Dims      int
 }
 
 type KnowledgeService struct {
 	Queries  *db.Queries
 	Embedder knowledge.Embedder
+	Profiles *EmbeddingProfileService
 }
 
 func NewKnowledgeService(q *db.Queries, embedder knowledge.Embedder) *KnowledgeService {
 	return &KnowledgeService{Queries: q, Embedder: embedder}
 }
 
-func (s *KnowledgeService) EmbeddingStatus() (bool, string, int) {
-	if s.Embedder == nil {
-		return false, "", knowledge.EmbeddingDims
+// EmbeddingStatus reports the corpus new deposits would join: the active
+// workspace profile, or the legacy environment embedder when a deployment
+// still relies on one.
+func (s *KnowledgeService) EmbeddingStatus(ctx context.Context, wsID pgtype.UUID) KnowledgeEmbeddingStatus {
+	row, resolved, err := s.embeddingTarget(ctx, wsID, pgtype.UUID{})
+	if err != nil {
+		slog.Warn("knowledge embedding status unavailable",
+			"workspace_id", util.UUIDToString(wsID), "error", err)
 	}
-	return true, s.Embedder.Model(), s.Embedder.Dims()
+	if row != nil {
+		return KnowledgeEmbeddingStatus{
+			Enabled:   resolved != nil,
+			ProfileID: util.UUIDToString(row.ID),
+			Provider:  row.Provider,
+			Model:     row.Model,
+			Dims:      int(row.Dims),
+		}
+	}
+	if resolved != nil {
+		return KnowledgeEmbeddingStatus{
+			Enabled:  true,
+			Provider: "env",
+			Model:    resolved.Model,
+			Dims:     resolved.Dims,
+		}
+	}
+	return KnowledgeEmbeddingStatus{Dims: knowledge.ColumnDims}
+}
+
+// embeddingTarget resolves the requested profile (or the active one) into a
+// row and a ready embedder. A broken key leaves the row in place but returns a
+// nil embedder: the page can still show the corpus and fall back to keyword.
+func (s *KnowledgeService) embeddingTarget(
+	ctx context.Context,
+	wsID, requested pgtype.UUID,
+) (*db.WorkspaceEmbeddingProfile, *ResolvedEmbedding, error) {
+	if s.Profiles != nil {
+		var row db.WorkspaceEmbeddingProfile
+		var err error
+		if requested.Valid {
+			row, err = s.Profiles.Get(ctx, wsID, requested)
+		} else {
+			row, err = s.Profiles.Active(ctx, wsID)
+			if errors.Is(err, ErrEmbeddingProfileNotFound) {
+				err = nil
+			}
+		}
+		if err != nil {
+			return nil, nil, err
+		}
+		if row.ID.Valid {
+			resolved, resolveErr := s.Profiles.Resolve(ctx, wsID, row.ID)
+			if resolveErr != nil {
+				slog.Warn("embedding profile could not be decrypted",
+					"profile_id", util.UUIDToString(row.ID), "error", resolveErr)
+				return &row, nil, nil
+			}
+			return &row, resolved, nil
+		}
+		if requested.Valid {
+			return nil, nil, ErrEmbeddingProfileNotFound
+		}
+	}
+	if s.Embedder != nil {
+		return nil, &ResolvedEmbedding{
+			Model:    s.Embedder.Model(),
+			Dims:     s.Embedder.Dims(),
+			Embedder: s.Embedder,
+		}, nil
+	}
+	return nil, nil, nil
 }
 
 // ComposeTaskKnowledge builds the summary document and the FAQ drafts from the
@@ -278,13 +375,15 @@ func (s *KnowledgeService) ComposeTaskKnowledge(ctx context.Context, issue db.Is
 		summary.WriteString("（没有未决问题。）\n")
 	}
 
-	embeddingEnabled, embeddingModel, embeddingDims := s.EmbeddingStatus()
+	status := s.EmbeddingStatus(ctx, issue.WorkspaceID)
 	preview := &KnowledgePreview{
-		Summary:          strings.TrimSpace(summary.String()) + "\n",
-		Entries:          entries,
-		EmbeddingEnabled: embeddingEnabled,
-		EmbeddingModel:   embeddingModel,
-		EmbeddingDims:    embeddingDims,
+		Summary:            strings.TrimSpace(summary.String()) + "\n",
+		Entries:            entries,
+		EmbeddingEnabled:   status.Enabled,
+		EmbeddingProfileID: status.ProfileID,
+		EmbeddingProvider:  status.Provider,
+		EmbeddingModel:     status.Model,
+		EmbeddingDims:      status.Dims,
 	}
 	// The summary document itself is always the first selectable entry.
 	preview.Entries = append([]KnowledgeEntryPreview{{
@@ -301,17 +400,25 @@ func (s *KnowledgeService) ComposeTaskKnowledge(ctx context.Context, issue db.Is
 
 // DepositTaskKnowledge writes the selected preview entries into the workspace
 // knowledge base. Publishing is the caller's role decision, checked by the
-// handler; drafts are inert until someone publishes them.
+// handler; drafts are inert until someone publishes them. A published entry is
+// stamped with the chosen profile and its dimension.
 func (s *KnowledgeService) DepositTaskKnowledge(
 	ctx context.Context,
 	issue db.Issue,
 	actorID pgtype.UUID,
 	keys []string,
 	publish bool,
-) ([]db.KnowledgeEntry, error) {
+	profileID pgtype.UUID,
+) ([]KnowledgeEntryRecord, error) {
 	preview, err := s.ComposeTaskKnowledge(ctx, issue)
 	if err != nil {
 		return nil, err
+	}
+	var resolved *ResolvedEmbedding
+	if publish {
+		if _, resolved, err = s.embeddingTarget(ctx, issue.WorkspaceID, profileID); err != nil {
+			return nil, err
+		}
 	}
 	selected := map[string]bool{}
 	for _, key := range keys {
@@ -321,7 +428,7 @@ func (s *KnowledgeService) DepositTaskKnowledge(
 	if publish {
 		status = KnowledgeStatusPublished
 	}
-	created := make([]db.KnowledgeEntry, 0, len(preview.Entries))
+	created := make([]KnowledgeEntryRecord, 0, len(preview.Entries))
 	for _, entry := range preview.Entries {
 		if len(selected) > 0 && !selected[entry.Key] {
 			continue
@@ -350,27 +457,78 @@ func (s *KnowledgeService) DepositTaskKnowledge(
 		if err != nil {
 			return nil, err
 		}
-		created = append(created, row)
+		record := KnowledgeEntryRecord{Entry: row}
+		if publish && resolved != nil {
+			if s.embedEntryBestEffort(ctx, row, resolved) {
+				record.Stamp = &KnowledgeEntryStamp{
+					ProfileID: resolved.ProfileID,
+					Model:     resolved.Model,
+					Dims:      int32(resolved.Dims),
+				}
+			}
+		}
+		created = append(created, record)
 	}
 	if len(created) == 0 {
 		return nil, ErrKnowledgeEmptySelection
 	}
-	if publish {
-		for _, entry := range created {
-			s.embedEntryBestEffort(ctx, entry)
-		}
-	}
 	return created, nil
 }
 
-// List returns the workspace's entries, newest first.
-func (s *KnowledgeService) List(ctx context.Context, wsID pgtype.UUID, status, kind string, limit int32) ([]db.KnowledgeEntry, error) {
-	return s.Queries.ListKnowledgeEntries(ctx, db.ListKnowledgeEntriesParams{
+// List returns the workspace's entries, newest first. dimsFilter is the corpus
+// selector: 0 = all, -1 = unindexed, positive = that embedding width.
+func (s *KnowledgeService) List(
+	ctx context.Context,
+	wsID pgtype.UUID,
+	status, kind string,
+	profileID pgtype.UUID,
+	dimsFilter int32,
+	limit int32,
+) ([]KnowledgeEntryRecord, error) {
+	rows, err := s.Queries.ListKnowledgeEntries(ctx, db.ListKnowledgeEntriesParams{
 		WorkspaceID: wsID,
 		Status:      status,
 		Kind:        kind,
+		ProfileID:   profileID,
+		DimsFilter:  dimsFilter,
 		RowLimit:    limit,
 	})
+	if err != nil {
+		return nil, err
+	}
+	out := make([]KnowledgeEntryRecord, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, KnowledgeEntryRecord{
+			Entry: db.KnowledgeEntry{
+				ID:            row.ID,
+				WorkspaceID:   row.WorkspaceID,
+				SquadID:       row.SquadID,
+				Kind:          row.Kind,
+				Title:         row.Title,
+				Body:          row.Body,
+				Tags:          row.Tags,
+				Status:        row.Status,
+				SourceIssueID: row.SourceIssueID,
+				SourceLeg:     row.SourceLeg,
+				SourceKind:    row.SourceKind,
+				CreatedBy:     row.CreatedBy,
+				PublishedBy:   row.PublishedBy,
+				PublishedAt:   row.PublishedAt,
+				UsageCount:    row.UsageCount,
+				CreatedAt:     row.CreatedAt,
+				UpdatedAt:     row.UpdatedAt,
+			},
+			Stamp: stampFromRow(row.EmbeddingProfileID, row.EmbeddingModel, row.EmbeddingDims),
+		})
+	}
+	return out, nil
+}
+
+func stampFromRow(profileID pgtype.UUID, model pgtype.Text, dims pgtype.Int4) *KnowledgeEntryStamp {
+	if !dims.Valid {
+		return nil
+	}
+	return &KnowledgeEntryStamp{ProfileID: profileID, Model: model.String, Dims: dims.Int32}
 }
 
 // Stats returns counts keyed as "<kind>:<status>", for the page's corpus card.
@@ -386,8 +544,8 @@ func (s *KnowledgeService) Stats(ctx context.Context, wsID pgtype.UUID) (map[str
 	return out, nil
 }
 
-// Publish flips a draft (or archived entry) to published and embeds it when a
-// provider is configured. The trgm fallback keeps it searchable regardless.
+// Publish flips a draft (or archived entry) to published and embeds it into
+// the active corpus. The trgm fallback keeps it searchable regardless.
 func (s *KnowledgeService) Publish(ctx context.Context, wsID, id, actorID pgtype.UUID) (db.KnowledgeEntry, error) {
 	row, err := s.Queries.SetKnowledgeEntryStatus(ctx, db.SetKnowledgeEntryStatusParams{
 		ID:          id,
@@ -401,7 +559,9 @@ func (s *KnowledgeService) Publish(ctx context.Context, wsID, id, actorID pgtype
 		}
 		return db.KnowledgeEntry{}, err
 	}
-	s.embedEntryBestEffort(ctx, row)
+	if _, resolved, err := s.embeddingTarget(ctx, wsID, pgtype.UUID{}); err == nil && resolved != nil {
+		s.embedEntryBestEffort(ctx, row, resolved)
+	}
 	return row, nil
 }
 
@@ -422,10 +582,16 @@ func (s *KnowledgeService) Archive(ctx context.Context, wsID, id, actorID pgtype
 	return row, nil
 }
 
-// Search retrieves published entries. Vector search is used when an embedder
-// is configured; a provider failure degrades to keyword instead of failing the
-// page. Drafts never surface here.
-func (s *KnowledgeService) Search(ctx context.Context, wsID pgtype.UUID, query string, limit int32) (KnowledgeSearch, error) {
+// Search retrieves published entries from one corpus. The requested profile
+// (or the active one) supplies both the query embedding and the profile
+// filter; a provider failure degrades to keyword inside the same corpus.
+func (s *KnowledgeService) Search(
+	ctx context.Context,
+	wsID pgtype.UUID,
+	query string,
+	limit int32,
+	profileID pgtype.UUID,
+) (KnowledgeSearch, error) {
 	query = strings.TrimSpace(query)
 	if query == "" {
 		return KnowledgeSearch{Hits: []KnowledgeHit{}, Mode: "keyword"}, nil
@@ -433,20 +599,58 @@ func (s *KnowledgeService) Search(ctx context.Context, wsID pgtype.UUID, query s
 	if limit <= 0 {
 		limit = 5
 	}
-	if s.Embedder != nil {
-		vectors, err := s.Embedder.Embed(ctx, []string{query})
+	profileRow, resolved, err := s.embeddingTarget(ctx, wsID, profileID)
+	if err != nil {
+		return KnowledgeSearch{}, err
+	}
+	result := KnowledgeSearch{Hits: []KnowledgeHit{}, Mode: "keyword"}
+	if profileRow != nil {
+		result.Profile = &KnowledgeProfileRef{
+			ID:       util.UUIDToString(profileRow.ID),
+			Provider: profileRow.Provider,
+			Model:    profileRow.Model,
+			Dims:     int(profileRow.Dims),
+		}
+	} else if resolved != nil {
+		result.Profile = &KnowledgeProfileRef{Provider: "env", Model: resolved.Model, Dims: resolved.Dims}
+	}
+
+	var corpusID pgtype.UUID
+	if profileRow != nil {
+		corpusID = profileRow.ID
+	}
+	if resolved != nil {
+		vectors, err := resolved.Embedder.Embed(ctx, []string{query})
 		if err == nil && len(vectors) == 1 {
+			literal, literalErr := vectorLiteral(vectors[0])
+			if literalErr != nil {
+				return KnowledgeSearch{}, literalErr
+			}
 			rows, err := s.Queries.SearchKnowledgeByVector(ctx, db.SearchKnowledgeByVectorParams{
 				WorkspaceID:    wsID,
-				QueryEmbedding: vectorLiteral(vectors[0]),
+				QueryEmbedding: literal,
+				Dims:           int32(resolved.Dims),
+				ProfileID:      resolved.ProfileID,
 				RowLimit:       limit,
 			})
 			if err == nil {
 				hits := make([]KnowledgeHit, 0, len(rows))
 				for _, row := range rows {
-					hits = append(hits, KnowledgeHit{Entry: rowToEntry(row), Score: row.Score})
+					hits = append(hits, KnowledgeHit{
+						Entry: KnowledgeEntryRecord{
+							Entry: vectorRowToEntry(row),
+							Stamp: &KnowledgeEntryStamp{
+								ProfileID: row.EmbeddingProfileID,
+								Model:     row.EmbeddingModel,
+								Dims:      row.EmbeddingDims,
+							},
+						},
+						Score: row.Score,
+					})
 				}
-				return KnowledgeSearch{Hits: hits, Mode: "vector"}, nil
+				result.Hits = hits
+				result.Mode = "vector"
+				return result, nil
 			}
 			slog.Warn("knowledge vector search failed; falling back to keyword",
 				"workspace_id", util.UUIDToString(wsID), "error", err)
@@ -458,6 +662,7 @@ func (s *KnowledgeService) Search(ctx context.Context, wsID pgtype.UUID, query s
 	rows, err := s.Queries.SearchKnowledgeByKeyword(ctx, db.SearchKnowledgeByKeywordParams{
 		WorkspaceID: wsID,
 		Terms:       knowledgeQueryTerms(query),
+		ProfileID:   corpusID,
 		RowLimit:    limit,
 	})
 	if err != nil {
@@ -465,15 +670,31 @@ func (s *KnowledgeService) Search(ctx context.Context, wsID pgtype.UUID, query s
 	}
 	hits := make([]KnowledgeHit, 0, len(rows))
 	for _, row := range rows {
-		hits = append(hits, KnowledgeHit{Entry: keywordRowToEntry(row), Score: row.Score})
+		hits = append(hits, KnowledgeHit{
+			Entry: KnowledgeEntryRecord{
+				Entry: keywordRowToEntry(row),
+				Stamp: stampFromRow(row.EmbeddingProfileID, row.EmbeddingModel, row.EmbeddingDims),
+			},
+			Score: row.Score,
+		})
 	}
-	return KnowledgeSearch{Hits: hits, Mode: "keyword"}, nil
+	result.Hits = hits
+	return result, nil
 }
 
-// ReembedMissing embeds published entries that have no vector yet (a provider
-// was configured after they were published). Returns the number embedded.
-func (s *KnowledgeService) ReembedMissing(ctx context.Context, wsID pgtype.UUID, limit int32) (int, error) {
-	if s.Embedder == nil {
+// ReembedMissing embeds published entries that have no vector yet. Entries
+// already stamped with another corpus are left alone: an entry belongs to
+// exactly one dimension.
+func (s *KnowledgeService) ReembedMissing(
+	ctx context.Context,
+	wsID, profileID pgtype.UUID,
+	limit int32,
+) (int, error) {
+	_, resolved, err := s.embeddingTarget(ctx, wsID, profileID)
+	if err != nil {
+		return 0, err
+	}
+	if resolved == nil {
 		return 0, nil
 	}
 	rows, err := s.Queries.ListKnowledgeEntriesMissingEmbedding(ctx, db.ListKnowledgeEntriesMissingEmbeddingParams{
@@ -485,31 +706,42 @@ func (s *KnowledgeService) ReembedMissing(ctx context.Context, wsID pgtype.UUID,
 	}
 	embedded := 0
 	for _, entry := range rows {
-		if s.embedEntryBestEffort(ctx, entry) {
+		if s.embedEntryBestEffort(ctx, entry, resolved) {
 			embedded++
 		}
 	}
 	return embedded, nil
 }
 
-func (s *KnowledgeService) embedEntryBestEffort(ctx context.Context, entry db.KnowledgeEntry) bool {
-	if s.Embedder == nil {
+func (s *KnowledgeService) embedEntryBestEffort(
+	ctx context.Context,
+	entry db.KnowledgeEntry,
+	resolved *ResolvedEmbedding,
+) bool {
+	if resolved == nil || resolved.Embedder == nil {
 		return false
 	}
 	embedCtx, cancel := context.WithTimeout(ctx, 20*time.Second)
 	defer cancel()
-	vectors, err := s.Embedder.Embed(embedCtx, []string{entry.Title + "\n\n" + entry.Body})
-	if err != nil || len(vectors) != 1 {
+	vectors, err := resolved.Embedder.Embed(embedCtx, []string{entry.Title + "\n\n" + entry.Body})
+	if err != nil || len(vectors) != 1 || len(vectors[0]) != resolved.Dims {
 		slog.Warn("knowledge entry could not be embedded",
 			"entry_id", util.UUIDToString(entry.ID), "error", err)
 		return false
 	}
-	hash := sha256.Sum256([]byte(s.Embedder.Model() + "\n" + entry.Title + "\n" + entry.Body))
+	literal, err := vectorLiteral(vectors[0])
+	if err != nil {
+		slog.Warn("knowledge embedding could not be encoded",
+			"entry_id", util.UUIDToString(entry.ID), "error", err)
+		return false
+	}
+	hash := sha256.Sum256([]byte(fmt.Sprintf("%s\n%d\n%s\n%s", resolved.Model, resolved.Dims, entry.Title, entry.Body)))
 	if err := s.Queries.UpsertKnowledgeEmbedding(ctx, db.UpsertKnowledgeEmbeddingParams{
 		EntryID:     entry.ID,
-		Model:       s.Embedder.Model(),
-		Dims:        int32(s.Embedder.Dims()),
-		Embedding:   vectorLiteral(vectors[0]),
+		ProfileID:   resolved.ProfileID,
+		Model:       resolved.Model,
+		Dims:        int32(resolved.Dims),
+		Embedding:   literal,
 		ContentHash: hex.EncodeToString(hash[:]),
 	}); err != nil {
 		slog.Warn("knowledge embedding could not be stored",
@@ -519,8 +751,8 @@ func (s *KnowledgeService) embedEntryBestEffort(ctx context.Context, entry db.Kn
 	return true
 }
 
-func rowToEntry(row db.SearchKnowledgeByVectorRow) db.KnowledgeEntry {
-	entry := db.KnowledgeEntry{
+func vectorRowToEntry(row db.SearchKnowledgeByVectorRow) db.KnowledgeEntry {
+	return db.KnowledgeEntry{
 		ID:            row.ID,
 		WorkspaceID:   row.WorkspaceID,
 		SquadID:       row.SquadID,
@@ -539,7 +771,6 @@ func rowToEntry(row db.SearchKnowledgeByVectorRow) db.KnowledgeEntry {
 		CreatedAt:     row.CreatedAt,
 		UpdatedAt:     row.UpdatedAt,
 	}
-	return entry
 }
 
 // knowledgeQueryTerms splits a question into searchable terms. Chinese has no
@@ -590,15 +821,25 @@ func keywordRowToEntry(row db.SearchKnowledgeByKeywordRow) db.KnowledgeEntry {
 	}
 }
 
-func vectorLiteral(values []float32) string {
+// vectorLiteral zero-pads the embedding to the physical column width. Padding
+// with zeros leaves cosine similarity unchanged, so vectors from a 512, 768 or
+// 1024-dimension model can share the 1536-wide HNSW index.
+func vectorLiteral(values []float32) (string, error) {
+	if len(values) > knowledge.ColumnDims {
+		return "", fmt.Errorf("embedding has %d dimensions, more than the %d-wide column", len(values), knowledge.ColumnDims)
+	}
 	var b strings.Builder
 	b.WriteByte('[')
-	for i, value := range values {
+	for i := 0; i < knowledge.ColumnDims; i++ {
 		if i > 0 {
 			b.WriteByte(',')
+		}
+		value := float32(0)
+		if i < len(values) {
+			value = values[i]
 		}
 		b.WriteString(strconv.FormatFloat(float64(value), 'f', 6, 32))
 	}
 	b.WriteByte(']')
-	return b.String()
+	return b.String(), nil
 }

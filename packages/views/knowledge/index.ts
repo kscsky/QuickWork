@@ -1,1 +1,1 @@
-export { KnowledgePage, DepositKnowledgeDialog } from "./components";
+export { KnowledgePage, DepositKnowledgeDialog, EmbeddingProfileDialog } from "./components";

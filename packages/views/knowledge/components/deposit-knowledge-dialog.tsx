@@ -6,7 +6,10 @@ import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import { useWorkspaceId } from "@quickwork/core/hooks";
 import { useCurrentMember } from "@quickwork/core/permissions";
-import { knowledgePreviewOptions } from "@quickwork/core/knowledge/queries";
+import {
+  knowledgePreviewOptions,
+  knowledgeProfilesOptions,
+} from "@quickwork/core/knowledge/queries";
 import { useDepositIssueKnowledge } from "@quickwork/core/knowledge/mutations";
 
 import { Button } from "@quickwork/ui/components/ui/button";
@@ -21,6 +24,7 @@ import {
 } from "@quickwork/ui/components/ui/dialog";
 import { cn } from "@quickwork/ui/lib/utils";
 import { useT } from "../../i18n";
+import { EmbeddingProfileDialog } from "./embedding-profile-dialog";
 
 /**
  * "Save to knowledge": the completion-time gate that turns a finished relay's
@@ -44,15 +48,39 @@ export function DepositKnowledgeDialog({
   const { data: preview, isPending, isError } = useQuery(
     knowledgePreviewOptions(issueId, open),
   );
+  const { data: profiles = [] } = useQuery({
+    ...knowledgeProfilesOptions(wsId),
+    enabled: open && !!wsId,
+  });
   const deposit = useDepositIssueKnowledge(wsId, issueId);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [publish, setPublish] = useState(canPublish);
+  const [profileId, setProfileId] = useState("");
+  const [profileDialogOpen, setProfileDialogOpen] = useState(false);
+
+  const activeProfile = profiles.find((profile) => profile.is_active) ?? null;
+  const selectedProfile =
+    profiles.find((profile) => profile.id === profileId) ?? activeProfile;
 
   useEffect(() => {
     if (!open || !preview) return;
     setSelected(new Set(preview.entries.map((entry) => entry.key)));
     setPublish(canPublish);
   }, [open, preview, canPublish]);
+
+  useEffect(() => {
+    if (!open) return;
+    if (!profiles.some((profile) => profile.id === profileId)) {
+      setProfileId(preview?.embedding_profile_id || activeProfile?.id || "");
+    }
+  }, [open, profiles, profileId, preview?.embedding_profile_id, activeProfile?.id]);
+
+  const providerLabel = (provider: string) =>
+    provider === "bailian"
+      ? t(($) => $.provider_bailian)
+      : provider === "openai"
+        ? t(($) => $.provider_openai)
+        : t(($) => $.provider_custom);
 
   const toggle = (key: string) => {
     setSelected((current) => {
@@ -65,7 +93,11 @@ export function DepositKnowledgeDialog({
 
   const submit = () => {
     deposit.mutate(
-      { keys: [...selected], publish },
+      {
+        keys: [...selected],
+        publish,
+        ...(publish && selectedProfile ? { profileId: selectedProfile.id } : {}),
+      },
       {
         onSuccess: () => {
           toast.success(t(($) => $.deposit_success));
@@ -145,6 +177,52 @@ export function DepositKnowledgeDialog({
               })}
             </section>
 
+            <section className="rounded-lg border border-surface-border bg-muted/20 p-3">
+              <div className="flex items-center gap-2">
+                <span className="font-mono text-micro uppercase tracking-wide text-muted-foreground">
+                  {t(($) => $.deposit_embedding)}
+                </span>
+                {canPublish ? (
+                  <button
+                    type="button"
+                    className="ml-auto text-micro font-medium text-brand hover:underline"
+                    onClick={() => setProfileDialogOpen(true)}
+                  >
+                    {t(($) => $.deposit_configure_model)}
+                  </button>
+                ) : null}
+              </div>
+              {profiles.length > 0 && selectedProfile ? (
+                <>
+                  <select
+                    value={selectedProfile.id}
+                    onChange={(event) => setProfileId(event.target.value)}
+                    aria-label={t(($) => $.deposit_embedding)}
+                    className="mt-2 h-8 w-full rounded-md border border-surface-border bg-background px-2 text-caption text-foreground"
+                  >
+                    {profiles.map((profile) => (
+                      <option key={profile.id} value={profile.id}>
+                        {providerLabel(profile.provider)} · {profile.model} · {profile.dims}{" "}
+                        {t(($) => $.dims_short)}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="mt-2 text-micro leading-relaxed text-muted-foreground">
+                    {publish
+                      ? t(($) => $.deposit_publish_stamp, {
+                          count: selected.size,
+                          dims: selectedProfile.dims,
+                        })
+                      : t(($) => $.deposit_profile_hint)}
+                  </p>
+                </>
+              ) : (
+                <p className="mt-2 text-micro leading-relaxed text-muted-foreground">
+                  {t(($) => $.deposit_profile_missing)}
+                </p>
+              )}
+            </section>
+
             {canPublish ? (
               <label className="flex w-fit items-center gap-2 text-caption text-muted-foreground">
                 <Checkbox
@@ -177,6 +255,13 @@ export function DepositKnowledgeDialog({
           </Button>
         </DialogFooter>
       </DialogContent>
+      <EmbeddingProfileDialog
+        wsId={wsId}
+        open={profileDialogOpen}
+        onOpenChange={setProfileDialogOpen}
+        canAdminister={canPublish}
+        onSaved={(profile) => setProfileId(profile.id)}
+      />
     </Dialog>
   );
 }

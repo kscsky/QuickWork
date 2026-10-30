@@ -2763,3 +2763,125 @@ describe("clientErrorMessage", () => {
     expect(clientErrorMessage(undefined)).toBeUndefined();
   });
 });
+
+describe("ApiClient knowledge corpora", () => {
+  const profile = {
+    id: "p-1",
+    provider: "bailian",
+    base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+    model: "text-embedding-v4",
+    dims: 1024,
+    key_hint: "9f2c",
+    status: "verified",
+    last_error: "",
+    is_active: true,
+    created_at: "2026-10-30T00:00:00Z",
+    updated_at: "2026-10-30T00:00:00Z",
+  };
+
+  it("parses corpus counts, profiles and dimension stamps", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          entries: [
+            {
+              id: "e-1",
+              workspace_id: "w-1",
+              kind: "faq",
+              title: "t",
+              body: "b",
+              tags: [],
+              status: "published",
+              created_by: "u-1",
+              created_at: "",
+              updated_at: "",
+              embedding_profile_id: "p-1",
+              embedding_model: "text-embedding-v4",
+              embedding_dims: 1024,
+            },
+          ],
+          stats: {},
+          embedding: {
+            enabled: true,
+            profile_id: "p-1",
+            provider: "bailian",
+            model: "text-embedding-v4",
+            dims: 1024,
+          },
+          profiles: [profile],
+          corpora: [
+            {
+              profile_id: "p-1",
+              provider: "bailian",
+              model: "text-embedding-v4",
+              dims: 1024,
+              entries: 1,
+              active: true,
+            },
+          ],
+          unindexed: 2,
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const client = new ApiClient("https://api.example.test");
+    const list = await client.listKnowledge({ dims: 1024 });
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain("dims=1024");
+    expect(list.corpora[0]?.dims).toBe(1024);
+    expect(list.profiles[0]?.is_active).toBe(true);
+    expect(list.entries[0]?.embedding_dims).toBe(1024);
+    expect(list.unindexed).toBe(2);
+  });
+
+  it("falls back to an empty list when the body is malformed", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ entries: "nope", corpora: "nope" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      ),
+    );
+    const client = new ApiClient("https://api.example.test");
+    const list = await client.listKnowledge();
+    expect(list.entries).toEqual([]);
+    expect(list.corpora).toEqual([]);
+    expect(list.profiles).toEqual([]);
+  });
+
+  it("sends the selected corpus with a search", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ mode: "keyword", hits: [] }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const client = new ApiClient("https://api.example.test");
+    await client.searchKnowledge("标题", 5, "p-1");
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain("profile_id=p-1");
+  });
+
+  it("rejects a profile create response without an id", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ provider: "bailian" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      ),
+    );
+    const client = new ApiClient("https://api.example.test");
+    await expect(
+      client.createEmbeddingProfile({
+        provider: "bailian",
+        model: "text-embedding-v4",
+        dims: 1024,
+        api_key: "sk-test",
+      }),
+    ).rejects.toThrow(/invalid embedding profile response/);
+  });
+});

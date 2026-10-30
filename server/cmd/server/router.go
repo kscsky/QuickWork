@@ -419,6 +419,11 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 	}
 	h := handler.New(queries, pool, hub, bus, emailSvc, store, cfSigner, analyticsClient, signupConfig, daemonHub)
 	h.Knowledge = service.NewKnowledgeService(queries, knowledge.EmbedderFromEnv())
+	cipher, cipherErr := knowledge.CipherFromEnv()
+	if cipherErr != nil {
+		slog.Warn("embedding profiles cannot store API keys until QUICKWORK_SECRET_KEY is set", "error", cipherErr)
+	}
+	h.Knowledge.Profiles = service.NewEmbeddingProfileService(queries, cipher)
 	invitationRateLimits := handler.DefaultInvitationRateLimits()
 	invitationRateLimits.Actor.Limit = envNonNegativeInt("RATE_LIMIT_INVITATION_ACTOR_10M", invitationRateLimits.Actor.Limit)
 	invitationRateLimits.Workspace.Limit = envNonNegativeInt("RATE_LIMIT_INVITATION_WORKSPACE_24H", invitationRateLimits.Workspace.Limit)
@@ -2216,10 +2221,18 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 			// reassign / skip) across the workspace, newest first.
 			r.Get("/api/activity", h.ListActivityEvents)
 
-			// Knowledge base: the squad's distilled memory.
+			// Knowledge base: the squad's distilled memory. Embedding profiles
+			// pin the model and dimension an entry is stamped with; a corpus is
+			// one profile's vectors, and retrieval never crosses corpora.
 			r.Get("/api/knowledge", h.ListKnowledge)
 			r.Get("/api/knowledge/search", h.SearchKnowledge)
 			r.Post("/api/knowledge/reindex", h.ReindexKnowledge)
+			r.Get("/api/knowledge/embedding-providers", h.ListEmbeddingProviders)
+			r.Get("/api/knowledge/profiles", h.ListEmbeddingProfiles)
+			r.Post("/api/knowledge/profiles", h.CreateEmbeddingProfile)
+			r.Post("/api/knowledge/profiles/match", h.MatchEmbeddingModels)
+			r.Post("/api/knowledge/profiles/{id}/activate", h.ActivateEmbeddingProfile)
+			r.Delete("/api/knowledge/profiles/{id}", h.DeleteEmbeddingProfile)
 			r.Post("/api/knowledge/{id}/publish", h.PublishKnowledgeEntry)
 			r.Post("/api/knowledge/{id}/archive", h.ArchiveKnowledgeEntry)
 

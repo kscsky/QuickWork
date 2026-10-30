@@ -123,6 +123,12 @@ export type {
 export type { InboxItem, InboxSeverity, InboxItemType, InboxWorkspaceUnread } from "./inbox";
 export type { RelayActivityAction, RelayActivityEvent } from "./activity";
 export type {
+  EmbeddingMatchResult,
+  EmbeddingModel,
+  EmbeddingProfile,
+  EmbeddingProfileInput,
+  EmbeddingProvider,
+  KnowledgeCorpus,
   KnowledgeEntry,
   KnowledgeEmbeddingStatus,
   KnowledgeHit,
@@ -130,6 +136,7 @@ export type {
   KnowledgeListResponse,
   KnowledgePreview,
   KnowledgePreviewEntry,
+  KnowledgeProfileRef,
   KnowledgeSearchResponse,
   KnowledgeStatus,
 } from "./knowledge";

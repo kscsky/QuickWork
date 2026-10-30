@@ -4,12 +4,13 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Loader2, Search } from "lucide-react";
-import type { KnowledgeEntry } from "@quickwork/core/types";
+import type { EmbeddingProfile, KnowledgeCorpus, KnowledgeEntry } from "@quickwork/core/types";
 import { useWorkspaceId } from "@quickwork/core/hooks";
 import { useWorkspacePaths } from "@quickwork/core/paths";
 import { useCurrentMember } from "@quickwork/core/permissions";
 import {
   knowledgeListOptions,
+  knowledgeProfilesOptions,
   knowledgeSearchOptions,
 } from "@quickwork/core/knowledge/queries";
 import {
@@ -20,8 +21,12 @@ import {
 
 import { AppLink } from "../../navigation";
 import { useT } from "../../i18n";
+import { EmbeddingProfileDialog } from "./embedding-profile-dialog";
 
 type Filter = "all" | "published" | "draft" | "archived";
+/** A corpus is an embedding profile, not a bare dimension: two models can
+ *  produce the same width and their vectors are still incomparable. */
+type Corpus = string | "unindexed" | null;
 
 const FILTERS: Filter[] = ["all", "published", "draft", "archived"];
 
@@ -34,11 +39,15 @@ function plainPreview(body: string, limit = 240): string {
     .slice(0, limit);
 }
 
+function providerMark(provider: string): string {
+  return provider === "openai" ? "O" : provider === "bailian" ? "百" : "⌁";
+}
+
 /**
  * The workspace knowledge base. A finished relay deposits one summary
- * document plus FAQ drafts; this page lists them, searches them (vector when
- * an embedding provider is configured, trigram otherwise), and lets an owner
- * publish or archive entries. Drafts never surface in retrieval.
+ * document plus FAQ drafts. Every published entry is stamped with the
+ * embedding profile it was deposited under, so the list, search and the
+ * agent all operate on one dimension's corpus at a time.
  */
 export function KnowledgePage() {
   const { t } = useT("knowledge");
@@ -47,26 +56,53 @@ export function KnowledgePage() {
   const { role } = useCurrentMember(wsId);
   const canAdminister = role === "owner" || role === "admin";
   const [filter, setFilter] = useState<Filter>("all");
+  const [corpus, setCorpus] = useState<Corpus>(null);
   const [draftQuery, setDraftQuery] = useState("");
   const [query, setQuery] = useState("");
+  const [profileDialogOpen, setProfileDialogOpen] = useState(false);
 
-  const { data, isPending } = useQuery(knowledgeListOptions(wsId));
+  const { data: profileData = [] } = useQuery(knowledgeProfilesOptions(wsId));
+  const activeProfile = profileData.find((profile) => profile.is_active) ?? null;
+  const effectiveCorpus: Corpus = corpus ?? activeProfile?.id ?? null;
+  const { data, isPending } = useQuery(
+    knowledgeListOptions(wsId, effectiveCorpus),
+  );
+  const profiles = data?.profiles?.length ? data.profiles : profileData;
+  const corpora = useMemo(() => data?.corpora ?? [], [data?.corpora]);
+  const unindexed = data?.unindexed ?? 0;
+  const selectedProfile =
+    typeof effectiveCorpus === "string"
+      ? profiles.find((profile) => profile.id === effectiveCorpus) ?? null
+      : null;
+  const searchProfileId = selectedProfile?.id ?? activeProfile?.id;
   const { data: search, isFetching: searching } = useQuery(
-    knowledgeSearchOptions(wsId, query),
+    knowledgeSearchOptions(wsId, query, 5, searchProfileId),
   );
   const publishEntry = usePublishKnowledgeEntry(wsId);
   const archiveEntry = useArchiveKnowledgeEntry(wsId);
   const reindex = useReindexKnowledge(wsId);
 
-  const entries = data?.entries ?? [];
-  const stats = data?.stats ?? {};
-  const embedding = data?.embedding ?? { enabled: false, model: "", dims: 0 };
+  const entries = useMemo(() => data?.entries ?? [], [data?.entries]);
+  const stats = useMemo(() => data?.stats ?? {}, [data?.stats]);
   const visible = useMemo(
     () => (filter === "all" ? entries : entries.filter((entry) => entry.status === filter)),
     [entries, filter],
   );
   const searchingNow = query.trim().length > 0;
-
+  const publishedTotal = useMemo(
+    () =>
+      Object.entries(stats)
+        .filter(([key]) => key.endsWith(":published"))
+        .reduce((sum, [, count]) => sum + count, 0),
+    [stats],
+  );
+  const dimsMultiplicity = useMemo(() => {
+    const counts = new Map<number, number>();
+    for (const group of corpora) {
+      counts.set(group.dims, (counts.get(group.dims) ?? 0) + 1);
+    }
+    return counts;
+  }, [corpora]);
   const drafts = useMemo(
     () => (stats["faq:draft"] ?? 0) + (stats["summary:draft"] ?? 0),
     [stats],
@@ -79,6 +115,15 @@ export function KnowledgePage() {
         : status === "archived"
           ? t(($) => $.status_archived)
           : status;
+
+  const providerLabel = (provider: string) =>
+    provider === "bailian"
+      ? t(($) => $.provider_bailian)
+      : provider === "openai"
+        ? t(($) => $.provider_openai)
+        : provider === "env"
+          ? t(($) => $.provider_env)
+          : t(($) => $.provider_custom);
 
   const submitSearch = () => {
     setQuery(draftQuery.trim());
@@ -99,7 +144,7 @@ export function KnowledgePage() {
   };
 
   const handleReindex = () => {
-    reindex.mutate(undefined, {
+    reindex.mutate(selectedProfile?.id ?? activeProfile?.id, {
       onSuccess: (result) =>
         toast.success(t(($) => $.reindex_done, { count: result.embedded })),
       onError: () => toast.error(t(($) => $.deposit_failed)),
@@ -113,6 +158,11 @@ export function KnowledgePage() {
           {entry.kind === "summary" ? t(($) => $.kind_summary) : t(($) => $.kind_faq)}
         </span>
         <span className="kb-tag">{statusLabel(entry.status)}</span>
+        <span className="kb-tag dim">
+          {entry.embedding_dims
+            ? t(($) => $.dimension_badge, { dims: entry.embedding_dims })
+            : t(($) => $.unindexed_badge)}
+        </span>
         {typeof score === "number" && search?.mode === "vector" ? (
           <span className="kb-score">
             {t(($) => $.similarity, { score: score.toFixed(2) })}
@@ -150,6 +200,31 @@ export function KnowledgePage() {
       </div>
     </article>
   );
+
+  const selectCorpus = (next: Corpus) => {
+    setCorpus(next);
+    if (filter === "draft") setFilter("all");
+  };
+
+  const corpusButton = (group: KnowledgeCorpus) => (
+    <button
+      key={group.profile_id}
+      type="button"
+      title={`${group.model} · ${group.entries}`}
+      className={effectiveCorpus === group.profile_id ? "on" : undefined}
+      onClick={() => selectCorpus(group.profile_id)}
+    >
+      {t(($) => $.corpus_dims, { dims: group.dims })}
+      {(dimsMultiplicity.get(group.dims) ?? 0) > 1 ? ` · ${group.model}` : ""}
+      <em>{group.entries}</em>
+    </button>
+  );
+
+  const modelProfile: EmbeddingProfile | null = selectedProfile ?? activeProfile;
+  const activeCorpusEntries = modelProfile
+    ? corpora.find((group) => group.profile_id === modelProfile.id)?.entries ?? 0
+    : 0;
+  const coverage = publishedTotal > 0 ? publishedTotal : Math.max(activeCorpusEntries + unindexed, 1);
 
   return (
     <div className="kb-main">
@@ -191,13 +266,33 @@ export function KnowledgePage() {
           </button>
         </div>
 
-        {searchingNow ? (
-          <p className="kb-mode">
-            {search?.mode === "vector"
-              ? t(($) => $.mode_vector, { model: embedding.model })
-              : t(($) => $.mode_keyword)}
-          </p>
-        ) : null}
+        <div className="kb-mode-line">
+          <span className="tag">
+            {searchingNow ? (search?.mode === "vector" ? "VECTOR" : "KEYWORD") : "CORPUS"}
+          </span>
+          <span>
+            {searchingNow
+              ? search?.mode === "vector" && search.profile
+                ? t(($) => $.mode_profile, {
+                    provider: providerLabel(search.profile.provider),
+                    model: search.profile.model,
+                    dims: search.profile.dims,
+                  })
+                : t(($) => $.mode_keyword)
+              : modelProfile
+                ? t(($) => $.mode_profile, {
+                    provider: providerLabel(modelProfile.provider),
+                    model: modelProfile.model,
+                    dims: modelProfile.dims,
+                  })
+                : t(($) => $.model_unconfigured)}
+          </span>
+          <em>
+            {searchingNow
+              ? t(($) => $.results, { count: search?.hits.length ?? 0 })
+              : t(($) => $.list_count, { count: visible.length })}
+          </em>
+        </div>
 
         <div className="kb-body">
           <div>
@@ -225,7 +320,10 @@ export function KnowledgePage() {
                       key={value}
                       type="button"
                       className={filter === value ? "kb-filter on" : "kb-filter"}
-                      onClick={() => setFilter(value)}
+                      onClick={() => {
+                        setFilter(value);
+                        if (value === "draft") setCorpus("unindexed");
+                      }}
                     >
                       {value === "all"
                         ? t(($) => $.filter_all)
@@ -253,6 +351,83 @@ export function KnowledgePage() {
 
           <aside className="kb-side">
             <section className="kb-card">
+              <div className="kb-label">{t(($) => $.model_title)}</div>
+              {modelProfile ? (
+                <>
+                  <div className="kb-em-top">
+                    <span className="kb-em-mark">{providerMark(modelProfile.provider)}</span>
+                    <span className="kb-em-name">
+                      <b>{modelProfile.model}</b>
+                      <em>
+                        {providerLabel(modelProfile.provider)} · {modelProfile.dims}{" "}
+                        {t(($) => $.dims_short)}
+                      </em>
+                    </span>
+                    <i className="kb-em-dot" />
+                  </div>
+                  <div className="kb-em-key">
+                    <span>{t(($) => $.model_key)}</span>
+                    <code>••••{modelProfile.key_hint}</code>
+                    <span className="ok">{t(($) => $.model_verified)}</span>
+                  </div>
+                </>
+              ) : (
+                <p className="kb-corpus-hint">{t(($) => $.model_unconfigured)}</p>
+              )}
+
+              <div className="kb-em-corpus">
+                {corpora.map((group) => corpusButton(group))}
+                <button
+                  type="button"
+                  className={effectiveCorpus === "unindexed" ? "on" : undefined}
+                  onClick={() => selectCorpus("unindexed")}
+                >
+                  {t(($) => $.unindexed_badge)}
+                  <em>{unindexed}</em>
+                </button>
+              </div>
+
+              {modelProfile ? (
+                <div className="kb-em-cover">
+                  <div className="row">
+                    <span>{t(($) => $.model_coverage, { dims: modelProfile.dims })}</span>
+                    <b>
+                      {activeCorpusEntries} / {coverage}
+                    </b>
+                  </div>
+                  <span className="bar">
+                    <i style={{ width: `${Math.min(100, (activeCorpusEntries / coverage) * 100)}%` }} />
+                  </span>
+                </div>
+              ) : null}
+
+              {canAdminister ? (
+                <div className="kb-em-actions">
+                  <button
+                    type="button"
+                    className="kb-rebuild"
+                    onClick={() => setProfileDialogOpen(true)}
+                  >
+                    {modelProfile ? t(($) => $.model_change) : t(($) => $.model_configure)}
+                  </button>
+                  {modelProfile ? (
+                    <button
+                      type="button"
+                      className="kb-rebuild"
+                      disabled={reindex.isPending}
+                      onClick={handleReindex}
+                    >
+                      {reindex.isPending
+                        ? t(($) => $.model_reindexing)
+                        : t(($) => $.model_reindex)}
+                    </button>
+                  ) : null}
+                </div>
+              ) : null}
+              <p className="kb-corpus-hint">{t(($) => $.corpus_hint)}</p>
+            </section>
+
+            <section className="kb-card">
               <div className="kb-label">{t(($) => $.corpus)}</div>
               <div className="kb-stat">
                 <span>{t(($) => $.corpus_summary)}</span>
@@ -266,7 +441,12 @@ export function KnowledgePage() {
                 <span>{t(($) => $.filter_draft)}</span>
                 <b>{drafts}</b>
               </div>
+              <div className="kb-stat">
+                <span>{t(($) => $.unindexed_badge)}</span>
+                <b>{unindexed}</b>
+              </div>
             </section>
+
             <section className="kb-card">
               <div className="kb-label">{t(($) => $.ingest)}</div>
               <div className="kb-rule"><span className="n">01</span><span>{t(($) => $.ingest_1)}</span></div>
@@ -278,31 +458,17 @@ export function KnowledgePage() {
               <div className="kb-rule"><span className="n">01</span><span>{t(($) => $.retrieve_1)}</span></div>
               <div className="kb-rule"><span className="n">02</span><span>{t(($) => $.retrieve_2)}</span></div>
             </section>
-            <section className="kb-card">
-              <div className="kb-label">{t(($) => $.index)}</div>
-              <div className="kb-index">
-                <i className={embedding.enabled ? "" : "off"} />
-                <span>
-                  {embedding.enabled
-                    ? t(($) => $.index_on, { model: embedding.model, dims: embedding.dims })
-                    : t(($) => $.index_off)}
-                </span>
-                {canAdminister && embedding.enabled ? (
-                  <button
-                    type="button"
-                    className="kb-rebuild"
-                    disabled={reindex.isPending}
-                    onClick={handleReindex}
-                  >
-                    {reindex.isPending ? t(($) => $.reindex_pending) : t(($) => $.reindex)}
-                  </button>
-                ) : null}
-              </div>
-            </section>
             <p className="kb-note">{t(($) => $.note)}</p>
           </aside>
         </div>
       </div>
+
+      <EmbeddingProfileDialog
+        wsId={wsId}
+        open={profileDialogOpen}
+        onOpenChange={setProfileDialogOpen}
+        canAdminister={canAdminister}
+      />
     </div>
   );
 }

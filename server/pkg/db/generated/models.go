@@ -968,6 +968,7 @@ type IssueViewPreference struct {
 
 type KnowledgeEmbedding struct {
 	EntryID     pgtype.UUID        `json:"entry_id"`
+	ProfileID   pgtype.UUID        `json:"profile_id"`
 	Model       string             `json:"model"`
 	Dims        int32              `json:"dims"`
 	Embedding   string             `json:"embedding"`
@@ -1618,6 +1619,24 @@ type Workspace struct {
 	AvatarUrl    pgtype.Text        `json:"avatar_url"`
 	// When TRUE, an agent run that resolves to no precise accountable human (would be owner_fallback) is refused at enqueue instead of degrading to the agent owner (MUL-4302 §3.5). Default FALSE = owner_fallback. Never affects authorization (originator_user_id).
 	AttributionFailClosed bool `json:"attribution_fail_closed"`
+}
+
+type WorkspaceEmbeddingProfile struct {
+	ID            pgtype.UUID        `json:"id"`
+	WorkspaceID   pgtype.UUID        `json:"workspace_id"`
+	Provider      string             `json:"provider"`
+	BaseUrl       string             `json:"base_url"`
+	Model         string             `json:"model"`
+	Dims          int32              `json:"dims"`
+	ApiKeyCipher  string             `json:"api_key_cipher"`
+	KeyHint       string             `json:"key_hint"`
+	Status        string             `json:"status"`
+	LastError     string             `json:"last_error"`
+	IsActive      bool               `json:"is_active"`
+	CreatedBy     pgtype.UUID        `json:"created_by"`
+	CreatedAt     pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
+	LastCheckedAt pgtype.Timestamptz `json:"last_checked_at"`
 }
 
 type WorkspaceInvitation struct {
