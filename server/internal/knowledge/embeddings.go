@@ -126,11 +126,28 @@ func (e *openAIEmbedder) Embed(ctx context.Context, texts []string) ([][]float32
 	if len(texts) == 0 {
 		return nil, nil
 	}
+	withDimensions := supportsDimensions(e.model)
+	vectors, err := e.embedOnce(ctx, texts, withDimensions)
+	if err != nil && withDimensions && isDimensionsUnsupported(err) {
+		// Some OpenAI-compatible gateways (notably LiteLLM's embedding
+		// handler) reject `dimensions` even when the target model supports it.
+		// Retry once with the model's native width; the length check below
+		// still rejects a width that does not match the selected profile.
+		retried, retryErr := e.embedOnce(ctx, texts, false)
+		if retryErr == nil {
+			return retried, nil
+		}
+		return nil, fmt.Errorf("%v; retrying without the dimensions parameter also failed: %v", err, retryErr)
+	}
+	return vectors, err
+}
+
+func (e *openAIEmbedder) embedOnce(ctx context.Context, texts []string, withDimensions bool) ([][]float32, error) {
 	reqBody := embeddingRequest{Model: e.model, Input: texts}
 	// Matryoshka models accept an explicit width. Other models are expected to
 	// return `dims` natively; a mismatch is rejected below with an actionable
 	// error instead of writing a vector the column cannot hold.
-	if supportsDimensions(e.model) {
+	if withDimensions {
 		reqBody.Dimensions = e.dims
 	}
 	payload, err := json.Marshal(reqBody)
@@ -184,6 +201,13 @@ func (e *openAIEmbedder) Embed(ctx context.Context, texts []string) ([][]float32
 		vectors[index] = item.Embedding
 	}
 	return vectors, nil
+}
+
+func isDimensionsUnsupported(err error) bool {
+	message := strings.ToLower(err.Error())
+	return strings.Contains(message, "dimensions is not supported") ||
+		strings.Contains(message, "unsupportedparams") ||
+		strings.Contains(message, "setting dimensions")
 }
 
 func supportsDimensions(model string) bool {
