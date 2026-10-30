@@ -31,6 +31,7 @@ import type {
   InboxItem,
   InboxWorkspaceUnread,
   EmbeddingMatchResult,
+  IssueKnowledgeStatus,
   KnowledgeListResponse,
   KnowledgePreview,
   KnowledgeSearchResponse,
@@ -2879,6 +2880,7 @@ export const KnowledgeSearchSchema = z
 export const KnowledgePreviewSchema = z
   .object({
     summary: z.string().default(""),
+    source: z.string().default("relay"),
     entries: z
       .array(
         z
@@ -2940,10 +2942,23 @@ export const EMPTY_KNOWLEDGE_LIST: KnowledgeListResponse = {
 export const EMPTY_KNOWLEDGE_SEARCH: KnowledgeSearchResponse = { mode: "keyword", hits: [] };
 export const EMPTY_KNOWLEDGE_PREVIEW: KnowledgePreview = {
   summary: "",
+  source: "relay",
   entries: [],
   embedding_enabled: false,
   embedding_model: "",
   embedding_dims: 0,
+};
+
+export const IssueKnowledgeStatusSchema = z
+  .object({
+    deposited: z.boolean().default(false),
+    entries: z.number().default(0),
+  })
+  .loose();
+
+export const EMPTY_ISSUE_KNOWLEDGE_STATUS: IssueKnowledgeStatus = {
+  deposited: false,
+  entries: 0,
 };
 export const EMPTY_EMBEDDING_MATCH: EmbeddingMatchResult = {
   provider: "",

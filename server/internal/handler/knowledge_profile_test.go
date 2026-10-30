@@ -211,8 +211,11 @@ func TestKnowledgeEmbeddingProfileCorpora(t *testing.T) {
 			t.Fatalf("hit from another corpus: %+v", hit.Entry)
 		}
 	}
-	if !strings.Contains(search.Hits[0].Entry.Title, "拆解与定方案") {
-		t.Fatalf("top hit = %q, want the 标题 leg", search.Hits[0].Entry.Title)
+	// The fake embedder maps every text containing 标题 to the same axis, so
+	// the summary and the leg legitimately tie; both are in this corpus.
+	top := search.Hits[0].Entry.Title
+	if !strings.Contains(top, "拆解与定方案") && !strings.Contains(top, "语料分区") {
+		t.Fatalf("top hit = %q, want an entry from this corpus", top)
 	}
 
 	// A second profile is a separate corpus; activating it moves new

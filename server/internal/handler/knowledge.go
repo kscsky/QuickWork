@@ -267,6 +267,30 @@ func (h *Handler) SearchKnowledge(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, resp)
 }
 
+type IssueKnowledgeStatusResponse struct {
+	Deposited bool  `json:"deposited"`
+	Entries   int64 `json:"entries"`
+}
+
+func (h *Handler) IssueKnowledgeStatus(w http.ResponseWriter, r *http.Request) {
+	issue, ok := h.loadIssueForUser(w, r, chi.URLParam(r, "id"))
+	if !ok {
+		return
+	}
+	count, err := h.Queries.CountKnowledgeEntriesBySourceIssue(r.Context(), db.CountKnowledgeEntriesBySourceIssueParams{
+		WorkspaceID:   issue.WorkspaceID,
+		SourceIssueID: issue.ID,
+	})
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to read knowledge status")
+		return
+	}
+	writeJSON(w, http.StatusOK, IssueKnowledgeStatusResponse{
+		Deposited: count > 0,
+		Entries:   count,
+	})
+}
+
 func (h *Handler) PreviewIssueKnowledge(w http.ResponseWriter, r *http.Request) {
 	issue, ok := h.loadIssueForUser(w, r, chi.URLParam(r, "id"))
 	if !ok {
@@ -278,7 +302,7 @@ func (h *Handler) PreviewIssueKnowledge(w http.ResponseWriter, r *http.Request) 
 		case errors.Is(err, service.ErrKnowledgeNoChain):
 			writeError(w, http.StatusBadRequest, "this task has no relay to distil")
 		case errors.Is(err, service.ErrKnowledgeTaskNotDone):
-			writeError(w, http.StatusConflict, "finish the relay before distilling it")
+			writeError(w, http.StatusConflict, "finish the task before distilling it")
 		default:
 			writeError(w, http.StatusInternalServerError, "failed to compose knowledge")
 		}
@@ -336,7 +360,7 @@ func (h *Handler) DepositIssueKnowledge(w http.ResponseWriter, r *http.Request) 
 		case errors.Is(err, service.ErrKnowledgeNoChain):
 			writeError(w, http.StatusBadRequest, "this task has no relay to distil")
 		case errors.Is(err, service.ErrKnowledgeTaskNotDone):
-			writeError(w, http.StatusConflict, "finish the relay before distilling it")
+			writeError(w, http.StatusConflict, "finish the task before distilling it")
 		case errors.Is(err, service.ErrKnowledgeEmptySelection):
 			writeError(w, http.StatusBadRequest, "select at least one knowledge entry")
 		case errors.Is(err, service.ErrEmbeddingProfileNotFound):

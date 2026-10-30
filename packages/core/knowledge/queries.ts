@@ -3,6 +3,7 @@ import { api } from "../api";
 import type {
   EmbeddingProfile,
   EmbeddingProvider,
+  IssueKnowledgeStatus,
   KnowledgeListResponse,
   KnowledgePreview,
   KnowledgeSearchResponse,
@@ -19,6 +20,7 @@ export const knowledgeKeys = {
   /** The deposit preview is keyed by issue, not workspace: it is the task's
    *  own distillation and must not be reused across tasks. */
   preview: (issueId: string) => ["knowledge", "preview", issueId] as const,
+  issueStatus: (issueId: string) => ["knowledge", "issue-status", issueId] as const,
 };
 
 export function knowledgeListOptions(
@@ -70,6 +72,15 @@ export function embeddingProvidersOptions(wsId: string) {
     queryFn: () => api.listEmbeddingProviders(),
     enabled: !!wsId,
     staleTime: 300_000,
+  });
+}
+
+export function issueKnowledgeStatusOptions(issueId: string, enabled = true) {
+  return queryOptions<IssueKnowledgeStatus>({
+    queryKey: knowledgeKeys.issueStatus(issueId),
+    queryFn: () => api.getIssueKnowledgeStatus(issueId),
+    enabled: enabled && !!issueId,
+    staleTime: 0,
   });
 }
 

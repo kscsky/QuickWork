@@ -46,6 +46,7 @@ import type {
   EmbeddingProfile,
   EmbeddingProfileInput,
   EmbeddingProvider,
+  IssueKnowledgeStatus,
   KnowledgeEntry,
   KnowledgeListResponse,
   KnowledgePreview,
@@ -384,6 +385,8 @@ import {
   KnowledgeSearchSchema,
   KnowledgePreviewSchema,
   KnowledgeEntrySchema,
+  IssueKnowledgeStatusSchema,
+  EMPTY_ISSUE_KNOWLEDGE_STATUS,
   EmbeddingProfileSchema,
   EmbeddingProviderSchema,
   EmbeddingMatchSchema,
@@ -2290,7 +2293,15 @@ export class ApiClient {
     });
   }
 
-  /** Compose the summary document + FAQ drafts for a finished relay. */
+  /** Whether this task already deposited knowledge, for the completion card. */
+  async getIssueKnowledgeStatus(issueId: string): Promise<IssueKnowledgeStatus> {
+    const raw = await this.fetch<unknown>(`/api/issues/${issueId}/knowledge/status`);
+    return parseWithFallback(raw, IssueKnowledgeStatusSchema, EMPTY_ISSUE_KNOWLEDGE_STATUS, {
+      endpoint: "GET /api/issues/:id/knowledge/status",
+    });
+  }
+
+  /** Compose the summary document + FAQ drafts for a finished task. */
   async previewIssueKnowledge(issueId: string): Promise<KnowledgePreview> {
     const raw = await this.fetch<unknown>(`/api/issues/${issueId}/knowledge/preview`, {
       method: "POST",

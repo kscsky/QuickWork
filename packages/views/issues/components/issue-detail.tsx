@@ -110,7 +110,7 @@ import { SubIssuesAgentWorkingChip } from "./sub-issues-agent-working-chip";
 import { LocalDirectoryHint } from "../../projects/components/local-directory-hint";
 import { CommentCard } from "./comment-card";
 import { ChainAdminBar, ChainHaltBar, ChainParkedBar, ChainStateTag, LockedLegBlock, RoomMessage } from "./squad-room";
-import { DepositKnowledgeDialog } from "../../knowledge/components";
+import { DepositCompletionCard } from "../../knowledge/components";
 import { chainStateKey, latestLegRun, legRunTasks, selectProducedLegComment, stepRunState } from "./chain-run-state";
 import { LegRunLive } from "./leg-run-live";
 import { deriveRelayView } from "./chain-run-state";
@@ -1219,7 +1219,6 @@ export function IssueDetail({ issueId, layout = "legacy", onDelete, onDone, high
   // (the reader's own unfinished leg — their task IS that subtask), "parent"
   // = explicitly back at the parent, a number = that leg's own page.
   const [openLeg, setOpenLeg] = useState<number | "parent" | null>(null);
-  const [depositKnowledgeOpen, setDepositKnowledgeOpen] = useState(false);
   useEffect(() => {
     setOpenLeg(null);
   }, [id]);
@@ -4982,15 +4981,6 @@ export function IssueDetail({ issueId, layout = "legacy", onDelete, onDone, high
               : t(($) => $.room.handoff_extract)}
           </button>
         ) : null}
-        {relayView?.done ? (
-          <button
-            type="button"
-            className="rd-secondary"
-            onClick={() => setDepositKnowledgeOpen(true)}
-          >
-            {t(($) => $.room.deposit_knowledge)}
-          </button>
-        ) : null}
         <button
           type="button"
           className="rd-delete"
@@ -5154,6 +5144,17 @@ export function IssueDetail({ issueId, layout = "legacy", onDelete, onDone, high
       />
     ) : null;
 
+  const relayComplete = relayView?.done === true;
+  const soloComplete =
+    !isRoom && issue ? issueBehavesAs(issue, "done") : false;
+  const refreshDepositCard =
+    relayComplete || soloComplete ? (
+      <DepositCompletionCard
+        issueId={id}
+        source={relayComplete ? "relay" : "solo"}
+      />
+    ) : null;
+
   const refreshBody = (
     <div className="rd-enter" key={`${id}:${refreshStep?.id ?? "solo"}`}>
       {refreshHeader}
@@ -5167,6 +5168,7 @@ export function IssueDetail({ issueId, layout = "legacy", onDelete, onDone, high
           {refreshOutputSection}
           {refreshDiscussion}
           {refreshHalt}
+          {refreshDepositCard}
         </div>
         <aside className="rd-rail">
           {refreshStep ? refreshSquadRail : refreshSoloRail}
@@ -5696,11 +5698,6 @@ export function IssueDetail({ issueId, layout = "legacy", onDelete, onDone, high
   return (
     <div className="flex flex-1 min-h-0">
       {detailContent}
-      <DepositKnowledgeDialog
-        issueId={id}
-        open={depositKnowledgeOpen}
-        onOpenChange={setDepositKnowledgeOpen}
-      />
     </div>
   );
 }

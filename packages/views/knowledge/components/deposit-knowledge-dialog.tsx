@@ -61,6 +61,7 @@ export function DepositKnowledgeDialog({
   const activeProfile = profiles.find((profile) => profile.is_active) ?? null;
   const selectedProfile =
     profiles.find((profile) => profile.id === profileId) ?? activeProfile;
+  const source = preview?.source === "solo" ? "solo" : "relay";
 
   useEffect(() => {
     if (!open || !preview) return;
@@ -114,8 +115,13 @@ export function DepositKnowledgeDialog({
         <DialogHeader>
           <DialogTitle className="text-title">{t(($) => $.deposit_title)}</DialogTitle>
           <DialogDescription className="text-body">
-            {t(($) => $.deposit_sub)}
+            {source === "solo" ? t(($) => $.deposit_sub_solo) : t(($) => $.deposit_sub)}
           </DialogDescription>
+          <span className="w-fit rounded-full bg-muted px-2 py-0.5 text-micro text-muted-foreground">
+            {source === "solo"
+              ? t(($) => $.deposit_source_solo)
+              : t(($) => $.deposit_source_relay)}
+          </span>
         </DialogHeader>
 
         {isPending ? (
@@ -143,8 +149,10 @@ export function DepositKnowledgeDialog({
             </section>
 
             <section className="flex flex-col gap-1.5">
-              <h4 className="text-caption font-semibold text-foreground">
-                {t(($) => $.deposit_entries)}
+              <h4 className="text-body font-semibold text-foreground">
+                {source === "solo"
+                  ? t(($) => $.deposit_entries_solo)
+                  : t(($) => $.deposit_entries)}
               </h4>
               {preview.entries
                 .filter((entry) => entry.key !== "summary")

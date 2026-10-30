@@ -102,12 +102,20 @@ export interface KnowledgePreviewEntry {
 
 export interface KnowledgePreview {
   summary: string;
+  /** "relay" when composed from handoff packages; "solo" otherwise. */
+  source: "relay" | "solo" | (string & {});
   entries: KnowledgePreviewEntry[];
   embedding_enabled: boolean;
   embedding_profile_id?: string;
   embedding_provider?: string;
   embedding_model: string;
   embedding_dims: number;
+}
+
+/** Whether a task already deposited entries, for the completion card. */
+export interface IssueKnowledgeStatus {
+  deposited: boolean;
+  entries: number;
 }
 
 export interface EmbeddingModel {

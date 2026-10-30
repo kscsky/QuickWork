@@ -1822,7 +1822,10 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 					// The finished leg's output: the holder asks their leg's
 					// agent to write the handoff document (产出 md).
 					r.Post("/chain/output", h.GenerateIssueChainLegOutput)
-					// Distil a finished relay into the workspace knowledge base.
+					// Distil a finished task into the workspace knowledge base.
+					// Relay tasks compose from handoff packages; solo tasks
+					// compose from the issue goal and final delivery comment.
+					r.Get("/knowledge/status", h.IssueKnowledgeStatus)
 					r.Post("/knowledge/preview", h.PreviewIssueKnowledge)
 					r.Post("/knowledge/deposit", h.DepositIssueKnowledge)
 					r.Get("/usage", h.GetIssueUsage)

@@ -11,6 +11,7 @@ export function useDepositIssueKnowledge(wsId: string, issueId: string) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: knowledgeKeys.all(wsId) });
       qc.invalidateQueries({ queryKey: knowledgeKeys.preview(issueId) });
+      qc.invalidateQueries({ queryKey: knowledgeKeys.issueStatus(issueId) });
     },
   });
 }

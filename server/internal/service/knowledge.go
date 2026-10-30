@@ -16,6 +16,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 
+	"github.com/kscsky/quickwork/server/internal/issuestatus"
 	"github.com/kscsky/quickwork/server/internal/knowledge"
 	"github.com/kscsky/quickwork/server/internal/util"
 	db "github.com/kscsky/quickwork/server/pkg/db/generated"
@@ -40,7 +41,12 @@ const (
 	KnowledgeSourceSummary      = "relay_summary"
 	KnowledgeSourceHandoff      = "handoff"
 	KnowledgeSourceOpenQuestion = "open_question"
+	KnowledgeSourceSoloSummary  = "solo_summary"
+	KnowledgeSourceSoloResult   = "solo_result"
 	KnowledgeSourceManual       = "manual"
+
+	KnowledgeSourceRelay = "relay"
+	KnowledgeSourceSolo  = "solo"
 )
 
 var (
@@ -64,6 +70,7 @@ type KnowledgeEntryPreview struct {
 // KnowledgePreview is the composed summary document and its FAQ drafts.
 type KnowledgePreview struct {
 	Summary            string                  `json:"summary"`
+	Source             string                  `json:"source"` // "relay" | "solo"
 	Entries            []KnowledgeEntryPreview `json:"entries"`
 	EmbeddingEnabled   bool                    `json:"embedding_enabled"`
 	EmbeddingProfileID string                  `json:"embedding_profile_id"`
@@ -203,7 +210,7 @@ func (s *KnowledgeService) ComposeTaskKnowledge(ctx context.Context, issue db.Is
 		return nil, err
 	}
 	if len(steps) == 0 {
-		return nil, ErrKnowledgeNoChain
+		return s.composeSoloKnowledge(ctx, issue)
 	}
 	for _, step := range steps {
 		if step.State != ChainStateDone && step.State != ChainStateSkipped {
@@ -378,6 +385,7 @@ func (s *KnowledgeService) ComposeTaskKnowledge(ctx context.Context, issue db.Is
 	status := s.EmbeddingStatus(ctx, issue.WorkspaceID)
 	preview := &KnowledgePreview{
 		Summary:            strings.TrimSpace(summary.String()) + "\n",
+		Source:             KnowledgeSourceRelay,
 		Entries:            entries,
 		EmbeddingEnabled:   status.Enabled,
 		EmbeddingProfileID: status.ProfileID,
@@ -396,6 +404,116 @@ func (s *KnowledgeService) ComposeTaskKnowledge(ctx context.Context, issue db.Is
 		SourceKind: KnowledgeSourceSummary,
 	}}, preview.Entries...)
 	return preview, nil
+}
+
+// composeSoloKnowledge distils a completed task that never had a relay. The
+// source is the issue itself: its goal, the final agent delivery, and the
+// result comment. It never invents FAQ items the task did not produce.
+func (s *KnowledgeService) composeSoloKnowledge(ctx context.Context, issue db.Issue) (*KnowledgePreview, error) {
+	category := issuestatus.Effective(ctx, s.Queries, issue.WorkspaceID, issue.Status)
+	if category != issuestatus.Done {
+		return nil, ErrKnowledgeTaskNotDone
+	}
+	ws, err := s.Queries.GetWorkspace(ctx, issue.WorkspaceID)
+	if err != nil {
+		return nil, err
+	}
+	identifier := IssueIdentifier(ws.IssuePrefix, issue.Number)
+	completedAt := issue.UpdatedAt.Time
+	if !issue.UpdatedAt.Valid {
+		completedAt = issue.CreatedAt.Time
+	}
+	result := s.latestSoloResult(ctx, issue)
+
+	var summary strings.Builder
+	fmt.Fprintf(&summary, "# %s · %s\n\n", identifier, issue.Title)
+	fmt.Fprintf(&summary, "> 来自 QuickWork 单人任务 · 完成于 %s\n\n", completedAt.Format("2006-01-02"))
+	summary.WriteString("## 目标\n\n")
+	if desc := strings.TrimSpace(issue.Description.String); desc != "" {
+		summary.WriteString(desc)
+	} else {
+		summary.WriteString("（任务没有写描述。）")
+	}
+	summary.WriteString("\n\n## 结果\n\n")
+	if result != "" {
+		summary.WriteString(result)
+	} else {
+		summary.WriteString("（任务没有留下结果评论。）")
+	}
+
+	entries := make([]KnowledgeEntryPreview, 0, 1)
+	if result != "" {
+		entries = append(entries, KnowledgeEntryPreview{
+			Key:        "faq-0",
+			Kind:       KnowledgeKindFAQ,
+			Title:      "这次任务是怎么完成的？",
+			Body:       result,
+			Tags:       []string{"单人任务", "结果"},
+			SourceLeg:  0,
+			SourceKind: KnowledgeSourceSoloResult,
+		})
+	}
+
+	status := s.EmbeddingStatus(ctx, issue.WorkspaceID)
+	preview := &KnowledgePreview{
+		Summary:            strings.TrimSpace(summary.String()) + "\n",
+		Source:             KnowledgeSourceSolo,
+		Entries:            entries,
+		EmbeddingEnabled:   status.Enabled,
+		EmbeddingProfileID: status.ProfileID,
+		EmbeddingProvider:  status.Provider,
+		EmbeddingModel:     status.Model,
+		EmbeddingDims:      status.Dims,
+	}
+	preview.Entries = append([]KnowledgeEntryPreview{{
+		Key:        "summary",
+		Kind:       KnowledgeKindSummary,
+		Title:      issue.Title,
+		Body:       preview.Summary,
+		Tags:       []string{"单人任务", "任务总结"},
+		SourceLeg:  0,
+		SourceKind: KnowledgeSourceSoloSummary,
+	}}, preview.Entries...)
+	return preview, nil
+}
+
+// latestSoloResult prefers the last agent delivery; a member's final note is
+// the fallback. System notices are never treated as a result.
+func (s *KnowledgeService) latestSoloResult(ctx context.Context, issue db.Issue) string {
+	comments, err := s.Queries.ListCommentsForIssue(ctx, db.ListCommentsForIssueParams{
+		IssueID:     issue.ID,
+		WorkspaceID: issue.WorkspaceID,
+		ViewerID:    issue.CreatorID,
+		RowLimit:    50,
+	})
+	if err != nil {
+		return ""
+	}
+	var agentResult, memberResult string
+	for _, comment := range comments {
+		content := strings.TrimSpace(comment.Content)
+		if content == "" {
+			continue
+		}
+		switch comment.AuthorType {
+		case "agent":
+			agentResult = content
+		case "member":
+			memberResult = content
+		}
+	}
+	if agentResult != "" {
+		return truncateRunes(agentResult, 4000)
+	}
+	return truncateRunes(memberResult, 4000)
+}
+
+func truncateRunes(value string, limit int) string {
+	runes := []rune(value)
+	if len(runes) <= limit {
+		return value
+	}
+	return string(runes[:limit]) + "…"
 }
 
 // DepositTaskKnowledge writes the selected preview entries into the workspace

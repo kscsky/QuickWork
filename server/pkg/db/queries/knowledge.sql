@@ -55,6 +55,13 @@ FROM knowledge_entry
 WHERE workspace_id = $1
 GROUP BY kind, status;
 
+-- name: CountKnowledgeEntriesBySourceIssue :one
+-- The completion card uses this to replace "deposit" with "already deposited"
+-- instead of inserting a second copy of the same task's memory.
+SELECT count(*)::bigint AS count
+FROM knowledge_entry
+WHERE workspace_id = $1 AND source_issue_id = $2;
+
 -- name: CountKnowledgeEmbeddingsByProfile :many
 -- Corpus inventory for the model card. Counts only entries in this workspace,
 -- so an orphaned vector could never inflate another workspace's corpus.

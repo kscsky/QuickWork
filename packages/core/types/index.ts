@@ -128,6 +128,7 @@ export type {
   EmbeddingProfile,
   EmbeddingProfileInput,
   EmbeddingProvider,
+  IssueKnowledgeStatus,
   KnowledgeCorpus,
   KnowledgeEntry,
   KnowledgeEmbeddingStatus,

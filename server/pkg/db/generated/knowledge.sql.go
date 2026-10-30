@@ -127,6 +127,26 @@ func (q *Queries) CountKnowledgeEntries(ctx context.Context, workspaceID pgtype.
 	return items, nil
 }
 
+const countKnowledgeEntriesBySourceIssue = `-- name: CountKnowledgeEntriesBySourceIssue :one
+SELECT count(*)::bigint AS count
+FROM knowledge_entry
+WHERE workspace_id = $1 AND source_issue_id = $2
+`
+
+type CountKnowledgeEntriesBySourceIssueParams struct {
+	WorkspaceID   pgtype.UUID `json:"workspace_id"`
+	SourceIssueID pgtype.UUID `json:"source_issue_id"`
+}
+
+// The completion card uses this to replace "deposit" with "already deposited"
+// instead of inserting a second copy of the same task's memory.
+func (q *Queries) CountKnowledgeEntriesBySourceIssue(ctx context.Context, arg CountKnowledgeEntriesBySourceIssueParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countKnowledgeEntriesBySourceIssue, arg.WorkspaceID, arg.SourceIssueID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const countUnindexedKnowledgeEntries = `-- name: CountUnindexedKnowledgeEntries :one
 SELECT count(*)::bigint AS count
 FROM knowledge_entry e
