@@ -3976,6 +3976,42 @@ html[lang|="ko"] .qk-create-dialog {
 .kb-mode-line em { margin-left: auto; font-style: normal; font-size: 11px; }
 .kb-mode-line b { color: var(--foreground); font-weight: 650; }
 .kb-tag.dim { color: var(--muted-foreground); border-color: var(--border); background: var(--muted); }
+.kb-tag.chunk {
+  color: var(--brand);
+  border-color: color-mix(in oklab, var(--brand) 30%, var(--border));
+  background: color-mix(in oklab, var(--brand) 6%, transparent);
+}
+.kb-hit {
+  margin-top: 10px;
+  padding: 9px 12px;
+  border-left: 2px solid var(--brand);
+  border-radius: 0 5px 5px 0;
+  background: color-mix(in oklab, var(--brand) 5%, var(--muted));
+}
+.kb-hit .lbl {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--brand);
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 600;
+}
+.kb-hit p {
+  margin: 5px 0 0;
+  color: var(--muted-foreground);
+  font-size: 12px;
+  line-height: 1.7;
+}
+.kb-hit a {
+  display: inline-block;
+  margin-top: 5px;
+  color: var(--brand);
+  font-size: 11px;
+  font-weight: 600;
+  text-decoration: none;
+}
+.kb-hit a:hover { text-decoration: underline; }
 .kb-em-top { display: flex; align-items: center; gap: 9px; }
 .kb-em-mark {
   display: grid;

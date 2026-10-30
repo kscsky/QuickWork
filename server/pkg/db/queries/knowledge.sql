@@ -24,10 +24,17 @@ WHERE id = $1 AND workspace_id = $2;
 -- only, a positive number = entries whose vector was produced at that width.
 SELECT e.*,
        emb.profile_id AS embedding_profile_id,
-       emb.model AS embedding_model,
-       emb.dims AS embedding_dims
+       COALESCE(emb.model, '') AS embedding_model,
+       COALESCE(emb.dims, 0) AS embedding_dims,
+       COALESCE((SELECT count(*) FROM knowledge_embedding k WHERE k.entry_id = e.id), 0)::int AS embedding_chunks
 FROM knowledge_entry e
-LEFT JOIN knowledge_embedding emb ON emb.entry_id = e.id
+LEFT JOIN LATERAL (
+    SELECT k.entry_id, k.profile_id, k.model, k.dims
+    FROM knowledge_embedding k
+    WHERE k.entry_id = e.id
+    ORDER BY k.chunk_index
+    LIMIT 1
+) emb ON true
 WHERE e.workspace_id = sqlc.arg(workspace_id)
   AND (sqlc.arg(status)::text = '' OR e.status = sqlc.arg(status)::text)
   AND (sqlc.arg(kind)::text = '' OR e.kind = sqlc.arg(kind)::text)
@@ -70,7 +77,7 @@ SELECT p.id AS profile_id,
        p.model,
        p.dims,
        p.is_active,
-       count(e.id)::bigint AS entries
+       count(DISTINCT e.id)::bigint AS entries
 FROM workspace_embedding_profile p
 LEFT JOIN knowledge_embedding emb ON emb.profile_id = p.id
 LEFT JOIN knowledge_entry e ON e.id = emb.entry_id AND e.workspace_id = p.workspace_id
@@ -81,10 +88,9 @@ ORDER BY p.is_active DESC, p.created_at;
 -- name: CountUnindexedKnowledgeEntries :one
 SELECT count(*)::bigint AS count
 FROM knowledge_entry e
-LEFT JOIN knowledge_embedding emb ON emb.entry_id = e.id
 WHERE e.workspace_id = $1
   AND e.status = 'published'
-  AND emb.entry_id IS NULL;
+  AND NOT EXISTS (SELECT 1 FROM knowledge_embedding emb WHERE emb.entry_id = e.id);
 
 -- name: SearchKnowledgeByKeyword :many
 -- Trigram fallback that also works for Chinese. The query arrives split into
@@ -93,8 +99,9 @@ WHERE e.workspace_id = $1
 -- retrievable; a selected corpus narrows the search to that profile.
 SELECT e.*,
        emb.profile_id AS embedding_profile_id,
-       emb.model AS embedding_model,
-       emb.dims AS embedding_dims,
+       COALESCE(emb.model, '') AS embedding_model,
+       COALESCE(emb.dims, 0) AS embedding_dims,
+       COALESCE((SELECT count(*) FROM knowledge_embedding k WHERE k.entry_id = e.id), 0)::int AS embedding_chunks,
        COALESCE((
            SELECT MAX(GREATEST(similarity(e.title, term), similarity(e.body, term)))
            FROM unnest(sqlc.arg(terms)::text[]) AS term
@@ -104,7 +111,13 @@ SELECT e.*,
            WHERE e.title ILIKE '%' || term || '%' OR e.body ILIKE '%' || term || '%'
        )::bigint AS match_count
 FROM knowledge_entry e
-LEFT JOIN knowledge_embedding emb ON emb.entry_id = e.id
+LEFT JOIN LATERAL (
+    SELECT k.entry_id, k.profile_id, k.model, k.dims
+    FROM knowledge_embedding k
+    WHERE k.entry_id = e.id
+    ORDER BY k.chunk_index
+    LIMIT 1
+) emb ON true
 WHERE e.workspace_id = sqlc.arg(workspace_id)
   AND e.status = 'published'
   AND (sqlc.narg(profile_id)::uuid IS NULL OR emb.profile_id = sqlc.narg(profile_id)::uuid)
@@ -123,47 +136,68 @@ LIMIT sqlc.arg(row_limit);
 -- produced by the same profile (or both by the legacy env embedder, which has
 -- a NULL profile_id). dims is a second guard so vectors from two models with
 -- the same profile cannot be compared by accident.
-SELECT e.*,
-       emb.profile_id AS embedding_profile_id,
-       emb.model AS embedding_model,
-       emb.dims AS embedding_dims,
-       (1 - (emb.embedding <=> sqlc.arg(query_embedding)::text::vector))::float8 AS score
-FROM knowledge_entry e
-JOIN knowledge_embedding emb ON emb.entry_id = e.id
-WHERE e.workspace_id = sqlc.arg(workspace_id)
-  AND e.status = 'published'
-  AND emb.dims = sqlc.arg(dims)::int
-  AND (
-      (sqlc.narg(profile_id)::uuid IS NOT NULL AND emb.profile_id = sqlc.narg(profile_id)::uuid)
-      OR (sqlc.narg(profile_id)::uuid IS NULL AND emb.profile_id IS NULL)
-  )
-ORDER BY emb.embedding <=> sqlc.arg(query_embedding)::text::vector
+SELECT * FROM (
+    SELECT DISTINCT ON (e.id)
+           e.*,
+           emb.profile_id AS embedding_profile_id,
+           emb.model AS embedding_model,
+           emb.dims AS embedding_dims,
+           emb.chunk_index AS embedding_chunk_index,
+           emb.chunk_text AS embedding_chunk_text,
+           emb.heading AS embedding_heading,
+           COALESCE((SELECT count(*) FROM knowledge_embedding k WHERE k.entry_id = e.id), 0)::int AS embedding_chunks,
+           (1 - (emb.embedding <=> sqlc.arg(query_embedding)::text::vector))::float8 AS score
+    FROM knowledge_entry e
+    JOIN knowledge_embedding emb ON emb.entry_id = e.id
+    WHERE e.workspace_id = sqlc.arg(workspace_id)
+      AND e.status = 'published'
+      AND emb.dims = sqlc.arg(dims)::int
+      AND (
+          (sqlc.narg(profile_id)::uuid IS NOT NULL AND emb.profile_id = sqlc.narg(profile_id)::uuid)
+          OR (sqlc.narg(profile_id)::uuid IS NULL AND emb.profile_id IS NULL)
+      )
+    ORDER BY e.id, emb.embedding <=> sqlc.arg(query_embedding)::text::vector
+) best
+ORDER BY best.score DESC
 LIMIT sqlc.arg(row_limit);
 
+-- name: DeleteKnowledgeEmbeddingsForEntry :exec
+DELETE FROM knowledge_embedding
+WHERE entry_id = sqlc.arg(entry_id);
+
 -- name: UpsertKnowledgeEmbedding :exec
-INSERT INTO knowledge_embedding (entry_id, profile_id, model, dims, embedding, content_hash)
+INSERT INTO knowledge_embedding (
+    entry_id, chunk_index, profile_id, model, dims,
+    chunk_text, heading, strategy, embedding, content_hash
+)
 VALUES (
     sqlc.arg(entry_id),
+    sqlc.arg(chunk_index),
     sqlc.narg(profile_id),
     sqlc.arg(model),
     sqlc.arg(dims),
+    sqlc.arg(chunk_text),
+    sqlc.arg(heading),
+    sqlc.arg(strategy),
     sqlc.arg(embedding)::text::vector,
     sqlc.arg(content_hash)
 )
-ON CONFLICT (entry_id) DO UPDATE
+ON CONFLICT (entry_id, chunk_index) DO UPDATE
 SET profile_id = EXCLUDED.profile_id,
     model = EXCLUDED.model,
     dims = EXCLUDED.dims,
+    chunk_text = EXCLUDED.chunk_text,
+    heading = EXCLUDED.heading,
+    strategy = EXCLUDED.strategy,
     embedding = EXCLUDED.embedding,
     content_hash = EXCLUDED.content_hash,
     updated_at = now();
 
 -- name: ListKnowledgeEntriesMissingEmbedding :many
 SELECT e.* FROM knowledge_entry e
-LEFT JOIN knowledge_embedding emb ON emb.entry_id = e.id
 WHERE e.workspace_id = $1
   AND e.status = 'published'
-  AND emb.entry_id IS NULL
+  AND NOT EXISTS (SELECT 1 FROM knowledge_embedding emb WHERE emb.entry_id = e.id)
 ORDER BY e.updated_at DESC
 LIMIT $2;
 

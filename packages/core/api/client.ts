@@ -2316,6 +2316,7 @@ export class ApiClient {
     keys: string[],
     publish: boolean,
     profileId?: string,
+    strategy?: string,
   ): Promise<KnowledgeEntry[]> {
     const raw = await this.fetch<unknown>(`/api/issues/${issueId}/knowledge/deposit`, {
       method: "POST",
@@ -2323,6 +2324,7 @@ export class ApiClient {
         keys,
         publish,
         ...(profileId ? { profile_id: profileId } : {}),
+        ...(strategy ? { strategy } : {}),
       }),
     });
     const parsed = parseWithFallback(

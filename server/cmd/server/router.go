@@ -424,6 +424,7 @@ func NewRouterWithOptions(pool *pgxpool.Pool, hub *realtime.Hub, bus *events.Bus
 		slog.Warn("embedding profiles cannot store API keys until QUICKWORK_SECRET_KEY is set", "error", cipherErr)
 	}
 	h.Knowledge.Profiles = service.NewEmbeddingProfileService(queries, cipher)
+	h.TaskService.Knowledge = h.Knowledge
 	invitationRateLimits := handler.DefaultInvitationRateLimits()
 	invitationRateLimits.Actor.Limit = envNonNegativeInt("RATE_LIMIT_INVITATION_ACTOR_10M", invitationRateLimits.Actor.Limit)
 	invitationRateLimits.Workspace.Limit = envNonNegativeInt("RATE_LIMIT_INVITATION_WORKSPACE_24H", invitationRateLimits.Workspace.Limit)

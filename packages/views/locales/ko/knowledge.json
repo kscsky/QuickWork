@@ -130,5 +130,17 @@
   "completion_decide": "다음 / DECIDE",
   "completion_deposit": "지식에 저장",
   "completion_dismiss": "이번에는 저장하지 않음",
-  "completion_deposited": "저장됨 · 지식 베이스 열기"
+  "completion_deposited": "저장됨 · 지식 베이스 열기",
+  "strategy_title": "인덱싱 방식",
+  "strategy_auto": "자동 · 추천",
+  "strategy_entry": "전체",
+  "strategy_parent": "부모-자식",
+  "strategy_auto_hint": "FAQ는 전체, 요약은 섹션별로 분할.",
+  "strategy_entry_hint": "기억당 벡터 1개. 가장 빠르고 저렴.",
+  "strategy_parent_hint": "작은 청크로 검색하고 전체를 반환.",
+  "strategy_note": "청크 분할은 인덱스 세분화만 바꾸며 코퍼스와 모델은 그대로입니다.",
+  "chunk_badge": "부모-자식 · {{count}}개 청크",
+  "whole_badge": "전체",
+  "matched_chunk": "일치한 하위 청크",
+  "backfill_parent": "부모로 확장: 전체 기억 열기 →"
 }

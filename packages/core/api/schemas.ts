@@ -2809,6 +2809,10 @@ export const KnowledgeEntrySchema = z
     embedding_profile_id: z.string().nullish(),
     embedding_model: z.string().nullish(),
     embedding_dims: z.number().nullish(),
+    embedding_chunks: z.number().default(0),
+    matched_chunk_index: z.number().nullish(),
+    matched_chunk_text: z.string().default(""),
+    matched_heading: z.string().default(""),
   })
   .loose();
 

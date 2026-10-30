@@ -43,6 +43,9 @@ type TaskService struct {
 	Analytics analytics.Client
 	Metrics   *obsmetrics.BusinessMetrics
 	Wakeup    TaskWakeupNotifier
+	// Knowledge supplies the cited memory block injected into a run's opening
+	// context. Nil disables injection without affecting dispatch.
+	Knowledge *KnowledgeService
 	// SourceContextStorage is used only by the bounded 30-day cleanup pass for
 	// terminal quick-create captures. Nil disables it where storage is absent.
 	SourceContextStorage SourceContextObjectStore
@@ -1037,7 +1040,8 @@ func (s *TaskService) EnqueueTaskForIssue(ctx context.Context, issue db.Issue, t
 	if len(triggerCommentID) > 0 {
 		commentID = triggerCommentID[0]
 	}
-	return s.enqueueIssueTask(ctx, issue, commentID, false, "", pgtype.UUID{}, pgtype.UUID{}, pgtype.Timestamptz{})
+	note := s.knowledgeNoteForTask(ctx, issue, issue.Description.String)
+	return s.enqueueIssueTask(ctx, issue, commentID, false, note, pgtype.UUID{}, pgtype.UUID{}, pgtype.Timestamptz{})
 }
 
 // EnqueueDeferredChannelIssueTask persists the assigned task for a media-backed
@@ -1098,7 +1102,14 @@ func (s *TaskService) hydrateDeferredChannelIssueTaskOverlay(ctx context.Context
 // member who performed the assign/promote and becomes the accountable human for
 // the run (MUL-4302 §4); invalid when the caller has no member actor.
 func (s *TaskService) EnqueueTaskForIssueWithHandoff(ctx context.Context, issue db.Issue, handoffNote string, actorUserID pgtype.UUID) (db.AgentTaskQueue, error) {
-	return s.enqueueIssueTask(ctx, issue, pgtype.UUID{}, false, handoffNote, actorUserID, pgtype.UUID{}, pgtype.Timestamptz{})
+	note := strings.TrimSpace(handoffNote)
+	if memory := s.knowledgeNoteForTask(ctx, issue, issue.Description.String); memory != "" {
+		if note != "" {
+			note += "\n\n"
+		}
+		note += memory
+	}
+	return s.enqueueIssueTask(ctx, issue, pgtype.UUID{}, false, note, actorUserID, pgtype.UUID{}, pgtype.Timestamptz{})
 }
 
 // enqueueIssueTask is the shared implementation behind EnqueueTaskForIssue

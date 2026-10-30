@@ -974,6 +974,10 @@ type KnowledgeEmbedding struct {
 	Embedding   string             `json:"embedding"`
 	ContentHash string             `json:"content_hash"`
 	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
+	ChunkIndex  int32              `json:"chunk_index"`
+	ChunkText   string             `json:"chunk_text"`
+	Heading     string             `json:"heading"`
+	Strategy    string             `json:"strategy"`
 }
 
 type KnowledgeEntry struct {

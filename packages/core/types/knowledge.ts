@@ -24,6 +24,12 @@ export interface KnowledgeEntry {
   embedding_profile_id?: string | null;
   embedding_model?: string;
   embedding_dims?: number | null;
+  /** Number of vectors this entry owns; >1 means parent-child chunks. */
+  embedding_chunks?: number;
+  /** Search-only: the child chunk that ranked best for this entry. */
+  matched_chunk_index?: number | null;
+  matched_chunk_text?: string;
+  matched_heading?: string;
 }
 
 export interface KnowledgeEmbeddingStatus {

@@ -130,5 +130,17 @@
   "completion_decide": "下一步 / DECIDE",
   "completion_deposit": "沉淀到知识库",
   "completion_dismiss": "这次先不沉淀",
-  "completion_deposited": "已沉淀 · 查看知识库"
+  "completion_deposited": "已沉淀 · 查看知识库",
+  "strategy_title": "索引方式",
+  "strategy_auto": "自动 · 推荐",
+  "strategy_entry": "整条索引",
+  "strategy_parent": "父子索引",
+  "strategy_auto_hint": "FAQ 整条；总结按小节切块。",
+  "strategy_entry_hint": "每条记忆一个向量，最快最省。",
+  "strategy_parent_hint": "小块检索，整条回填；长文档推荐。",
+  "strategy_note": "切块只改变索引粒度，不改变语料和向量模型。",
+  "chunk_badge": "父子 · {{count}} 块",
+  "whole_badge": "整条",
+  "matched_chunk": "命中子块",
+  "backfill_parent": "回填父级：查看整条记忆 →"
 }

@@ -42,6 +42,7 @@ const { LIST, SEARCH } = vi.hoisted(() => {
           title: "发布「秋日的第一支精华」内容包",
           body: "三篇笔记与九张图的总结。",
           status: "published",
+          embedding_chunks: 6,
         },
         {
           ...base,
@@ -107,6 +108,10 @@ const { LIST, SEARCH } = vi.hoisted(() => {
             title: "配图色调规范",
             body: "暖棕 + 米白 + 琥珀，3:4。",
             status: "published",
+            embedding_chunks: 4,
+            matched_chunk_index: 2,
+            matched_chunk_text: "命中片段：暖棕 + 米白 + 琥珀；3:4 / 1080×1440。",
+            matched_heading: "配图规范",
           },
           score: 0.42,
         },
@@ -195,6 +200,7 @@ describe("KnowledgePage", () => {
     expect(screen.getAllByText("1024 dims").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Unindexed").length).toBeGreaterThan(0);
     expect(screen.getByText("text-embedding-v4")).toBeInTheDocument();
+    expect(screen.getAllByText("Parent-child · 6 chunks").length).toBeGreaterThan(0);
   });
 
   it("runs a keyword search when no embedding provider is configured", async () => {
@@ -207,6 +213,10 @@ describe("KnowledgePage", () => {
     await user.keyboard("{Enter}");
 
     expect(await screen.findByText("配图色调规范")).toBeInTheDocument();
+    expect(
+      screen.getByText("命中片段：暖棕 + 米白 + 琥珀；3:4 / 1080×1440。"),
+    ).toBeInTheDocument();
+    expect(screen.getAllByText(/Matched chunk/).length).toBeGreaterThan(0);
     expect(
       screen.getByText(/Keyword search · no embeddings configured/),
     ).toBeInTheDocument();

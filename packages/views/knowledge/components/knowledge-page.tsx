@@ -163,6 +163,13 @@ export function KnowledgePage() {
             ? t(($) => $.dimension_badge, { dims: entry.embedding_dims })
             : t(($) => $.unindexed_badge)}
         </span>
+        {entry.embedding_dims ? (
+          <span className="kb-tag chunk">
+            {entry.embedding_chunks && entry.embedding_chunks > 1
+              ? t(($) => $.chunk_badge, { count: entry.embedding_chunks })
+              : t(($) => $.whole_badge)}
+          </span>
+        ) : null}
         {typeof score === "number" && search?.mode === "vector" ? (
           <span className="kb-score">
             {t(($) => $.similarity, { score: score.toFixed(2) })}
@@ -185,6 +192,21 @@ export function KnowledgePage() {
       </div>
       <p className="kb-q">{entry.title}</p>
       <p className="kb-a">{plainPreview(entry.body)}</p>
+      {entry.matched_chunk_text && (entry.embedding_chunks ?? 0) > 1 ? (
+        <div className="kb-hit">
+          <span className="lbl">
+            {t(($) => $.matched_chunk)}
+            {entry.matched_heading ? ` · ${entry.matched_heading}` : ""}
+            {` · #${(entry.matched_chunk_index ?? 0) + 1}/${entry.embedding_chunks ?? 1}`}
+          </span>
+          <p>{entry.matched_chunk_text}</p>
+          {entry.source_issue_id ? (
+            <AppLink href={paths.issueDetail(entry.source_issue_id)}>
+              {t(($) => $.backfill_parent)}
+            </AppLink>
+          ) : null}
+        </div>
+      ) : null}
       <div className="kb-meta">
         {entry.source_issue_id ? (
           <AppLink href={paths.issueDetail(entry.source_issue_id)}>

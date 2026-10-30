@@ -6,8 +6,19 @@ import { knowledgeKeys } from "./queries";
 export function useDepositIssueKnowledge(wsId: string, issueId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (vars: { keys: string[]; publish: boolean; profileId?: string }) =>
-      api.depositIssueKnowledge(issueId, vars.keys, vars.publish, vars.profileId),
+    mutationFn: (vars: {
+      keys: string[];
+      publish: boolean;
+      profileId?: string;
+      strategy?: string;
+    }) =>
+      api.depositIssueKnowledge(
+        issueId,
+        vars.keys,
+        vars.publish,
+        vars.profileId,
+        vars.strategy,
+      ),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: knowledgeKeys.all(wsId) });
       qc.invalidateQueries({ queryKey: knowledgeKeys.preview(issueId) });

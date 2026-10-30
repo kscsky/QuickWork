@@ -141,6 +141,12 @@ func TestKnowledgeEmbeddingProfileCorpora(t *testing.T) {
 			t.Fatalf("entry was not stamped with the 512-dim corpus: %+v", entry)
 		}
 	}
+	if created[0].EmbeddingChunks < 2 {
+		t.Fatalf("summary chunks = %d, want the summary split by section", created[0].EmbeddingChunks)
+	}
+	if created[1].EmbeddingChunks != 1 {
+		t.Fatalf("faq chunks = %d, want one whole-entry vector", created[1].EmbeddingChunks)
+	}
 	createdIDs := map[string]bool{}
 	for _, entry := range created {
 		createdIDs[entry.ID] = true
@@ -210,6 +216,9 @@ func TestKnowledgeEmbeddingProfileCorpora(t *testing.T) {
 		if hit.Entry.EmbeddingDims == nil || *hit.Entry.EmbeddingDims != 512 {
 			t.Fatalf("hit from another corpus: %+v", hit.Entry)
 		}
+	}
+	if search.Hits[0].Entry.MatchedChunkText == "" {
+		t.Fatal("vector hit did not carry the matched child chunk")
 	}
 	// The fake embedder maps every text containing 标题 to the same axis, so
 	// the summary and the leg legitimately tie; both are in this corpus.

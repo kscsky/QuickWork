@@ -55,6 +55,7 @@ export function DepositKnowledgeDialog({
   const deposit = useDepositIssueKnowledge(wsId, issueId);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [publish, setPublish] = useState(canPublish);
+  const [strategy, setStrategy] = useState("auto");
   const [profileId, setProfileId] = useState("");
   const [profileDialogOpen, setProfileDialogOpen] = useState(false);
 
@@ -97,6 +98,7 @@ export function DepositKnowledgeDialog({
       {
         keys: [...selected],
         publish,
+        strategy,
         ...(publish && selectedProfile ? { profileId: selectedProfile.id } : {}),
       },
       {
@@ -185,6 +187,45 @@ export function DepositKnowledgeDialog({
                   </button>
                 );
               })}
+            </section>
+
+            <section className="flex flex-col gap-2.5">
+              <h4 className="text-body font-semibold text-foreground">
+                {t(($) => $.strategy_title)}
+              </h4>
+              <div className="grid grid-cols-3 gap-2">
+                {(["auto", "entry", "parent"] as const).map((value) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => setStrategy(value)}
+                    className={cn(
+                      "rounded-md border px-2.5 py-2 text-left transition-colors",
+                      strategy === value
+                        ? "border-brand bg-brand/5"
+                        : "border-surface-border hover:border-brand/40",
+                    )}
+                  >
+                    <span className="block text-body font-semibold text-foreground">
+                      {value === "auto"
+                        ? t(($) => $.strategy_auto)
+                        : value === "entry"
+                          ? t(($) => $.strategy_entry)
+                          : t(($) => $.strategy_parent)}
+                    </span>
+                    <span className="mt-1 block text-caption leading-relaxed text-muted-foreground">
+                      {value === "auto"
+                        ? t(($) => $.strategy_auto_hint)
+                        : value === "entry"
+                          ? t(($) => $.strategy_entry_hint)
+                          : t(($) => $.strategy_parent_hint)}
+                    </span>
+                  </button>
+                ))}
+              </div>
+              <p className="text-caption leading-relaxed text-muted-foreground">
+                {t(($) => $.strategy_note)}
+              </p>
             </section>
 
             <section className="rounded-lg border border-surface-border bg-muted/20 p-3">

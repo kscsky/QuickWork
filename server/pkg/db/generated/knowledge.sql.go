@@ -47,7 +47,7 @@ SELECT p.id AS profile_id,
        p.model,
        p.dims,
        p.is_active,
-       count(e.id)::bigint AS entries
+       count(DISTINCT e.id)::bigint AS entries
 FROM workspace_embedding_profile p
 LEFT JOIN knowledge_embedding emb ON emb.profile_id = p.id
 LEFT JOIN knowledge_entry e ON e.id = emb.entry_id AND e.workspace_id = p.workspace_id
@@ -150,10 +150,9 @@ func (q *Queries) CountKnowledgeEntriesBySourceIssue(ctx context.Context, arg Co
 const countUnindexedKnowledgeEntries = `-- name: CountUnindexedKnowledgeEntries :one
 SELECT count(*)::bigint AS count
 FROM knowledge_entry e
-LEFT JOIN knowledge_embedding emb ON emb.entry_id = e.id
 WHERE e.workspace_id = $1
   AND e.status = 'published'
-  AND emb.entry_id IS NULL
+  AND NOT EXISTS (SELECT 1 FROM knowledge_embedding emb WHERE emb.entry_id = e.id)
 `
 
 func (q *Queries) CountUnindexedKnowledgeEntries(ctx context.Context, workspaceID pgtype.UUID) (int64, error) {
@@ -306,6 +305,16 @@ func (q *Queries) CreateWorkspaceEmbeddingProfile(ctx context.Context, arg Creat
 	return i, err
 }
 
+const deleteKnowledgeEmbeddingsForEntry = `-- name: DeleteKnowledgeEmbeddingsForEntry :exec
+DELETE FROM knowledge_embedding
+WHERE entry_id = $1
+`
+
+func (q *Queries) DeleteKnowledgeEmbeddingsForEntry(ctx context.Context, entryID pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, deleteKnowledgeEmbeddingsForEntry, entryID)
+	return err
+}
+
 const deleteWorkspaceEmbeddingProfile = `-- name: DeleteWorkspaceEmbeddingProfile :execrows
 DELETE FROM workspace_embedding_profile
 WHERE id = $1 AND workspace_id = $2 AND is_active = false
@@ -425,10 +434,17 @@ func (q *Queries) GetWorkspaceEmbeddingProfile(ctx context.Context, arg GetWorks
 const listKnowledgeEntries = `-- name: ListKnowledgeEntries :many
 SELECT e.id, e.workspace_id, e.squad_id, e.kind, e.title, e.body, e.tags, e.status, e.source_issue_id, e.source_leg, e.source_kind, e.created_by, e.published_by, e.published_at, e.usage_count, e.created_at, e.updated_at,
        emb.profile_id AS embedding_profile_id,
-       emb.model AS embedding_model,
-       emb.dims AS embedding_dims
+       COALESCE(emb.model, '') AS embedding_model,
+       COALESCE(emb.dims, 0) AS embedding_dims,
+       COALESCE((SELECT count(*) FROM knowledge_embedding k WHERE k.entry_id = e.id), 0)::int AS embedding_chunks
 FROM knowledge_entry e
-LEFT JOIN knowledge_embedding emb ON emb.entry_id = e.id
+LEFT JOIN LATERAL (
+    SELECT k.entry_id, k.profile_id, k.model, k.dims
+    FROM knowledge_embedding k
+    WHERE k.entry_id = e.id
+    ORDER BY k.chunk_index
+    LIMIT 1
+) emb ON true
 WHERE e.workspace_id = $1
   AND ($2::text = '' OR e.status = $2::text)
   AND ($3::text = '' OR e.kind = $3::text)
@@ -470,8 +486,9 @@ type ListKnowledgeEntriesRow struct {
 	CreatedAt          pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt          pgtype.Timestamptz `json:"updated_at"`
 	EmbeddingProfileID pgtype.UUID        `json:"embedding_profile_id"`
-	EmbeddingModel     pgtype.Text        `json:"embedding_model"`
-	EmbeddingDims      pgtype.Int4        `json:"embedding_dims"`
+	EmbeddingModel     string             `json:"embedding_model"`
+	EmbeddingDims      int32              `json:"embedding_dims"`
+	EmbeddingChunks    int32              `json:"embedding_chunks"`
 }
 
 // One workspace, newest first. Empty status/kind filters mean "all". The
@@ -514,6 +531,7 @@ func (q *Queries) ListKnowledgeEntries(ctx context.Context, arg ListKnowledgeEnt
 			&i.EmbeddingProfileID,
 			&i.EmbeddingModel,
 			&i.EmbeddingDims,
+			&i.EmbeddingChunks,
 		); err != nil {
 			return nil, err
 		}
@@ -527,10 +545,9 @@ func (q *Queries) ListKnowledgeEntries(ctx context.Context, arg ListKnowledgeEnt
 
 const listKnowledgeEntriesMissingEmbedding = `-- name: ListKnowledgeEntriesMissingEmbedding :many
 SELECT e.id, e.workspace_id, e.squad_id, e.kind, e.title, e.body, e.tags, e.status, e.source_issue_id, e.source_leg, e.source_kind, e.created_by, e.published_by, e.published_at, e.usage_count, e.created_at, e.updated_at FROM knowledge_entry e
-LEFT JOIN knowledge_embedding emb ON emb.entry_id = e.id
 WHERE e.workspace_id = $1
   AND e.status = 'published'
-  AND emb.entry_id IS NULL
+  AND NOT EXISTS (SELECT 1 FROM knowledge_embedding emb WHERE emb.entry_id = e.id)
 ORDER BY e.updated_at DESC
 LIMIT $2
 `
@@ -623,8 +640,9 @@ func (q *Queries) ListWorkspaceEmbeddingProfiles(ctx context.Context, workspaceI
 const searchKnowledgeByKeyword = `-- name: SearchKnowledgeByKeyword :many
 SELECT e.id, e.workspace_id, e.squad_id, e.kind, e.title, e.body, e.tags, e.status, e.source_issue_id, e.source_leg, e.source_kind, e.created_by, e.published_by, e.published_at, e.usage_count, e.created_at, e.updated_at,
        emb.profile_id AS embedding_profile_id,
-       emb.model AS embedding_model,
-       emb.dims AS embedding_dims,
+       COALESCE(emb.model, '') AS embedding_model,
+       COALESCE(emb.dims, 0) AS embedding_dims,
+       COALESCE((SELECT count(*) FROM knowledge_embedding k WHERE k.entry_id = e.id), 0)::int AS embedding_chunks,
        COALESCE((
            SELECT MAX(GREATEST(similarity(e.title, term), similarity(e.body, term)))
            FROM unnest($1::text[]) AS term
@@ -634,7 +652,13 @@ SELECT e.id, e.workspace_id, e.squad_id, e.kind, e.title, e.body, e.tags, e.stat
            WHERE e.title ILIKE '%' || term || '%' OR e.body ILIKE '%' || term || '%'
        )::bigint AS match_count
 FROM knowledge_entry e
-LEFT JOIN knowledge_embedding emb ON emb.entry_id = e.id
+LEFT JOIN LATERAL (
+    SELECT k.entry_id, k.profile_id, k.model, k.dims
+    FROM knowledge_embedding k
+    WHERE k.entry_id = e.id
+    ORDER BY k.chunk_index
+    LIMIT 1
+) emb ON true
 WHERE e.workspace_id = $2
   AND e.status = 'published'
   AND ($3::uuid IS NULL OR emb.profile_id = $3::uuid)
@@ -675,8 +699,9 @@ type SearchKnowledgeByKeywordRow struct {
 	CreatedAt          pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt          pgtype.Timestamptz `json:"updated_at"`
 	EmbeddingProfileID pgtype.UUID        `json:"embedding_profile_id"`
-	EmbeddingModel     pgtype.Text        `json:"embedding_model"`
-	EmbeddingDims      pgtype.Int4        `json:"embedding_dims"`
+	EmbeddingModel     string             `json:"embedding_model"`
+	EmbeddingDims      int32              `json:"embedding_dims"`
+	EmbeddingChunks    int32              `json:"embedding_chunks"`
 	Score              float64            `json:"score"`
 	MatchCount         int64              `json:"match_count"`
 }
@@ -720,6 +745,7 @@ func (q *Queries) SearchKnowledgeByKeyword(ctx context.Context, arg SearchKnowle
 			&i.EmbeddingProfileID,
 			&i.EmbeddingModel,
 			&i.EmbeddingDims,
+			&i.EmbeddingChunks,
 			&i.Score,
 			&i.MatchCount,
 		); err != nil {
@@ -734,21 +760,29 @@ func (q *Queries) SearchKnowledgeByKeyword(ctx context.Context, arg SearchKnowle
 }
 
 const searchKnowledgeByVector = `-- name: SearchKnowledgeByVector :many
-SELECT e.id, e.workspace_id, e.squad_id, e.kind, e.title, e.body, e.tags, e.status, e.source_issue_id, e.source_leg, e.source_kind, e.created_by, e.published_by, e.published_at, e.usage_count, e.created_at, e.updated_at,
-       emb.profile_id AS embedding_profile_id,
-       emb.model AS embedding_model,
-       emb.dims AS embedding_dims,
-       (1 - (emb.embedding <=> $1::text::vector))::float8 AS score
-FROM knowledge_entry e
-JOIN knowledge_embedding emb ON emb.entry_id = e.id
-WHERE e.workspace_id = $2
-  AND e.status = 'published'
-  AND emb.dims = $3::int
-  AND (
-      ($4::uuid IS NOT NULL AND emb.profile_id = $4::uuid)
-      OR ($4::uuid IS NULL AND emb.profile_id IS NULL)
-  )
-ORDER BY emb.embedding <=> $1::text::vector
+SELECT id, workspace_id, squad_id, kind, title, body, tags, status, source_issue_id, source_leg, source_kind, created_by, published_by, published_at, usage_count, created_at, updated_at, embedding_profile_id, embedding_model, embedding_dims, embedding_chunk_index, embedding_chunk_text, embedding_heading, embedding_chunks, score FROM (
+    SELECT DISTINCT ON (e.id)
+           e.id, e.workspace_id, e.squad_id, e.kind, e.title, e.body, e.tags, e.status, e.source_issue_id, e.source_leg, e.source_kind, e.created_by, e.published_by, e.published_at, e.usage_count, e.created_at, e.updated_at,
+           emb.profile_id AS embedding_profile_id,
+           emb.model AS embedding_model,
+           emb.dims AS embedding_dims,
+           emb.chunk_index AS embedding_chunk_index,
+           emb.chunk_text AS embedding_chunk_text,
+           emb.heading AS embedding_heading,
+           COALESCE((SELECT count(*) FROM knowledge_embedding k WHERE k.entry_id = e.id), 0)::int AS embedding_chunks,
+           (1 - (emb.embedding <=> $1::text::vector))::float8 AS score
+    FROM knowledge_entry e
+    JOIN knowledge_embedding emb ON emb.entry_id = e.id
+    WHERE e.workspace_id = $2
+      AND e.status = 'published'
+      AND emb.dims = $3::int
+      AND (
+          ($4::uuid IS NOT NULL AND emb.profile_id = $4::uuid)
+          OR ($4::uuid IS NULL AND emb.profile_id IS NULL)
+      )
+    ORDER BY e.id, emb.embedding <=> $1::text::vector
+) best
+ORDER BY best.score DESC
 LIMIT $5
 `
 
@@ -761,27 +795,31 @@ type SearchKnowledgeByVectorParams struct {
 }
 
 type SearchKnowledgeByVectorRow struct {
-	ID                 pgtype.UUID        `json:"id"`
-	WorkspaceID        pgtype.UUID        `json:"workspace_id"`
-	SquadID            pgtype.UUID        `json:"squad_id"`
-	Kind               string             `json:"kind"`
-	Title              string             `json:"title"`
-	Body               string             `json:"body"`
-	Tags               []byte             `json:"tags"`
-	Status             string             `json:"status"`
-	SourceIssueID      pgtype.UUID        `json:"source_issue_id"`
-	SourceLeg          pgtype.Int4        `json:"source_leg"`
-	SourceKind         string             `json:"source_kind"`
-	CreatedBy          pgtype.UUID        `json:"created_by"`
-	PublishedBy        pgtype.UUID        `json:"published_by"`
-	PublishedAt        pgtype.Timestamptz `json:"published_at"`
-	UsageCount         int32              `json:"usage_count"`
-	CreatedAt          pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt          pgtype.Timestamptz `json:"updated_at"`
-	EmbeddingProfileID pgtype.UUID        `json:"embedding_profile_id"`
-	EmbeddingModel     string             `json:"embedding_model"`
-	EmbeddingDims      int32              `json:"embedding_dims"`
-	Score              float64            `json:"score"`
+	ID                  pgtype.UUID        `json:"id"`
+	WorkspaceID         pgtype.UUID        `json:"workspace_id"`
+	SquadID             pgtype.UUID        `json:"squad_id"`
+	Kind                string             `json:"kind"`
+	Title               string             `json:"title"`
+	Body                string             `json:"body"`
+	Tags                []byte             `json:"tags"`
+	Status              string             `json:"status"`
+	SourceIssueID       pgtype.UUID        `json:"source_issue_id"`
+	SourceLeg           pgtype.Int4        `json:"source_leg"`
+	SourceKind          string             `json:"source_kind"`
+	CreatedBy           pgtype.UUID        `json:"created_by"`
+	PublishedBy         pgtype.UUID        `json:"published_by"`
+	PublishedAt         pgtype.Timestamptz `json:"published_at"`
+	UsageCount          int32              `json:"usage_count"`
+	CreatedAt           pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt           pgtype.Timestamptz `json:"updated_at"`
+	EmbeddingProfileID  pgtype.UUID        `json:"embedding_profile_id"`
+	EmbeddingModel      string             `json:"embedding_model"`
+	EmbeddingDims       int32              `json:"embedding_dims"`
+	EmbeddingChunkIndex int32              `json:"embedding_chunk_index"`
+	EmbeddingChunkText  string             `json:"embedding_chunk_text"`
+	EmbeddingHeading    string             `json:"embedding_heading"`
+	EmbeddingChunks     int32              `json:"embedding_chunks"`
+	Score               float64            `json:"score"`
 }
 
 // One corpus only: the query embedding and every candidate vector were
@@ -824,6 +862,10 @@ func (q *Queries) SearchKnowledgeByVector(ctx context.Context, arg SearchKnowled
 			&i.EmbeddingProfileID,
 			&i.EmbeddingModel,
 			&i.EmbeddingDims,
+			&i.EmbeddingChunkIndex,
+			&i.EmbeddingChunkText,
+			&i.EmbeddingHeading,
+			&i.EmbeddingChunks,
 			&i.Score,
 		); err != nil {
 			return nil, err
@@ -884,19 +926,29 @@ func (q *Queries) SetKnowledgeEntryStatus(ctx context.Context, arg SetKnowledgeE
 }
 
 const upsertKnowledgeEmbedding = `-- name: UpsertKnowledgeEmbedding :exec
-INSERT INTO knowledge_embedding (entry_id, profile_id, model, dims, embedding, content_hash)
+INSERT INTO knowledge_embedding (
+    entry_id, chunk_index, profile_id, model, dims,
+    chunk_text, heading, strategy, embedding, content_hash
+)
 VALUES (
     $1,
     $2,
     $3,
     $4,
-    $5::text::vector,
-    $6
+    $5,
+    $6,
+    $7,
+    $8,
+    $9::text::vector,
+    $10
 )
-ON CONFLICT (entry_id) DO UPDATE
+ON CONFLICT (entry_id, chunk_index) DO UPDATE
 SET profile_id = EXCLUDED.profile_id,
     model = EXCLUDED.model,
     dims = EXCLUDED.dims,
+    chunk_text = EXCLUDED.chunk_text,
+    heading = EXCLUDED.heading,
+    strategy = EXCLUDED.strategy,
     embedding = EXCLUDED.embedding,
     content_hash = EXCLUDED.content_hash,
     updated_at = now()
@@ -904,9 +956,13 @@ SET profile_id = EXCLUDED.profile_id,
 
 type UpsertKnowledgeEmbeddingParams struct {
 	EntryID     pgtype.UUID `json:"entry_id"`
+	ChunkIndex  int32       `json:"chunk_index"`
 	ProfileID   pgtype.UUID `json:"profile_id"`
 	Model       string      `json:"model"`
 	Dims        int32       `json:"dims"`
+	ChunkText   string      `json:"chunk_text"`
+	Heading     string      `json:"heading"`
+	Strategy    string      `json:"strategy"`
 	Embedding   string      `json:"embedding"`
 	ContentHash string      `json:"content_hash"`
 }
@@ -914,9 +970,13 @@ type UpsertKnowledgeEmbeddingParams struct {
 func (q *Queries) UpsertKnowledgeEmbedding(ctx context.Context, arg UpsertKnowledgeEmbeddingParams) error {
 	_, err := q.db.Exec(ctx, upsertKnowledgeEmbedding,
 		arg.EntryID,
+		arg.ChunkIndex,
 		arg.ProfileID,
 		arg.Model,
 		arg.Dims,
+		arg.ChunkText,
+		arg.Heading,
+		arg.Strategy,
 		arg.Embedding,
 		arg.ContentHash,
 	)

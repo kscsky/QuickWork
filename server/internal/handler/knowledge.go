@@ -43,6 +43,10 @@ type KnowledgeEntryResponse struct {
 	EmbeddingProfileID *string         `json:"embedding_profile_id"`
 	EmbeddingModel     string          `json:"embedding_model"`
 	EmbeddingDims      *int32          `json:"embedding_dims"`
+	EmbeddingChunks    int32           `json:"embedding_chunks"`
+	MatchedChunkIndex  *int32          `json:"matched_chunk_index"`
+	MatchedChunkText   string          `json:"matched_chunk_text"`
+	MatchedHeading     string          `json:"matched_heading"`
 }
 
 func knowledgeEntryToResponse(row db.KnowledgeEntry) KnowledgeEntryResponse {
@@ -73,11 +77,18 @@ func knowledgeEntryToResponse(row db.KnowledgeEntry) KnowledgeEntryResponse {
 
 func knowledgeEntryRecordToResponse(record service.KnowledgeEntryRecord) KnowledgeEntryResponse {
 	resp := knowledgeEntryToResponse(record.Entry)
+	resp.EmbeddingChunks = record.Chunks
 	if record.Stamp != nil {
 		resp.EmbeddingProfileID = uuidToPtr(record.Stamp.ProfileID)
 		resp.EmbeddingModel = record.Stamp.Model
 		dims := record.Stamp.Dims
 		resp.EmbeddingDims = &dims
+	}
+	if record.Matched != nil {
+		index := record.Matched.Index
+		resp.MatchedChunkIndex = &index
+		resp.MatchedChunkText = record.Matched.Text
+		resp.MatchedHeading = record.Matched.Heading
 	}
 	return resp
 }
@@ -315,6 +326,7 @@ type depositKnowledgeRequest struct {
 	Keys      []string `json:"keys"`
 	Publish   bool     `json:"publish"`
 	ProfileID string   `json:"profile_id"`
+	Strategy  string   `json:"strategy"`
 }
 
 func (h *Handler) DepositIssueKnowledge(w http.ResponseWriter, r *http.Request) {
@@ -354,7 +366,12 @@ func (h *Handler) DepositIssueKnowledge(w http.ResponseWriter, r *http.Request) 
 		}
 		profileID = parsed
 	}
-	entries, err := h.Knowledge.DepositTaskKnowledge(r.Context(), issue, actorID, req.Keys, req.Publish, profileID)
+	strategy := strings.TrimSpace(req.Strategy)
+	if strategy != "" && strategy != knowledge.StrategyAuto && strategy != knowledge.StrategyEntry && strategy != knowledge.StrategyParent {
+		writeError(w, http.StatusBadRequest, "strategy must be auto, entry or parent")
+		return
+	}
+	entries, err := h.Knowledge.DepositTaskKnowledge(r.Context(), issue, actorID, req.Keys, req.Publish, profileID, strategy)
 	if err != nil {
 		switch {
 		case errors.Is(err, service.ErrKnowledgeNoChain):

@@ -924,7 +924,7 @@ func (s *TaskService) ResumeParkedChain(ctx context.Context, q *db.Queries, squa
 				"issue_id", util.UUIDToString(step.IssueID), "error", err)
 			continue
 		}
-		if _, err := s.EnqueueTaskForMention(ctx, issue, agentID, pgtype.UUID{}); err != nil {
+		if _, err := s.enqueueChainAgentTask(ctx, issue, agentID, step); err != nil {
 			slog.Warn("resumed chain step could not be dispatched",
 				"issue_id", util.UUIDToString(step.IssueID), "error", err)
 			continue
@@ -1151,7 +1151,7 @@ func (s *TaskService) ReassignChainStep(
 				}
 				updated = started
 				nextState = ChainStateDoing
-				if _, err := s.EnqueueTaskForMention(ctx, issue, agent, pgtype.UUID{}); err != nil {
+				if _, err := s.enqueueChainAgentTask(ctx, issue, agent, *target); err != nil {
 					slog.Warn("reassigned chain step could not be dispatched",
 						"issue_id", util.UUIDToString(issue.ID), "error", err)
 				}
@@ -1688,6 +1688,17 @@ func (s *TaskService) advanceIssueChain(ctx context.Context, task db.AgentTaskQu
 	s.dispatchChainStep(ctx, issue, *next)
 }
 
+// enqueueChainAgentTask starts a leg's agent with the cited knowledge block in
+// its opening context. The note is advisory; when no memory matches, dispatch
+// behaves exactly as before.
+func (s *TaskService) enqueueChainAgentTask(ctx context.Context, issue db.Issue, agentID pgtype.UUID, step db.IssueChainStep) (db.AgentTaskQueue, error) {
+	note := s.knowledgeNoteForTask(ctx, issue, step.Title+"\n"+step.Plan)
+	if note != "" {
+		return s.EnqueueTaskForMentionWithNote(ctx, issue, agentID, pgtype.UUID{}, note)
+	}
+	return s.EnqueueTaskForMention(ctx, issue, agentID, pgtype.UUID{})
+}
+
 // dispatchChainStep carries out where the relay just landed: start the next
 // step's agent so the chain keeps moving without anyone asking, or park and
 // say so in the squad's room. Shared by every path that moves a chain.
@@ -1695,7 +1706,7 @@ func (s *TaskService) dispatchChainStep(ctx context.Context, issue db.Issue, nex
 	s.publishChainChanged(issue)
 
 	if next.State == ChainStateDoing {
-		if _, err := s.EnqueueTaskForMention(ctx, issue, next.AgentID, pgtype.UUID{}); err != nil {
+		if _, err := s.enqueueChainAgentTask(ctx, issue, next.AgentID, next); err != nil {
 			// The chain has already moved; a dispatch that failed leaves the
 			// step marked doing with nothing running, which the room shows.
 			slog.Warn("chain hand-off could not be dispatched",

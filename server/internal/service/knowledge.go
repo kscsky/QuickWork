@@ -87,9 +87,19 @@ type KnowledgeEntryStamp struct {
 	Dims      int32
 }
 
+// KnowledgeMatch is the child chunk that ranked best for this entry. Search
+// returns the parent entry; the match is the provenance snippet.
+type KnowledgeMatch struct {
+	Index   int32
+	Text    string
+	Heading string
+}
+
 type KnowledgeEntryRecord struct {
-	Entry db.KnowledgeEntry
-	Stamp *KnowledgeEntryStamp
+	Entry   db.KnowledgeEntry
+	Stamp   *KnowledgeEntryStamp
+	Chunks  int32
+	Matched *KnowledgeMatch
 }
 
 type KnowledgeHit struct {
@@ -527,6 +537,7 @@ func (s *KnowledgeService) DepositTaskKnowledge(
 	keys []string,
 	publish bool,
 	profileID pgtype.UUID,
+	strategy string,
 ) ([]KnowledgeEntryRecord, error) {
 	preview, err := s.ComposeTaskKnowledge(ctx, issue)
 	if err != nil {
@@ -577,12 +588,13 @@ func (s *KnowledgeService) DepositTaskKnowledge(
 		}
 		record := KnowledgeEntryRecord{Entry: row}
 		if publish && resolved != nil {
-			if s.embedEntryBestEffort(ctx, row, resolved) {
+			if chunks, ok := s.indexEntryBestEffort(ctx, row, resolved, strategy); ok {
 				record.Stamp = &KnowledgeEntryStamp{
 					ProfileID: resolved.ProfileID,
 					Model:     resolved.Model,
 					Dims:      int32(resolved.Dims),
 				}
+				record.Chunks = chunks
 			}
 		}
 		created = append(created, record)
@@ -636,17 +648,18 @@ func (s *KnowledgeService) List(
 				CreatedAt:     row.CreatedAt,
 				UpdatedAt:     row.UpdatedAt,
 			},
-			Stamp: stampFromRow(row.EmbeddingProfileID, row.EmbeddingModel, row.EmbeddingDims),
+			Stamp:  stampFromValues(row.EmbeddingProfileID, row.EmbeddingModel, row.EmbeddingDims),
+			Chunks: row.EmbeddingChunks,
 		})
 	}
 	return out, nil
 }
 
-func stampFromRow(profileID pgtype.UUID, model pgtype.Text, dims pgtype.Int4) *KnowledgeEntryStamp {
-	if !dims.Valid {
+func stampFromValues(profileID pgtype.UUID, model string, dims int32) *KnowledgeEntryStamp {
+	if dims == 0 && !profileID.Valid {
 		return nil
 	}
-	return &KnowledgeEntryStamp{ProfileID: profileID, Model: model.String, Dims: dims.Int32}
+	return &KnowledgeEntryStamp{ProfileID: profileID, Model: model, Dims: dims}
 }
 
 // Stats returns counts keyed as "<kind>:<status>", for the page's corpus card.
@@ -678,7 +691,7 @@ func (s *KnowledgeService) Publish(ctx context.Context, wsID, id, actorID pgtype
 		return db.KnowledgeEntry{}, err
 	}
 	if _, resolved, err := s.embeddingTarget(ctx, wsID, pgtype.UUID{}); err == nil && resolved != nil {
-		s.embedEntryBestEffort(ctx, row, resolved)
+		s.indexEntryBestEffort(ctx, row, resolved, knowledge.StrategyAuto)
 	}
 	return row, nil
 }
@@ -762,6 +775,12 @@ func (s *KnowledgeService) Search(
 								Model:     row.EmbeddingModel,
 								Dims:      row.EmbeddingDims,
 							},
+							Chunks: row.EmbeddingChunks,
+							Matched: &KnowledgeMatch{
+								Index:   row.EmbeddingChunkIndex,
+								Text:    row.EmbeddingChunkText,
+								Heading: row.EmbeddingHeading,
+							},
 						},
 						Score: row.Score,
 					})
@@ -790,8 +809,9 @@ func (s *KnowledgeService) Search(
 	for _, row := range rows {
 		hits = append(hits, KnowledgeHit{
 			Entry: KnowledgeEntryRecord{
-				Entry: keywordRowToEntry(row),
-				Stamp: stampFromRow(row.EmbeddingProfileID, row.EmbeddingModel, row.EmbeddingDims),
+				Entry:  keywordRowToEntry(row),
+				Stamp:  stampFromValues(row.EmbeddingProfileID, row.EmbeddingModel, row.EmbeddingDims),
+				Chunks: row.EmbeddingChunks,
 			},
 			Score: row.Score,
 		})
@@ -824,49 +844,80 @@ func (s *KnowledgeService) ReembedMissing(
 	}
 	embedded := 0
 	for _, entry := range rows {
-		if s.embedEntryBestEffort(ctx, entry, resolved) {
+		if _, ok := s.indexEntryBestEffort(ctx, entry, resolved, knowledge.StrategyAuto); ok {
 			embedded++
 		}
 	}
 	return embedded, nil
 }
 
-func (s *KnowledgeService) embedEntryBestEffort(
+// indexEntryBestEffort chunks an entry, embeds every chunk in one provider
+// call, then replaces the entry's rows. The old rows are only deleted after
+// every vector came back, so a failed run leaves the previous index intact.
+func (s *KnowledgeService) indexEntryBestEffort(
 	ctx context.Context,
 	entry db.KnowledgeEntry,
 	resolved *ResolvedEmbedding,
-) bool {
+	strategy string,
+) (int32, bool) {
 	if resolved == nil || resolved.Embedder == nil {
-		return false
+		return 0, false
 	}
-	embedCtx, cancel := context.WithTimeout(ctx, 20*time.Second)
+	chunks := knowledge.SplitEntry(entry.Kind, entry.Body, strategy)
+	texts := make([]string, len(chunks))
+	for i, chunk := range chunks {
+		texts[i] = knowledge.ChunkEmbeddingText(entry.Title, chunk.Heading, chunk.Text)
+	}
+	embedCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
-	vectors, err := resolved.Embedder.Embed(embedCtx, []string{entry.Title + "\n\n" + entry.Body})
-	if err != nil || len(vectors) != 1 || len(vectors[0]) != resolved.Dims {
+	vectors, err := resolved.Embedder.Embed(embedCtx, texts)
+	if err != nil || len(vectors) != len(chunks) {
 		slog.Warn("knowledge entry could not be embedded",
-			"entry_id", util.UUIDToString(entry.ID), "error", err)
-		return false
+			"entry_id", util.UUIDToString(entry.ID), "chunks", len(chunks), "error", err)
+		return 0, false
 	}
-	literal, err := vectorLiteral(vectors[0])
-	if err != nil {
-		slog.Warn("knowledge embedding could not be encoded",
-			"entry_id", util.UUIDToString(entry.ID), "error", err)
-		return false
+	for _, vector := range vectors {
+		if len(vector) != resolved.Dims {
+			slog.Warn("knowledge chunk returned the wrong width",
+				"entry_id", util.UUIDToString(entry.ID), "dims", len(vector), "want", resolved.Dims)
+			return 0, false
+		}
 	}
-	hash := sha256.Sum256([]byte(fmt.Sprintf("%s\n%d\n%s\n%s", resolved.Model, resolved.Dims, entry.Title, entry.Body)))
-	if err := s.Queries.UpsertKnowledgeEmbedding(ctx, db.UpsertKnowledgeEmbeddingParams{
-		EntryID:     entry.ID,
-		ProfileID:   resolved.ProfileID,
-		Model:       resolved.Model,
-		Dims:        int32(resolved.Dims),
-		Embedding:   literal,
-		ContentHash: hex.EncodeToString(hash[:]),
-	}); err != nil {
-		slog.Warn("knowledge embedding could not be stored",
+	if err := s.Queries.DeleteKnowledgeEmbeddingsForEntry(ctx, entry.ID); err != nil {
+		slog.Warn("old knowledge chunks could not be replaced",
 			"entry_id", util.UUIDToString(entry.ID), "error", err)
-		return false
+		return 0, false
 	}
-	return true
+	normalized := knowledge.NormalizeStrategy(strategy)
+	for i, chunk := range chunks {
+		literal, err := vectorLiteral(vectors[i])
+		if err != nil {
+			slog.Warn("knowledge embedding could not be encoded",
+				"entry_id", util.UUIDToString(entry.ID), "error", err)
+			return 0, false
+		}
+		hash := sha256.Sum256([]byte(fmt.Sprintf(
+			"%s\n%d\n%s\n%s\n%s",
+			resolved.Model, resolved.Dims, entry.Title, chunk.Heading, chunk.Text,
+		)))
+		if err := s.Queries.UpsertKnowledgeEmbedding(ctx, db.UpsertKnowledgeEmbeddingParams{
+			EntryID:     entry.ID,
+			ChunkIndex:  int32(i),
+			ProfileID:   resolved.ProfileID,
+			Model:       resolved.Model,
+			Dims:        int32(resolved.Dims),
+			ChunkText:   chunk.Text,
+			Heading:     chunk.Heading,
+			Strategy:    normalized,
+			Embedding:   literal,
+			ContentHash: hex.EncodeToString(hash[:]),
+		}); err != nil {
+			slog.Warn("knowledge embedding could not be stored",
+				"entry_id", util.UUIDToString(entry.ID), "chunk", i, "error", err)
+			return 0, false
+		}
+	}
+	return int32(len(chunks)), true
 }
 
 func vectorRowToEntry(row db.SearchKnowledgeByVectorRow) db.KnowledgeEntry {

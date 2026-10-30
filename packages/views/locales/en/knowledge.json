@@ -130,5 +130,17 @@
   "completion_decide": "NEXT / DECIDE",
   "completion_deposit": "Save to knowledge",
   "completion_dismiss": "Not this time",
-  "completion_deposited": "Saved · open knowledge base"
+  "completion_deposited": "Saved · open knowledge base",
+  "strategy_title": "Indexing",
+  "strategy_auto": "Auto · recommended",
+  "strategy_entry": "Whole entry",
+  "strategy_parent": "Parent-child",
+  "strategy_auto_hint": "FAQs whole; summaries split by section.",
+  "strategy_entry_hint": "One vector per entry; fastest and cheapest.",
+  "strategy_parent_hint": "Small chunks retrieve; the whole entry is returned.",
+  "strategy_note": "Chunking changes index granularity only; the corpus and embedding model stay the same.",
+  "chunk_badge": "Parent-child · {{count}} chunks",
+  "whole_badge": "Whole entry",
+  "matched_chunk": "Matched chunk",
+  "backfill_parent": "Backfill parent: open the full memory →"
 }

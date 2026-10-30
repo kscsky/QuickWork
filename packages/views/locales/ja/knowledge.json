@@ -130,5 +130,17 @@
   "completion_decide": "次へ / DECIDE",
   "completion_deposit": "ナレッジに保存",
   "completion_dismiss": "今回は保存しない",
-  "completion_deposited": "保存済み · ナレッジを開く"
+  "completion_deposited": "保存済み · ナレッジを開く",
+  "strategy_title": "インデックス方式",
+  "strategy_auto": "自動 · 推奨",
+  "strategy_entry": "全体",
+  "strategy_parent": "親子",
+  "strategy_auto_hint": "FAQ は全体、要約は節ごとに分割。",
+  "strategy_entry_hint": "1 記憶 1 ベクトル。最速・最安。",
+  "strategy_parent_hint": "小さな塊で検索し、全体を返します。",
+  "strategy_note": "分割は索引の粒度だけを変え、コーパスとモデルは変えません。",
+  "chunk_badge": "親子 · {{count}} 塊",
+  "whole_badge": "全体",
+  "matched_chunk": "一致した子塊",
+  "backfill_parent": "親を展開：記憶全体を開く →"
 }

@@ -214,7 +214,7 @@ func TestKnowledgeVectorSearchRanksByEmbedding(t *testing.T) {
 		t.Fatal(err)
 	}
 	svc := service.NewKnowledgeService(testHandler.Queries, fakeEmbedder{})
-	created, err := svc.DepositTaskKnowledge(context.Background(), issue, actorUUID, []string{"faq-0", "faq-1"}, true, pgtype.UUID{})
+	created, err := svc.DepositTaskKnowledge(context.Background(), issue, actorUUID, []string{"faq-0", "faq-1"}, true, pgtype.UUID{}, "auto")
 	if err != nil {
 		t.Fatalf("deposit: %v", err)
 	}
