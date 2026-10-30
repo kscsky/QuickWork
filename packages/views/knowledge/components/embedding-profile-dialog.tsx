@@ -170,12 +170,12 @@ export function EmbeddingProfileDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl">
+      <DialogContent className="sm:max-w-3xl">
         <DialogHeader>
           <DialogTitle className="text-title">
             {t(($) => $.embedding_dialog_title)}
           </DialogTitle>
-          <DialogDescription className="text-caption">
+          <DialogDescription className="text-body">
             {t(($) => $.embedding_dialog_sub)}
           </DialogDescription>
         </DialogHeader>
@@ -184,7 +184,7 @@ export function EmbeddingProfileDialog({
           {canAdminister ? (
             <>
               <section className="flex flex-col gap-2.5">
-                <h4 className="text-caption font-semibold text-foreground">
+                <h4 className="text-body font-semibold text-foreground">
                   {t(($) => $.embedding_provider)}
                 </h4>
                 <div className="grid grid-cols-3 gap-2">
@@ -200,14 +200,14 @@ export function EmbeddingProfileDialog({
                           : "border-surface-border hover:border-brand/40",
                       )}
                     >
-                      <span className="grid size-6 shrink-0 place-items-center rounded bg-foreground text-micro font-semibold text-background">
+                      <span className="grid size-6 shrink-0 place-items-center rounded bg-foreground text-caption font-semibold text-background">
                         {candidate.manual ? "⌁" : candidate.label.slice(0, 1)}
                       </span>
                       <span className="min-w-0">
-                        <span className="block truncate text-caption font-medium text-foreground">
+                        <span className="block truncate text-body font-medium text-foreground">
                           {candidate.label}
                         </span>
-                        <span className="block truncate font-mono text-micro text-muted-foreground">
+                        <span className="block truncate font-mono text-caption text-muted-foreground">
                           {candidate.manual
                             ? t(($) => $.embedding_compatible)
                             : candidate.base_url.replace(/^https?:\/\//, "")}
@@ -219,7 +219,7 @@ export function EmbeddingProfileDialog({
               </section>
 
               <section className="flex flex-col gap-2.5">
-                <h4 className="text-caption font-semibold text-foreground">
+                <h4 className="text-body font-semibold text-foreground">
                   {t(($) => $.embedding_key)}
                 </h4>
                 {provider?.manual ? (
@@ -228,14 +228,14 @@ export function EmbeddingProfileDialog({
                       value={customBaseURL}
                       onChange={(event) => setCustomBaseURL(event.target.value)}
                       placeholder={t(($) => $.embedding_custom_base)}
-                      className="h-9 text-caption"
+                      className="h-10 text-body"
                       aria-label={t(($) => $.embedding_custom_base)}
                     />
                     <Input
                       value={customModel}
                       onChange={(event) => setCustomModel(event.target.value)}
                       placeholder={t(($) => $.embedding_custom_model)}
-                      className="h-9 text-caption"
+                      className="h-10 text-body"
                       aria-label={t(($) => $.embedding_custom_model)}
                     />
                     <Input
@@ -243,7 +243,7 @@ export function EmbeddingProfileDialog({
                       onChange={(event) => setCustomDims(event.target.value.replace(/[^0-9]/g, ""))}
                       inputMode="numeric"
                       placeholder={t(($) => $.embedding_custom_dims)}
-                      className="h-9 text-caption"
+                      className="h-10 text-body"
                       aria-label={t(($) => $.embedding_custom_dims)}
                     />
                   </div>
@@ -255,7 +255,7 @@ export function EmbeddingProfileDialog({
                     onChange={(event) => setApiKey(event.target.value)}
                     placeholder={t(($) => $.embedding_key_placeholder)}
                     autoComplete="off"
-                    className="h-9 flex-1 font-mono text-caption"
+                    className="h-10 flex-1 font-mono text-body"
                     aria-label={t(($) => $.embedding_key)}
                   />
                   <Button
@@ -269,20 +269,20 @@ export function EmbeddingProfileDialog({
                     {match.isPending ? t(($) => $.embedding_matching) : t(($) => $.embedding_match)}
                   </Button>
                 </div>
-                <p className="text-micro leading-relaxed text-muted-foreground">
+                <p className="text-caption leading-relaxed text-muted-foreground">
                   {t(($) => $.embedding_key_hint)}
                 </p>
                 {matched ? (
-                  <p className="text-micro text-done">
+                  <p className="text-caption text-done">
                     {t(($) => $.embedding_matched, { count: matched.models.length })}
                   </p>
                 ) : null}
-                {error ? <p className="text-micro text-destructive">{error}</p> : null}
+                {error ? <p className="text-caption text-destructive">{error}</p> : null}
               </section>
 
               {matched ? (
                 <section className="flex flex-col gap-2.5">
-                  <h4 className="text-caption font-semibold text-foreground">
+                  <h4 className="text-body font-semibold text-foreground">
                     {t(($) => $.embedding_models)}
                   </h4>
                   <div className="flex flex-col gap-2">
@@ -304,10 +304,10 @@ export function EmbeddingProfileDialog({
                               setSelectedDims(model.dims[0] ?? null);
                             }}
                           >
-                            <span className="block truncate font-mono text-caption font-semibold text-foreground">
+                            <span className="block truncate font-mono text-body font-semibold text-foreground">
                               {model.name}
                             </span>
-                            <span className="mt-0.5 block text-micro text-muted-foreground">
+                            <span className="mt-0.5 block text-caption text-muted-foreground">
                               {t(($) => $.embedding_model_hint)}
                             </span>
                           </button>
@@ -321,7 +321,7 @@ export function EmbeddingProfileDialog({
                                   setSelectedDims(dims);
                                 }}
                                 className={cn(
-                                  "h-6 rounded border px-2 font-mono text-micro",
+                                  "h-7 rounded border px-2 font-mono text-caption",
                                   selected && selectedDims === dims
                                     ? "border-foreground bg-foreground text-background"
                                     : "border-surface-border text-muted-foreground",
@@ -332,7 +332,7 @@ export function EmbeddingProfileDialog({
                             ))}
                           </div>
                           {model.recommended ? (
-                            <span className="rounded bg-brand px-1.5 py-0.5 font-mono text-micro text-brand-foreground">
+                            <span className="rounded bg-brand px-1.5 py-0.5 font-mono text-caption text-brand-foreground">
                               {t(($) => $.embedding_recommended)}
                             </span>
                           ) : null}
@@ -340,7 +340,7 @@ export function EmbeddingProfileDialog({
                       );
                     })}
                   </div>
-                  <p className="text-micro leading-relaxed text-muted-foreground">
+                  <p className="text-caption leading-relaxed text-muted-foreground">
                     {t(($) => $.embedding_dimension_hint)}
                   </p>
                 </section>
@@ -349,11 +349,11 @@ export function EmbeddingProfileDialog({
           ) : null}
 
           <section className="flex flex-col gap-2.5">
-            <h4 className="text-caption font-semibold text-foreground">
+            <h4 className="text-body font-semibold text-foreground">
               {t(($) => $.embedding_saved)}
             </h4>
             {profiles.length === 0 ? (
-              <p className="text-micro text-muted-foreground">
+              <p className="text-caption text-muted-foreground">
                 {t(($) => $.embedding_no_profiles)}
               </p>
             ) : (
@@ -366,14 +366,14 @@ export function EmbeddingProfileDialog({
                       profile.is_active ? "border-brand bg-brand/5" : "border-surface-border",
                     )}
                   >
-                    <span className="grid size-5 shrink-0 place-items-center rounded bg-foreground text-micro font-semibold text-background">
+                    <span className="grid size-5 shrink-0 place-items-center rounded bg-foreground text-caption font-semibold text-background">
                       {profile.provider === "openai" ? "O" : profile.provider === "bailian" ? "百" : "⌁"}
                     </span>
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-caption font-medium text-foreground">
+                      <span className="block truncate text-body font-medium text-foreground">
                         {profile.model}
                       </span>
-                      <span className="block font-mono text-micro text-muted-foreground">
+                      <span className="block font-mono text-caption text-muted-foreground">
                         {t(($) => $.embedding_key_line, {
                           dims: profile.dims,
                           hint: profile.key_hint,
@@ -381,7 +381,7 @@ export function EmbeddingProfileDialog({
                       </span>
                     </span>
                     {profile.is_active ? (
-                      <span className="rounded bg-brand px-1.5 py-0.5 font-mono text-micro text-brand-foreground">
+                      <span className="rounded bg-brand px-1.5 py-0.5 font-mono text-caption text-brand-foreground">
                         {t(($) => $.embedding_active)}
                       </span>
                     ) : canAdminister ? (
@@ -389,7 +389,7 @@ export function EmbeddingProfileDialog({
                         type="button"
                         onClick={() => enable(profile)}
                         disabled={activate.isPending}
-                        className="rounded border border-surface-border px-2 py-1 text-micro text-muted-foreground hover:text-foreground"
+                        className="rounded border border-surface-border px-2 py-1 text-caption text-muted-foreground hover:text-foreground"
                       >
                         {t(($) => $.embedding_activate)}
                       </button>
@@ -399,7 +399,7 @@ export function EmbeddingProfileDialog({
                         type="button"
                         onClick={() => removeProfile(profile)}
                         disabled={remove.isPending}
-                        className="rounded border border-surface-border px-2 py-1 text-micro text-muted-foreground hover:text-destructive"
+                        className="rounded border border-surface-border px-2 py-1 text-caption text-muted-foreground hover:text-destructive"
                       >
                         {t(($) => $.embedding_delete)}
                       </button>
@@ -408,7 +408,7 @@ export function EmbeddingProfileDialog({
                 ))}
               </div>
             )}
-            <p className="text-micro leading-relaxed text-muted-foreground">
+            <p className="text-caption leading-relaxed text-muted-foreground">
               {t(($) => $.embedding_saved_hint)}
             </p>
           </section>

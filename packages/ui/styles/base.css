@@ -3707,10 +3707,10 @@ html[lang|="ko"] .qk-create-dialog {
 .kb-kicker {
   margin: 0 0 10px;
   color: var(--brand);
-  font-family: var(--font-mono);
-  font-size: 10px;
-  font-weight: 500;
-  letter-spacing: 0.12em;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
 }
 .kb-title {
@@ -3726,8 +3726,8 @@ html[lang|="ko"] .qk-create-dialog {
   display: block;
   max-width: 820px;
   margin-top: 10px;
-  font-size: 13px;
-  line-height: 1.75;
+  font-size: 14px;
+  line-height: 1.8;
   color: var(--muted-foreground);
 }
 .kb-search {
@@ -3749,7 +3749,7 @@ html[lang|="ko"] .qk-create-dialog {
   outline: none;
   background: none;
   color: var(--foreground);
-  font-size: 14px;
+  font-size: 15px;
 }
 .kb-search .q::placeholder { color: var(--faint-foreground); }
 .kb-search .go {
@@ -3760,7 +3760,7 @@ html[lang|="ko"] .qk-create-dialog {
   border-radius: 5px;
   background: var(--primary);
   color: var(--primary-foreground);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   cursor: pointer;
 }
@@ -3775,26 +3775,26 @@ html[lang|="ko"] .qk-create-dialog {
 .kb-clear:hover { color: var(--foreground); }
 .kb-mode {
   margin: 0 0 18px;
-  color: var(--faint-foreground);
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.04em;
+  color: var(--muted-foreground);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  letter-spacing: 0.02em;
 }
 .kb-body { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 28px; align-items: start; }
 .kb-list-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 10px; }
 .kb-list-head span {
-  color: var(--faint-foreground);
-  font-family: var(--font-mono);
-  font-size: 10px;
-  font-weight: 500;
-  letter-spacing: 0.1em;
+  color: var(--muted-foreground);
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 .kb-list-head em {
   margin-left: auto;
-  color: var(--faint-foreground);
-  font-family: var(--font-mono);
-  font-size: 10px;
+  color: var(--muted-foreground);
+  font-family: var(--font-sans);
+  font-size: 11px;
   font-style: normal;
   font-weight: 500;
 }
@@ -3803,8 +3803,8 @@ html[lang|="ko"] .qk-create-dialog {
   border: 0;
   background: none;
   padding: 0;
-  color: var(--faint-foreground);
-  font-size: 11.5px;
+  color: var(--muted-foreground);
+  font-size: 13px;
   font-weight: 500;
   cursor: pointer;
 }
@@ -3812,9 +3812,9 @@ html[lang|="ko"] .qk-create-dialog {
 .kb-filter.on { color: var(--foreground); font-weight: 650; }
 .kb-filter em {
   margin-left: 5px;
-  color: var(--faint-foreground);
+  color: var(--muted-foreground);
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 11px;
   font-style: normal;
   font-weight: 500;
 }
@@ -3827,14 +3827,14 @@ html[lang|="ko"] .qk-create-dialog {
 }
 .kb-result-head { display: flex; align-items: center; gap: 8px; }
 .kb-tag {
-  padding: 2px 6px;
+  padding: 2px 7px;
   border: 1px solid var(--border);
   border-radius: 3px;
-  color: var(--faint-foreground);
-  font-family: var(--font-mono);
-  font-size: 9px;
+  color: var(--muted-foreground);
+  font-family: var(--font-sans);
+  font-size: 11px;
   font-weight: 500;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.02em;
 }
 .kb-tag.faq {
   color: var(--brand);
@@ -3844,9 +3844,9 @@ html[lang|="ko"] .qk-create-dialog {
 .kb-score {
   margin-left: auto;
   color: var(--brand);
-  font-family: var(--font-mono);
-  font-size: 9px;
-  font-weight: 500;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 600;
 }
 .kb-actions { margin-left: auto; display: flex; gap: 5px; }
 .kb-action {
@@ -3855,7 +3855,7 @@ html[lang|="ko"] .qk-create-dialog {
   background: none;
   padding: 3px 8px;
   color: var(--muted-foreground);
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 500;
   cursor: pointer;
 }
@@ -3863,15 +3863,15 @@ html[lang|="ko"] .qk-create-dialog {
 .kb-q {
   margin: 9px 0 0;
   color: var(--foreground);
-  font-size: 14.5px;
+  font-size: 15px;
   font-weight: 600;
-  line-height: 1.5;
+  line-height: 1.55;
 }
 .kb-a {
   margin: 6px 0 0;
   color: var(--muted-foreground);
-  font-size: 12px;
-  line-height: 1.75;
+  font-size: 13px;
+  line-height: 1.8;
 }
 .kb-meta {
   display: flex;
@@ -3879,9 +3879,9 @@ html[lang|="ko"] .qk-create-dialog {
   align-items: center;
   gap: 8px;
   margin-top: 10px;
-  color: var(--faint-foreground);
-  font-family: var(--font-mono);
-  font-size: 9px;
+  color: var(--muted-foreground);
+  font-family: var(--font-sans);
+  font-size: 11px;
   font-weight: 500;
 }
 .kb-meta a { color: var(--brand); text-decoration: none; }
@@ -3892,8 +3892,8 @@ html[lang|="ko"] .qk-create-dialog {
   align-items: center;
   gap: 8px;
   margin: 26px 0 0;
-  color: var(--faint-foreground);
-  font-size: 12px;
+  color: var(--muted-foreground);
+  font-size: 13px;
   line-height: 1.8;
 }
 .kb-side { display: flex; flex-direction: column; gap: 12px; }
@@ -3905,36 +3905,36 @@ html[lang|="ko"] .qk-create-dialog {
 }
 .kb-label {
   margin-bottom: 12px;
-  color: var(--faint-foreground);
-  font-family: var(--font-mono);
-  font-size: 9px;
-  font-weight: 500;
-  letter-spacing: 0.16em;
+  color: var(--muted-foreground);
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
 }
 .kb-stat {
   display: flex;
   align-items: baseline;
   gap: 8px;
-  padding: 6px 0;
+  padding: 7px 0;
   border-top: 1px dashed var(--border);
   color: var(--muted-foreground);
-  font-size: 11px;
+  font-size: 13px;
 }
 .kb-stat:first-of-type { border-top: 0; }
-.kb-stat b { margin-left: auto; color: var(--foreground); font-family: var(--font-mono); font-size: 13px; font-weight: 600; }
+.kb-stat b { margin-left: auto; color: var(--foreground); font-family: var(--font-mono); font-size: 14px; font-weight: 600; }
 .kb-rule {
   display: flex;
   gap: 9px;
-  padding: 8px 0;
+  padding: 9px 0;
   border-top: 1px dashed var(--border);
   color: var(--muted-foreground);
-  font-size: 10.5px;
-  line-height: 1.6;
+  font-size: 12px;
+  line-height: 1.7;
 }
 .kb-rule:first-of-type { border-top: 0; }
-.kb-rule .n { flex: none; padding-top: 2px; color: var(--brand); font-family: var(--font-mono); font-size: 9px; font-weight: 500; }
-.kb-index { display: flex; align-items: center; gap: 8px; color: var(--muted-foreground); font-family: var(--font-mono); font-size: 10px; font-weight: 500; }
+.kb-rule .n { flex: none; padding-top: 2px; color: var(--brand); font-family: var(--font-mono); font-size: 10px; font-weight: 500; }
+.kb-index { display: flex; align-items: center; gap: 8px; color: var(--muted-foreground); font-family: var(--font-sans); font-size: 12px; font-weight: 500; }
 .kb-index i { width: 6px; height: 6px; flex: none; border-radius: 50%; background: var(--done); }
 .kb-index i.off { background: var(--faint-foreground); }
 .kb-rebuild {
@@ -3942,14 +3942,14 @@ html[lang|="ko"] .qk-create-dialog {
   border: 1px solid var(--border);
   border-radius: 4px;
   background: none;
-  padding: 4px 8px;
+  padding: 4px 9px;
   color: var(--muted-foreground);
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 500;
   cursor: pointer;
 }
 .kb-rebuild:hover { color: var(--foreground); border-color: var(--faint-foreground); }
-.kb-note { color: var(--faint-foreground); font-size: 10.5px; line-height: 1.7; padding: 0 2px; }
+.kb-note { color: var(--muted-foreground); font-size: 12px; line-height: 1.7; padding: 0 2px; }
 
 /* ---------- knowledge corpora: one dimension per entry ---------- */
 .kb-mode-line {
@@ -3958,21 +3958,23 @@ html[lang|="ko"] .qk-create-dialog {
   align-items: center;
   gap: 8px;
   margin: -6px 0 16px;
-  color: var(--faint-foreground);
-  font-family: var(--font-mono);
-  font-size: 10px;
+  color: var(--muted-foreground);
+  font-family: var(--font-sans);
+  font-size: 12px;
   font-weight: 500;
 }
 .kb-mode-line .tag {
-  padding: 2px 6px;
+  padding: 2px 7px;
   border: 1px solid color-mix(in oklab, var(--brand) 30%, var(--border));
   border-radius: 3px;
   background: color-mix(in oklab, var(--brand) 7%, transparent);
   color: var(--brand);
+  font-family: var(--font-mono);
+  font-size: 10px;
   letter-spacing: .08em;
 }
-.kb-mode-line em { margin-left: auto; font-style: normal; }
-.kb-mode-line b { color: var(--muted-foreground); font-weight: 650; }
+.kb-mode-line em { margin-left: auto; font-style: normal; font-size: 11px; }
+.kb-mode-line b { color: var(--foreground); font-weight: 650; }
 .kb-tag.dim { color: var(--muted-foreground); border-color: var(--border); background: var(--muted); }
 .kb-em-top { display: flex; align-items: center; gap: 9px; }
 .kb-em-mark {
@@ -3993,7 +3995,7 @@ html[lang|="ko"] .qk-create-dialog {
   display: block;
   overflow: hidden;
   color: var(--foreground);
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -4001,9 +4003,9 @@ html[lang|="ko"] .qk-create-dialog {
 .kb-em-name em {
   display: block;
   margin-top: 2px;
-  color: var(--faint-foreground);
-  font-family: var(--font-mono);
-  font-size: 10px;
+  color: var(--muted-foreground);
+  font-family: var(--font-sans);
+  font-size: 11px;
   font-style: normal;
 }
 .kb-em-dot { width: 6px; height: 6px; flex: none; border-radius: 50%; background: var(--done); }
@@ -4014,23 +4016,23 @@ html[lang|="ko"] .qk-create-dialog {
   margin-top: 11px;
   padding-top: 10px;
   border-top: 1px dashed var(--border);
-  color: var(--faint-foreground);
-  font-family: var(--font-mono);
-  font-size: 10px;
+  color: var(--muted-foreground);
+  font-family: var(--font-sans);
+  font-size: 11px;
   font-weight: 500;
 }
-.kb-em-key code { color: var(--muted-foreground); font-family: var(--font-mono); font-size: 10px; }
+.kb-em-key code { color: var(--muted-foreground); font-family: var(--font-mono); font-size: 11px; }
 .kb-em-key .ok { margin-left: auto; color: var(--done); }
 .kb-em-cover { margin-top: 10px; }
 .kb-em-cover .row {
   display: flex;
   align-items: baseline;
-  color: var(--faint-foreground);
-  font-family: var(--font-mono);
-  font-size: 10px;
+  color: var(--muted-foreground);
+  font-family: var(--font-sans);
+  font-size: 11px;
   font-weight: 500;
 }
-.kb-em-cover .row b { margin-left: auto; color: var(--muted-foreground); font-family: var(--font-mono); font-size: 11px; font-weight: 600; }
+.kb-em-cover .row b { margin-left: auto; color: var(--foreground); font-family: var(--font-mono); font-size: 12px; font-weight: 600; }
 .kb-em-cover .bar { display: block; height: 3px; margin-top: 6px; overflow: hidden; border-radius: 99px; background: var(--border); }
 .kb-em-cover .bar i { display: block; height: 100%; background: var(--brand); }
 .kb-em-actions { display: flex; gap: 6px; margin-top: 11px; }
@@ -4038,21 +4040,21 @@ html[lang|="ko"] .qk-create-dialog {
 .kb-em-actions .kb-rebuild:first-child { margin-right: auto; }
 .kb-em-corpus { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 10px; }
 .kb-em-corpus button {
-  height: 24px;
-  padding: 0 8px;
+  height: 28px;
+  padding: 0 9px;
   border: 1px solid var(--border);
-  border-radius: 3px;
+  border-radius: 4px;
   background: var(--background);
-  color: var(--faint-foreground);
-  font-family: var(--font-mono);
-  font-size: 10px;
+  color: var(--muted-foreground);
+  font-family: var(--font-sans);
+  font-size: 12px;
   font-weight: 500;
   cursor: pointer;
 }
 .kb-em-corpus button.on { border-color: var(--foreground); background: var(--foreground); color: var(--background); }
-.kb-em-corpus button em { margin-left: 3px; font-style: normal; opacity: .7; }
+.kb-em-corpus button em { margin-left: 4px; font-family: var(--font-mono); font-style: normal; opacity: .75; }
 .kb-em-corpus button:disabled { opacity: .45; cursor: default; }
-.kb-corpus-hint { margin-top: 7px; color: var(--faint-foreground); font-size: 10px; line-height: 1.6; }
+.kb-corpus-hint { margin-top: 8px; color: var(--muted-foreground); font-size: 11px; line-height: 1.7; }
 
 @media (max-width: 1100px) {
   .kb-body { grid-template-columns: 1fr; }

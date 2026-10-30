@@ -110,10 +110,10 @@ export function DepositKnowledgeDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="sm:max-w-4xl">
         <DialogHeader>
-          <DialogTitle className="text-body">{t(($) => $.deposit_title)}</DialogTitle>
-          <DialogDescription className="text-caption">
+          <DialogTitle className="text-title">{t(($) => $.deposit_title)}</DialogTitle>
+          <DialogDescription className="text-body">
             {t(($) => $.deposit_sub)}
           </DialogDescription>
         </DialogHeader>
@@ -123,21 +123,21 @@ export function DepositKnowledgeDialog({
             <Loader2 className="size-4 animate-spin" />
           </div>
         ) : isError || !preview ? (
-          <p className="py-6 text-caption text-muted-foreground">
+          <p className="py-6 text-body text-muted-foreground">
             {t(($) => $.deposit_preview_failed)}
           </p>
         ) : (
           <div className="flex max-h-[52vh] flex-col gap-4 overflow-y-auto pr-1">
             <section className="flex flex-col gap-1.5">
               <div className="flex items-center gap-2">
-                <h4 className="text-caption font-semibold text-foreground">
+                <h4 className="text-body font-semibold text-foreground">
                   {t(($) => $.deposit_summary)}
                 </h4>
-                <span className="rounded-full bg-muted px-1.5 text-micro text-muted-foreground">
+                <span className="rounded-full bg-muted px-1.5 text-caption text-muted-foreground">
                   {preview.entries.length > 0 ? preview.entries[0]?.title : ""}
                 </span>
               </div>
-              <pre className="max-h-56 overflow-y-auto whitespace-pre-wrap rounded-lg border border-surface-border bg-muted/30 p-3 font-sans text-caption leading-relaxed text-muted-foreground">
+              <pre className="max-h-60 overflow-y-auto whitespace-pre-wrap rounded-lg border border-surface-border bg-muted/30 p-3 font-sans text-body leading-relaxed text-muted-foreground">
                 {preview.summary}
               </pre>
             </section>
@@ -146,7 +146,9 @@ export function DepositKnowledgeDialog({
               <h4 className="text-caption font-semibold text-foreground">
                 {t(($) => $.deposit_entries)}
               </h4>
-              {preview.entries.map((entry) => {
+              {preview.entries
+                .filter((entry) => entry.key !== "summary")
+                .map((entry) => {
                 const checked = selected.has(entry.key);
                 return (
                   <button
@@ -165,10 +167,10 @@ export function DepositKnowledgeDialog({
                       className="pointer-events-none mt-0.5"
                     />
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-caption font-medium text-foreground">
+                      <span className="block truncate text-body font-medium text-foreground">
                         {entry.title}
                       </span>
-                      <span className="mt-0.5 line-clamp-2 block whitespace-pre-wrap text-micro leading-relaxed text-muted-foreground">
+                      <span className="mt-0.5 line-clamp-2 block whitespace-pre-wrap text-caption leading-relaxed text-muted-foreground">
                         {entry.body}
                       </span>
                     </span>
@@ -179,13 +181,13 @@ export function DepositKnowledgeDialog({
 
             <section className="rounded-lg border border-surface-border bg-muted/20 p-3">
               <div className="flex items-center gap-2">
-                <span className="font-mono text-micro uppercase tracking-wide text-muted-foreground">
+                <span className="font-mono text-caption uppercase tracking-wide text-muted-foreground">
                   {t(($) => $.deposit_embedding)}
                 </span>
                 {canPublish ? (
                   <button
                     type="button"
-                    className="ml-auto text-micro font-medium text-brand hover:underline"
+                    className="ml-auto text-caption font-medium text-brand hover:underline"
                     onClick={() => setProfileDialogOpen(true)}
                   >
                     {t(($) => $.deposit_configure_model)}
@@ -198,7 +200,7 @@ export function DepositKnowledgeDialog({
                     value={selectedProfile.id}
                     onChange={(event) => setProfileId(event.target.value)}
                     aria-label={t(($) => $.deposit_embedding)}
-                    className="mt-2 h-8 w-full rounded-md border border-surface-border bg-background px-2 text-caption text-foreground"
+                    className="mt-2 h-9 w-full rounded-md border border-surface-border bg-background px-2 text-body text-foreground"
                   >
                     {profiles.map((profile) => (
                       <option key={profile.id} value={profile.id}>
@@ -207,7 +209,7 @@ export function DepositKnowledgeDialog({
                       </option>
                     ))}
                   </select>
-                  <p className="mt-2 text-micro leading-relaxed text-muted-foreground">
+                  <p className="mt-2 text-caption leading-relaxed text-muted-foreground">
                     {publish
                       ? t(($) => $.deposit_publish_stamp, {
                           count: selected.size,
@@ -224,7 +226,7 @@ export function DepositKnowledgeDialog({
             </section>
 
             {canPublish ? (
-              <label className="flex w-fit items-center gap-2 text-caption text-muted-foreground">
+              <label className="flex w-fit items-center gap-2 text-body text-muted-foreground">
                 <Checkbox
                   checked={publish}
                   onCheckedChange={(value) => setPublish(value === true)}
